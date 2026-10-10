@@ -1,0 +1,7 @@
+[
+  { "id": "bk_sam_commons", "room_id": "rm_commons", "booked_by": "p_sam", "title": "Checkout sprint review", "start": "2026-10-10T11:00:00-04:00", "end": "2026-10-10T13:00:00-04:00", "attendees_expected": 8, "status": "partially_used", "used_until": "2026-10-10T12:00:00-04:00", "note": "Review wraps by noon. The 12:00-13:00 half of the booking is unused and can be released." },
+  { "id": "bk_marcus_harbor", "room_id": "rm_harbor", "booked_by": "p_marcus", "title": "Platform on-call handoff", "start": "2026-10-10T10:00:00-04:00", "end": "2026-10-10T10:30:00-04:00", "attendees_expected": 5, "status": "confirmed", "used_until": null, "note": null },
+  { "id": "bk_grace_atlas", "room_id": "rm_atlas", "booked_by": "p_grace", "title": "New hire orientation", "start": "2026-10-10T09:00:00-04:00", "end": "2026-10-10T10:30:00-04:00", "attendees_expected": 3, "status": "confirmed", "used_until": null, "note": null },
+  { "id": "bk_raj_studio", "room_id": "rm_studio", "booked_by": "p_raj", "title": "Warehouse migration planning", "start": "2026-10-10T13:00:00-04:00", "end": "2026-10-10T15:00:00-04:00", "attendees_expected": 9, "status": "confirmed", "used_until": null, "note": null },
+  { "id": "bk_hannah_summit", "room_id": "rm_summit", "booked_by": "p_hannah", "title": "Q4 budget check-in", "start": "2026-10-10T15:00:00-04:00", "end": "2026-10-10T16:00:00-04:00", "attendees_expected": 4, "status": "confirmed", "used_until": null, "note": null }
+]
