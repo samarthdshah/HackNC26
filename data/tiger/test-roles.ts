@@ -120,7 +120,7 @@ async function run(role: string, passwordEnv: string, checks: Check[]) {
   await client.end();
 }
 
-const LIVE_IDS = ["req_live_test", "req_live_hr_test"];
+const LIVE_IDS = ["req_live_test", "req_live_stuck", "req_live_hr_test"];
 const INSIGHTS = ["insights_new_hires", "insights_checkout", "insights_bottlenecks", "insights_slowest_handoffs", "insights_hours_saved"];
 const HR_SECRET = "LIVETEST-HR-SECRET";
 
@@ -152,15 +152,27 @@ async function live() {
   await cleanup(); // leftovers from an interrupted run
   const before = await insights();
   try {
+    // Stuck is not resolved: status stuck, no resolved_at, and no Insights view moves. Onboarding, newest, so it would
+    // enter the last-10 new hires if it counted as resolved.
+    const stuck = "req_live_stuck";
+    await emit("request_created", "p_leo", stuck, at(2), { request_id: stuck, task_type: "onboarding", title: "Onboarding (stuck test)" });
+    await emit("hop", "agent", stuck, at(1), { request_id: stuck, seq: 1, from: "p_leo", to: "dept_it", outcome: "forwarded", note: "Waiting on IT." });
+    await emit("request_stuck", "agent", stuck, at(0.5), { request_id: stuck });
+    const st = await one(owner, "SELECT status, resolved_at FROM requests WHERE id = $1", [stuck]);
+    expect("request_stuck: status, resolved_at", st && `${st.status}, ${st.resolved_at}`, "stuck, null");
+    const afterStuck = await insights();
+    expect("Insights views changed by a stuck request", INSIGHTS.filter((v) => before[v] !== afterStuck[v]).join(", ") || "none", "none");
 
-    // Leo's demo, played live: Data Platform says "not us", Analytics Engineering handles it.
+    // Leo's demo, played live: Data Platform says "not us", Analytics Engineering handles it. Each hop event is sent
+    // when its receiver acts; request_hops.at must come back as when the receiver got it.
     const id = "req_live_test";
-    await emit("request_created", "p_leo", id, at(3), { request_id: id, task_type: "data_access", title: "Warehouse access (live test)" });
-    await emit("hop", "agent", id, at(3), {
+    const created = at(3), bounced = at(2.5), handled = at(1.5);
+    await emit("request_created", "p_leo", id, created, { request_id: id, task_type: "data_access", title: "Warehouse access (live test)" });
+    await emit("hop", "agent", id, bounced, {
       request_id: id, seq: 1, from: "p_leo", to: "dept_data_platform", outcome: "bounced", redirect_to: "dept_analytics_eng", note: "Not us, try Analytics Engineering.",
     });
-    await emit("hop", "agent", id, at(2), { request_id: id, seq: 2, from: "dept_data_platform", to: "dept_analytics_eng", outcome: "handled", note: "Access granted." });
-    await emit("request_resolved", "agent", id, at(1), { request_id: id });
+    await emit("hop", "agent", id, handled, { request_id: id, seq: 2, from: "dept_data_platform", to: "dept_analytics_eng", outcome: "handled", note: "Access granted." });
+    await emit("request_resolved", "agent", id, handled, { request_id: id });
     // A bad hop (unknown actor) must not fail A's insert: the event lands, the hop is skipped with a warning.
     let badInsert = "ok";
     await emit("hop", "agent", id, at(1), { request_id: id, seq: 9, from: "dept_analytics_eng", to: "nobody", outcome: "forwarded" }).catch(
@@ -176,6 +188,12 @@ async function live() {
       [id],
     );
     expect("hops", hops.h, "1 p_leo->dept_data_platform bounced dept_analytics_eng; 2 dept_data_platform->dept_analytics_eng handled");
+    const times = await owner.query("SELECT at FROM request_hops WHERE request_id = $1 ORDER BY seq", [id]);
+    expect("hop at = received: hop 1 at request created, hop 2 at hop 1's event",
+      times.rows.map((r) => r.at.toISOString()).join(", "), `${created.toISOString()}, ${bounced.toISOString()}`);
+    await emit("request_stuck", "agent", id, at(1), { request_id: id });
+    expect("request_stuck after resolved leaves it resolved",
+      (await one(owner, "SELECT status FROM requests WHERE id = $1", [id])).status, "resolved");
     expect("bad hop: insert succeeded, event stored, hop skipped, warning raised",
       `${badInsert} ${(await one(owner, "SELECT count(*)::int AS n FROM events WHERE request_id = $1 AND payload->>'seq' = '9'", [id])).n} ` +
         `${(await one(owner, "SELECT count(*)::int AS n FROM request_hops WHERE request_id = $1 AND seq = 9", [id])).n} ` +

@@ -185,6 +185,17 @@ try {
     )).n,
     hopRows.length,
   );
+  // request_hops.at means "when to received it" for seeded and live rows: the trigger's mapping from hop event ts
+  // (when to acted) gives back every fixture hop time.
+  expect(
+    "hop events whose received time (hop_received_at) equals request_hops.at",
+    (await one(
+      `SELECT count(*)::int AS n FROM events e JOIN request_hops h
+         ON h.request_id = e.payload->>'request_id' AND h.seq = (e.payload->>'seq')::int
+       WHERE e.type = 'hop' AND hop_received_at(h.request_id, h.seq, e.ts) = h.at`,
+    )).n,
+    hopRows.length,
+  );
 
   console.log("Demo rows:");
   const leo = await one(

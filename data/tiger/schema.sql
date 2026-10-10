@@ -34,7 +34,7 @@ CREATE TABLE requests (
   -- Same rule as HR_TYPES in snowflake/load.ts. Generated, so requests A creates live are masked too.
   hr_sensitive  boolean GENERATED ALWAYS AS (task_type IN ('leave_request', 'benefits_question', 'employee_relations')) STORED,
   origin        text NOT NULL DEFAULT 'seed' CHECK (origin IN ('seed', 'agent')),
-  CHECK ((status <> 'open') = (resolved_at IS NOT NULL))  -- resolved_at = when it left 'open' (resolved, denied, stuck)
+  CHECK ((status IN ('resolved', 'denied')) = (resolved_at IS NOT NULL))  -- stuck is not closed: no resolved_at
 );
 
 CREATE TABLE request_hops (
@@ -65,10 +65,25 @@ SELECT create_hypertable('events', by_range('ts', INTERVAL '7 days'));
 CREATE INDEX ON events (request_id, ts DESC);
 CREATE INDEX ON events (type, ts DESC);
 
+-- request_hops.at is when `to` received the request (the fixtures' meaning). A hop event's ts is when `to` acted on it
+-- (bounced, forwarded, delegated, handled), as in the seeded hop events. So hop 1 was received when the request was
+-- created, and hop n when hop n-1's receiver acted (the first hop n-1 event's ts). Falls back to ts if that is missing.
+CREATE OR REPLACE FUNCTION hop_received_at(req_id text, hop_seq int, hop_ts timestamptz) RETURNS timestamptz
+LANGUAGE sql STABLE SET search_path = public, pg_temp AS $$
+  SELECT coalesce(
+    CASE WHEN hop_seq = 1 THEN (SELECT r.created_at FROM requests r WHERE r.id = req_id)
+         ELSE (SELECT min(e.ts) FROM events e
+               WHERE e.type = 'hop' AND (e.request_id = req_id OR e.payload->>'request_id' = req_id)
+                 AND e.payload->>'seq' = (hop_seq - 1)::text) END,
+    hop_ts)
+$$;
+
 -- Live path: A writes events only; this trigger derives requests and request_hops from them, so Insights move live.
 --   request_created                             -> requests row (origin 'agent', open); ignored if the id exists
---   hop {request_id, seq, from, to, outcome, redirect_to?, note} -> request_hops row at ts; ignored if (request_id, seq) exists
---   request_resolved / request_denied / request_stuck -> that request's status and resolved_at = ts
+--   hop {request_id, seq, from, to, outcome, redirect_to?, note} -> request_hops row at hop_received_at(...);
+--                                                  ignored if (request_id, seq) exists
+--   request_resolved / request_denied           -> that request's status and resolved_at = ts
+--   request_stuck                               -> status 'stuck' (open requests only), resolved_at stays null
 -- SECURITY DEFINER (runs as the owner who applies this file) because wayfinder_agent cannot touch these tables.
 -- Never fails A's insert: any error rolls back only the derived write and raises a WARNING.
 CREATE OR REPLACE FUNCTION events_derive() RETURNS trigger
@@ -86,12 +101,15 @@ BEGIN
     ELSIF NEW.type = 'hop' THEN
       rid := coalesce(p->>'request_id', NEW.request_id);
       INSERT INTO request_hops (request_id, seq, from_id, to_id, at, outcome, redirect_to, note)
-      SELECT rid, (p->>'seq')::int, p->>'from', p->>'to', NEW.ts, p->>'outcome', p->>'redirect_to', p->>'note'
+      SELECT rid, (p->>'seq')::int, p->>'from', p->>'to', hop_received_at(rid, (p->>'seq')::int, NEW.ts), p->>'outcome', p->>'redirect_to', p->>'note'
       WHERE NOT EXISTS (SELECT 1 FROM request_hops WHERE request_id = rid AND seq = (p->>'seq')::int);
-    ELSIF NEW.type IN ('request_resolved', 'request_denied', 'request_stuck') THEN
+    ELSIF NEW.type IN ('request_resolved', 'request_denied') THEN
       rid := coalesce(NEW.request_id, p->>'request_id');
-      -- status = event type without the 'request_' prefix: resolved, denied, stuck
+      -- status = event type without the 'request_' prefix: resolved, denied
       UPDATE requests SET status = substr(NEW.type, 9), resolved_at = NEW.ts WHERE id = rid;
+    ELSIF NEW.type = 'request_stuck' THEN
+      rid := coalesce(NEW.request_id, p->>'request_id');
+      UPDATE requests SET status = 'stuck' WHERE id = rid AND status = 'open';
     END IF;
   EXCEPTION WHEN OTHERS THEN
     RAISE WARNING 'events_derive skipped % event % (request %): % %', NEW.type, NEW.id, rid, SQLSTATE, SQLERRM;

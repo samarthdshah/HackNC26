@@ -18,7 +18,7 @@ For lanes A (agent server) and B (website). Lane C owns this database. **This fi
 
 ## Logins
 
-Defined in `data/tiger/roles.sql`. `npm --prefix data run tiger:roles` creates or updates both roles and sets their passwords. `tiger:seed` re-applies the grants after it recreates the tables, so a reseed never needs a separate step. `npm --prefix data run tiger:test-roles` connects as each role and checks 46 allowed and denied actions, then plays a live request as `wayfinder_agent` (see [Live path](#live-path-events-trigger)); 56 checks in all.
+Defined in `data/tiger/roles.sql`. `npm --prefix data run tiger:roles` creates or updates both roles and sets their passwords. `tiger:seed` re-applies the grants after it recreates the tables, so a reseed never needs a separate step. `npm --prefix data run tiger:test-roles` connects as each role and checks 46 allowed and denied actions, then plays a live request as `wayfinder_agent` (see [Live path](#live-path-events-trigger)); 60 checks in all.
 
 | Login | Lane | Granted | Everything else |
 |---|---|---|---|
@@ -76,7 +76,7 @@ The directory itself (email, title, manager, out-of-office) is in Snowflake.
 | `requester_id` | text → actors | |
 | `created_at` | timestamptz | |
 | `status` | text | `open`, `resolved`, `denied` or `stuck`. Seed rows are `open` or `resolved` |
-| `resolved_at` | timestamptz | When the request left `open` (resolved, denied or stuck). Set exactly when `status <> 'open'` (enforced) |
+| `resolved_at` | timestamptz | When the request was resolved or denied. Set exactly when `status` is `resolved` or `denied` (enforced); null for `open` and `stuck`. Insights count only `resolved` |
 | `resolved_by` | text → actors | |
 | `resolution` | text | HR text: masked in `requests_public` |
 | `severity`, `new_hire_name`, `new_hire_id`, `room_id`, `vendor_id` | text | Optional details. Rooms and vendors live in Snowflake |
@@ -94,7 +94,7 @@ Primary key `(request_id, seq, at)`.
 | `seq` | int | 1, 2, 3… |
 | `from_id` | text → actors | Hop 1 is from the requester. After that, it is the previous hop's `to_id` |
 | `to_id` | text → actors | Who received it |
-| `at` | timestamptz | When `to_id` received it. Live hops take the `hop` event's `ts` |
+| `at` | timestamptz | When `to_id` received it, for seeded and live rows alike. Hop 1: the request's `created_at`. Hop n: when hop n−1's receiver acted. Live rows: derived by the trigger (see [Live path](#live-path-events-trigger)) |
 | `outcome` | text | What `to_id` did: `pending`, `forwarded`, `bounced` ("not us"), `delegated` (out), `handled` (closed it) |
 | `redirect_to` | text → actors | Set on `bounced` and `delegated`: where to go instead |
 | `note` | text | HR text: masked in `request_hops_public` |
@@ -236,17 +236,20 @@ The top four new-hire handoffs are within 1.1 h of each other (19.0 to 17.9 h), 
 | A's event | Payload A sends | What the trigger writes |
 |---|---|---|
 | `request_created` | `{task_type, title}`; `request_id` column set | `requests` row: `id` = `request_id`, `requester_id` = `actor`, `created_at` = `ts`, `status = 'open'`, `origin = 'agent'`. Ignored if the id exists |
-| `hop` | `{request_id, seq, from, to, outcome, redirect_to?, note}` | `request_hops` row at `ts`. Ignored if `(request_id, seq)` exists |
-| `request_resolved`, `request_denied`, `request_stuck` | `request_id` column set | That request's `status` (`resolved`/`denied`/`stuck`) and `resolved_at = ts` |
+| `hop` | `{request_id, seq, from, to, outcome, redirect_to?, note}` | `request_hops` row with `at` = when `to` received it: the request's `created_at` for `seq` 1, else the `ts` of the `seq − 1` hop event. Ignored if `(request_id, seq)` exists |
+| `request_resolved`, `request_denied` | `request_id` column set | That request's `status` (`resolved`/`denied`) and `resolved_at = ts` |
+| `request_stuck` | `request_id` column set | `status = 'stuck'`, `resolved_at` stays null. Only an `open` request becomes stuck; a later `request_resolved` still closes it |
 
 Rules for A:
 
 - Send `request_created` before any `hop` for that request, with `actor` = the requester (`p_*`). `from`, `to`, `redirect_to` and the requester must be ids in `actors`.
-- A `hop` event's `ts` becomes `request_hops.at`, read as the time `to` received the request.
+- **When to emit a `hop` event:** when `to` acts on the request (says "not us", forwards it, delegates it, or handles it), with `ts` = that moment and `outcome` = what `to` did. Do not emit it when `to` first receives the request. The trigger derives the receive time (`request_hops.at`) from the request's `created_at` and the previous hop event. This is the same meaning the seeded history uses.
+- For the last hop (`handled`), emit the `hop` event, then `request_resolved` with the same `ts`.
+- Use the same `request_id` in the event column and the payload, and send hops in `seq` order (1, 2, 3…). If the previous hop event is missing, the hop's own `ts` is used.
 - The trigger never makes A's insert fail. On any error (unknown actor, missing `seq` or `title`, bad `outcome`) the event is still stored, the derived write is skipped, and Postgres sends a `WARNING` (`events_derive skipped ...`). Log notices from node-postgres to see them.
 - Other event types are stored only.
 
-`tiger:test-roles` checks this as `wayfinder_agent`: it plays `req_live_test` (created; hop bounced Data Platform → Analytics Engineering; hop handled; resolved), checks the request and hops appear, that `insights_bottlenecks`, `insights_slowest_handoffs` and `insights_hours_saved` change (`agent_routing` 0 → 1 request), that a bad hop is skipped with the insert intact, that replays are ignored, and that an HR test request leaks nothing through `events_public`, `requests_public` or `request_hops_public`. Then the owner deletes the test rows and checks the Insights are back to the seed values.
+`tiger:test-roles` checks this as `wayfinder_agent`: it plays a stuck onboarding request (status `stuck`, no `resolved_at`, no Insights view changes), then `req_live_test` (created; hop bounced Data Platform → Analytics Engineering; hop handled; resolved), checks the request and hops appear with `at` = receive times, that `insights_bottlenecks`, `insights_slowest_handoffs` and `insights_hours_saved` change (`agent_routing` 0 → 1 request), that a bad hop is skipped with the insert intact, that replays are ignored, and that an HR test request leaks nothing through `events_public`, `requests_public` or `request_hops_public`. Then the owner deletes the test rows and checks the Insights are back to the seed values.
 
 **Live updates:** A pushes them to the website over SSE (`GET /live`). Tiger sends no notifications. B queries the Tiger views directly.
 
