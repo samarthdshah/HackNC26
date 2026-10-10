@@ -1,3 +1,5 @@
+> Superseded by [SCHEMA.md](SCHEMA.md), which is the contract. This plan is kept for history.
+
 # Tiger Data plan (S4)
 
 Status: plan only. Nothing has connected to Tiger yet. All SQL below is unverified until S4 step 2.

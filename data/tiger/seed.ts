@@ -20,14 +20,14 @@ function fixture(name: string): any {
 
 const departments: Row[] = fixture("departments");
 const people: Row[] = fixture("people");
-const requests: Row[] = fixture("requests");
+// Leo's request is created live by lane A (req_live_*), so it is not seeded: no request, hops, or events.
+const LIVE_ONLY = ["req_demo_leo"];
+const requests: Row[] = fixture("requests").filter((r: Row) => !LIVE_ONLY.includes(r.id));
 const edges: Row[] = fixture("edges");
 const bookings: Row[] = fixture("bookings");
 
 // Same rule as snowflake/load.ts and the generated requests.hr_sensitive column; used to check the HR-masked views.
 const HR_TYPES = ["leave_request", "benefits_question", "employee_relations"];
-// Hop outcome -> event type for the backfilled feed.
-const HOP_EVENT: Record<string, string> = { forwarded: "forwarded", bounced: "bounced", delegated: "delegated", handled: "resolved" };
 
 const actors = [
   ...departments.map((d) => ({ id: d.id, kind: "department", name: d.name, department_id: d.id })),
@@ -88,8 +88,9 @@ const bookingRows = bookings.map((b) => ({
   note: b.note,
 }));
 
-// Backfilled feed: one request_created per request, then one event per hop when its receiver acted
-// (the next hop, or resolution; the hop's own time if it is still the open last hop).
+// Backfilled feed: one request_created per request, then one "hop" event (A's shape) per hop when its receiver acted
+// (the next hop, or resolution; the hop's own time if it is still the open last hop). The events trigger ignores
+// them because the requests and hops are loaded first.
 const eventRows = requests.flatMap((r) => [
   {
     id: `seed_${r.id}_0`,
@@ -102,10 +103,10 @@ const eventRows = requests.flatMap((r) => [
   ...r.hops.map((h: Row, i: number) => ({
     id: `seed_${r.id}_${h.seq}`,
     ts: r.hops[i + 1]?.at ?? r.resolved_at ?? h.at,
-    type: HOP_EVENT[h.outcome],
+    type: "hop",
     actor: h.to,
     request_id: r.id,
-    payload: { seeded: true, seq: h.seq, from: h.from, to: h.to, redirect_to: h.redirect_to, note: h.note },
+    payload: { seeded: true, request_id: r.id, seq: h.seq, from: h.from, to: h.to, outcome: h.outcome, redirect_to: h.redirect_to, note: h.note },
   })),
 ]);
 
@@ -140,12 +141,15 @@ function expect(label: string, actual: unknown, expected: unknown) {
 const client = new pg.Client({ connectionString: process.env.TIGER_DATABASE_URL });
 client.on("notice", (n) => console.log(`notice: ${n.message}`));
 await client.connect();
-const one = async (sql: string, params: unknown[] = []) => (await client.query(sql, params)).rows[0];
+const rows = async (sql: string, params: unknown[] = []) => (await client.query(sql, params)).rows;
+const one = async (sql: string, params: unknown[] = []) => (await rows(sql, params))[0];
 
 try {
   await client.query("BEGIN");
   await client.query("SET LOCAL client_min_messages = warning");
   await client.query(readFileSync(new URL("schema.sql", import.meta.url), "utf8"));
+  // Recreated tables lose their grants, so re-apply the login grants (roles are created NOLOGIN if missing).
+  await client.query(readFileSync(new URL("roles.sql", import.meta.url), "utf8"));
   await client.query("SET LOCAL client_min_messages = notice");
   const overlap = await one("SELECT count(*)::int AS n FROM pg_constraint WHERE conname = 'bookings_no_overlap'");
   if (!overlap.n) console.log("notice: btree_gist unavailable, bookings_no_overlap skipped");
@@ -160,15 +164,47 @@ try {
   console.log("Row counts (tiger vs fixtures):");
   for (const [table, rows] of LOADS) expect(table, (await one(`SELECT count(*)::int AS n FROM ${table}`)).n, rows.length);
 
+  // Events trigger: present, runs as the owner, and derived nothing from the seed events (all ids already loaded).
+  console.log("Events trigger:");
+  const trig = await one(
+    `SELECT p.prosecdef AS definer, pg_get_userbyid(p.proowner) = current_user AS owner_fn,
+            (SELECT count(*)::int FROM pg_trigger t WHERE t.tgrelid = 'events'::regclass AND t.tgname = 'events_derive') AS triggers
+     FROM pg_proc p WHERE p.proname = 'events_derive'`,
+  );
+  expect("events_derive: security definer, owned by owner, triggers on events", trig && `${trig.definer} ${trig.owner_fn} ${trig.triggers}`, "true true 1");
+  expect("requests derived from seed events (origin agent)", (await one("SELECT count(*)::int AS n FROM requests WHERE origin = 'agent'")).n, 0);
+  const types = await one("SELECT string_agg(type || ' ' || n, ', ' ORDER BY type) AS t FROM (SELECT type, count(*) AS n FROM events GROUP BY type) x");
+  expect("event types", types.t, `hop ${hopRows.length}, request_created ${requestRows.length}`);
+  expect(
+    "hop events matching their request_hops row (seq, from, to, outcome, redirect_to)",
+    (await one(
+      `SELECT count(*)::int AS n FROM events e JOIN request_hops h
+         ON h.request_id = e.payload->>'request_id' AND h.seq = (e.payload->>'seq')::int AND h.from_id = e.payload->>'from'
+        AND h.to_id = e.payload->>'to' AND h.outcome = e.payload->>'outcome' AND h.redirect_to IS NOT DISTINCT FROM e.payload->>'redirect_to'
+       WHERE e.type = 'hop'`,
+    )).n,
+    hopRows.length,
+  );
+  // request_hops.at means "when to received it" for seeded and live rows: the trigger's mapping from hop event ts
+  // (when to acted) gives back every fixture hop time.
+  expect(
+    "hop events whose received time (hop_received_at) equals request_hops.at",
+    (await one(
+      `SELECT count(*)::int AS n FROM events e JOIN request_hops h
+         ON h.request_id = e.payload->>'request_id' AND h.seq = (e.payload->>'seq')::int
+       WHERE e.type = 'hop' AND hop_received_at(h.request_id, h.seq, e.ts) = h.at`,
+    )).n,
+    hopRows.length,
+  );
+
   console.log("Demo rows:");
   const leo = await one(
-    `SELECT r.status, r.task_type, r.requester_id, count(h.*)::int AS hops,
-            string_agg(h.to_id || ' ' || h.outcome || ' -> ' || h.redirect_to, '; ') AS hop
-     FROM requests r JOIN request_hops h ON h.request_id = r.id WHERE r.id = 'req_demo_leo'
-     GROUP BY r.status, r.task_type, r.requester_id`,
+    `SELECT (SELECT count(*) FROM requests WHERE id = ANY($1))::int
+          + (SELECT count(*) FROM request_hops WHERE request_id = ANY($1))::int
+          + (SELECT count(*) FROM events WHERE request_id = ANY($1) OR payload->>'request_id' = ANY($1))::int AS n`,
+    [LIVE_ONLY],
   );
-  expect("req_demo_leo", leo && `${leo.status} ${leo.task_type} ${leo.requester_id} ${leo.hops} hop: ${leo.hop}`,
-    "open data_access p_leo 1 hop: dept_data_platform bounced -> dept_analytics_eng");
+  expect("req_demo_leo rows (requests + hops + events), created live by A", leo.n, 0);
   const priya = await one(
     `SELECT string_agg(task_type, ',' ORDER BY task_type) AS types FROM org_edges
      WHERE from_id = 'p_priya' AND to_id = 'p_tom' AND delegate_until = '2026-10-16T17:00:00-04:00'
@@ -195,20 +231,65 @@ try {
   expect("checkout incidents", `${checkout.n} direct ${checkout.direct} routed ${checkout.routed}`,
     "6 direct req_0017,req_0066 routed req_0004,req_0029,req_0043,req_0055");
 
-  // learn_edge smoke test on Leo's bounce, rolled back so the seed keeps the chart edges.
-  console.log("learn_edge (rolled back):");
-  await client.query("SAVEPOINT learn");
-  const learned = (
-    await client.query(
-      `SELECT to_id, confidence, source FROM learn_edge('agent', 'dept_data_platform', 'dept_analytics_eng', 'data_access', 'req_demo_leo')`,
-    )
-  ).rows.map((e) => `${e.to_id} ${e.confidence} ${e.source}`);
-  expect("edges", learned.join("; "), "dept_data_platform 0.4 chart; dept_analytics_eng 0.8 learned");
-  expect("edge_updated events", (await one("SELECT count(*)::int AS n FROM events WHERE type = 'edge_updated'")).n, 2);
-  await client.query("ROLLBACK TO SAVEPOINT learn");
+  // Edges: chart only, Priya's delegations the only dated edges, and Data Platform the agent's top data_access route.
+  console.log("org_edges:");
+  expect("non-chart edges", (await one("SELECT count(*)::int AS n FROM org_edges WHERE source <> 'chart'")).n, 0);
+  const dated = await one(
+    "SELECT string_agg(from_id || '->' || to_id || ' ' || task_type, '; ' ORDER BY task_type) AS e FROM org_edges WHERE delegate_until IS NOT NULL",
+  );
+  expect("delegate edges", dated.e, "p_priya->p_tom data_access; p_priya->p_tom purchase_approval");
+  const route = await rows(
+    `SELECT to_id, confidence, source FROM org_edges_current
+     WHERE from_id = 'agent' AND task_type = 'data_access' ORDER BY confidence DESC, to_id`,
+  );
+  expect("agent data_access routes", route.map((e) => `${e.to_id} ${e.confidence} ${e.source}`).join("; "), "dept_data_platform 0.7 chart");
+  expect(
+    "learned agent -> dept_analytics_eng data_access",
+    (await one("SELECT count(*)::int AS n FROM org_edges WHERE from_id = 'agent' AND to_id = 'dept_analytics_eng' AND task_type = 'data_access'")).n,
+    0,
+  );
+  expect("learn_edge function", (await one("SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'learn_edge'")).n, 0);
+
+  // org_edge_changes: empty at seed; A's write (upsert edge + history row, reason and request_id null) works. Rolled back.
+  console.log("org_edge_changes (write rolled back):");
+  const cols = await one(
+    `SELECT string_agg(column_name || ' ' || is_nullable, ', ' ORDER BY ordinal_position) AS c
+     FROM information_schema.columns WHERE table_name = 'org_edge_changes'`,
+  );
+  expect(
+    "columns",
+    cols.c,
+    "id NO, changed_at NO, from_id NO, to_id NO, task_type NO, previous_confidence YES, confidence NO, source NO, delegate_until YES, reason YES, request_id YES",
+  );
+  expect("rows at seed", (await one("SELECT count(*)::int AS n FROM org_edge_changes")).n, 0);
+  await client.query("SAVEPOINT a_write");
+  await client.query(
+    `INSERT INTO org_edges (from_id, to_id, task_type, confidence, source) VALUES ('agent', 'dept_data_platform', 'data_access', 0.4, 'chart')
+     ON CONFLICT (from_id, to_id, task_type) DO UPDATE SET confidence = EXCLUDED.confidence, updated_at = now()`,
+  );
+  await client.query(
+    `INSERT INTO org_edge_changes (from_id, to_id, task_type, previous_confidence, confidence, source)
+     VALUES ('agent', 'dept_data_platform', 'data_access', 0.7, 0.4, 'chart')`,
+  );
+  const change = await one(
+    `SELECT c.previous_confidence, c.confidence, e.confidence AS edge FROM org_edge_changes c
+     JOIN org_edges e USING (from_id, to_id, task_type)`,
+  );
+  expect("upsert + history row", `${change.previous_confidence} -> ${change.confidence}, edge ${change.edge}`, "0.7 -> 0.4, edge 0.4");
+  await client.query("ROLLBACK TO SAVEPOINT a_write");
+
+  // Grants from roles.sql survive the reseed (full allow/deny checks: npm run tiger:test-roles).
+  console.log("Login grants:");
+  const grants = await one(
+    `SELECT has_table_privilege('wayfinder_agent', 'events', 'INSERT') AS agent_insert_events,
+            has_table_privilege('wayfinder_agent', 'org_edge_changes', 'INSERT') AS agent_insert_changes,
+            has_table_privilege('wayfinder_web', 'requests_public', 'SELECT') AS web_requests_public,
+            has_table_privilege('wayfinder_web', 'events', 'SELECT') AS web_events`,
+  );
+  expect("agent INSERT events, agent INSERT org_edge_changes, web SELECT requests_public, web SELECT events",
+    `${grants.agent_insert_events} ${grants.agent_insert_changes} ${grants.web_requests_public} ${grants.web_events}`, "true true true false");
 
   // Insights views must return the PLAN.md values.
-  const rows = async (sql: string, params: unknown[] = []) => (await client.query(sql, params)).rows;
   console.log("insights_new_hires:");
   const hire = await one("SELECT * FROM insights_new_hires");
   expect("last 10 onboarding", `${hire.requests} requests, ${hire.avg_days} days, ${hire.avg_hops} hops`, "10 requests, 4.01 days, 6.00 hops");
@@ -294,6 +375,18 @@ try {
     [mask],
   );
   expect("events_public HR events masked", `${hrEvents.masked} of ${hrEvents.n}`, `${hrIds.length + hrHops} of ${hrIds.length + hrHops}`);
+  // HR events keep only structural keys; every other key (title, note, seeded, ...) is the placeholder.
+  const keys = await one(
+    `SELECT string_agg(DISTINCT k, ',' ORDER BY k) FILTER (WHERE v = e.payload->k) AS kept,
+            string_agg(DISTINCT k, ',' ORDER BY k) FILTER (WHERE v = to_jsonb($1::text)) AS masked,
+            count(*) FILTER (WHERE v <> e.payload->k AND v <> to_jsonb($1::text))::int AS other
+     FROM events_public p JOIN events e ON e.id = p.id AND e.ts = p.ts JOIN requests r ON r.id = p.request_id,
+          jsonb_each(p.payload) AS kv(k, v)
+     WHERE r.hr_sensitive`,
+    [mask],
+  );
+  expect("events_public HR keys kept / masked", `kept ${keys.kept}; masked ${keys.masked}; other ${keys.other}`,
+    "kept from,outcome,redirect_to,request_id,requester_id,seq,task_type,to; masked note,seeded,title; other 0");
   const passthrough = await one(
     `SELECT count(*)::int AS n,
             count(*) FILTER (WHERE (e.id, e.ts, e.type, e.actor, e.request_id, e.tool, e.payload)
