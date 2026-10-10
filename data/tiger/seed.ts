@@ -149,6 +149,8 @@ try {
   await client.query("BEGIN");
   await client.query("SET LOCAL client_min_messages = warning");
   await client.query(readFileSync(new URL("schema.sql", import.meta.url), "utf8"));
+  // Recreated tables lose their grants, so re-apply the login grants (roles are created NOLOGIN if missing).
+  await client.query(readFileSync(new URL("roles.sql", import.meta.url), "utf8"));
   await client.query("SET LOCAL client_min_messages = notice");
   const overlap = await one("SELECT count(*)::int AS n FROM pg_constraint WHERE conname = 'bookings_no_overlap'");
   if (!overlap.n) console.log("notice: btree_gist unavailable, bookings_no_overlap skipped");
@@ -243,6 +245,17 @@ try {
   );
   expect("upsert + history row", `${change.previous_confidence} -> ${change.confidence}, edge ${change.edge}`, "0.7 -> 0.4, edge 0.4");
   await client.query("ROLLBACK TO SAVEPOINT a_write");
+
+  // Grants from roles.sql survive the reseed (full allow/deny checks: npm run tiger:test-roles).
+  console.log("Login grants:");
+  const grants = await one(
+    `SELECT has_table_privilege('wayfinder_agent', 'events', 'INSERT') AS agent_insert_events,
+            has_table_privilege('wayfinder_agent', 'org_edge_changes', 'INSERT') AS agent_insert_changes,
+            has_table_privilege('wayfinder_web', 'requests_public', 'SELECT') AS web_requests_public,
+            has_table_privilege('wayfinder_web', 'events', 'SELECT') AS web_events`,
+  );
+  expect("agent INSERT events, agent INSERT org_edge_changes, web SELECT requests_public, web SELECT events",
+    `${grants.agent_insert_events} ${grants.agent_insert_changes} ${grants.web_requests_public} ${grants.web_events}`, "true true true false");
 
   // Insights views must return the PLAN.md values.
   console.log("insights_new_hires:");

@@ -5,7 +5,7 @@ For lanes A (agent server) and B (website). Lane C owns this database. The desig
 - Tiger Data: Postgres 18 with TimescaleDB 2.30. Everything is in the `public` schema.
 - Built by `data/tiger/schema.sql` and loaded by `npm --prefix data run tiger:seed`. The seed drops and recreates everything and fails without committing if any demo row or Insights number is wrong.
 - All data is simulated (the fictional company Photon). The demo date is 2026-10-10.
-- **Access:** only lane C's owner login exists today. Agreed logins (not created yet): A gets a writer login (INSERT `events`; INSERT, UPDATE, SELECT `org_edges`; INSERT `org_edge_changes`; SELECT, UPDATE `bookings`) through `TIGER_DATABASE_URL` and `TIGER_PASSWORD` on A's machine. B and Darwin get read-only access to the public views. Connection details come from lane C directly, never from this file.
+- **Access:** each lane has its own login; see [Logins](#logins). Connection details and passwords come from lane C directly, never from this file.
 - **Who writes what:** A writes events only (plus edges and bookings). A computes each edge's final confidence and upserts `org_edges` itself, with one `org_edge_changes` row per change. There is no database-side learning function.
 
 ## Things to know before querying
@@ -15,6 +15,32 @@ For lanes A (agent server) and B (website). Lane C owns this database. The desig
 - **Numbers:** node-postgres returns `numeric` and `bigint` as **strings** (`"4.01"`, `"43"`). `int` and `real` come back as numbers. Every Insights value that is rounded is `numeric`, so call `Number(...)` before charting. Counts are cast to `int`.
 - **Live numbers:** the Insights views are plain views over the live tables, not cached. A new or resolved request changes them on the next query. History stats count only `status = 'resolved'` requests.
 - **HR text:** HR request types are `leave_request`, `benefits_question` and `employee_relations` (the same rule as Snowflake). For these, `title`, `resolution` and hop `note` show as `[visible to HR only]` in the `*_public` views; in `events_public`, the `title`, `note` and `resolution` payload keys are masked. **B and Darwin read `requests_public`, `request_hops_public` and `events_public`, never `requests`, `request_hops` or `events`.**
+
+## Logins
+
+Defined in `data/tiger/roles.sql`. `npm --prefix data run tiger:roles` creates or updates both roles and sets their passwords. `tiger:seed` re-applies the grants after it recreates the tables, so a reseed never needs a separate step. `npm --prefix data run tiger:test-roles` connects as each role and checks 46 allowed and denied actions.
+
+| Login | Lane | Granted | Everything else |
+|---|---|---|---|
+| `wayfinder_agent` | A | USAGE on schema `public`; INSERT on `events`; SELECT, INSERT, UPDATE on `org_edges`; INSERT on `org_edge_changes` and USAGE on its id sequence; SELECT, UPDATE on `bookings` | Denied, including reading `events`, `requests`, `request_hops`, every view and `actors`, and any DELETE or TRUNCATE |
+| `wayfinder_web` | B and Darwin | USAGE on schema `public`; SELECT on `requests_public`, `request_hops_public`, `events_public`, the five `insights_*` views, `org_edges`, `org_edge_changes`, `actors`, `bookings` | Denied, including base `requests`, `request_hops`, `events`, plus `hop_steps`, `org_edges_current` and every write |
+
+Notes for lane A:
+
+- `wayfinder_agent` cannot read `events`, so `INSERT ... RETURNING` on `events` fails. Generate the event `id` (UUID) in the app and insert it.
+- `org_edges` upserts (`INSERT ... ON CONFLICT DO UPDATE`) work. `org_edge_changes` is insert-only; `id` comes from the sequence.
+
+Notes for lane B and Darwin:
+
+- `org_edges_current` is not granted. For the live org map, read `org_edges` and drop expired delegate edges: `WHERE delegate_until IS NULL OR delegate_until > now()`.
+
+Env vars by lane:
+
+| Lane | Env vars | Notes |
+|---|---|---|
+| A | `TIGER_DATABASE_URL` (user `wayfinder_agent`, no password in the URL), `TIGER_PASSWORD` | Both on A's machine. Pass the password to node-postgres as `password` |
+| B, Darwin | `TIGER_DATABASE_URL` (user `wayfinder_web`) plus the password from lane C | Set on their own machines |
+| C | `TIGER_DATABASE_URL` (owner), `TIGER_AGENT_PASSWORD`, `TIGER_WEB_PASSWORD` | Root `.env`. The two passwords are the source for `tiger:roles` and the values C hands to A and B |
 
 ## Tables
 
@@ -166,8 +192,8 @@ The seed runs this pattern on `agent → dept_data_platform` (0.7 → 0.4) and r
 | `events_public` | `events` (same columns). For events of HR-sensitive requests, payload keys `title`, `note` and `resolution` become `[visible to HR only]`. Other keys, other events, and events with no request pass through unchanged. This is the activity feed: read it instead of `events` |
 | `requests_public` | `requests` with HR `title` and `resolution` masked |
 | `request_hops_public` | `request_hops` plus `task_type` and `hr_sensitive`, with HR `note` masked |
-| `org_edges_current` | `org_edges` without expired delegate edges. This is the live org map (Mycelium graph) |
-| `hop_steps` | Every hop with `hours` the receiver held it, plus `to_department_id`. No text. Used by the Insights views |
+| `org_edges_current` | `org_edges` without expired delegate edges. Not granted to `wayfinder_web`: B reads `org_edges` and applies the same filter for the Mycelium graph |
+| `hop_steps` | Every hop with `hours` the receiver held it, plus `to_department_id`. No text. Used by the Insights views; not granted to any login |
 
 ### Insights panels
 
@@ -207,7 +233,6 @@ The top four new-hire handoffs are within 1.1 h of each other (19.0 to 17.9 h), 
 These are open with lanes A and B; see PLAN.md section 7.
 
 - **Events-to-tables trigger** (PLAN 2.4). A writes events only, so until the trigger exists live requests do not reach `requests` or `request_hops` and the Insights numbers do not move during the demo.
-- **Logins** for A (writer) and for B and Darwin (read-only).
 
 **Live updates:** A pushes them to the website over SSE (`GET /live`). Tiger sends no notifications. B queries the Tiger views directly.
 
