@@ -1,0 +1,10 @@
+[
+  { "id": "dept_people", "name": "People Ops", "head_id": "p_grace", "cost_center": "CC-100", "charter": "Hiring, new-hire onboarding tickets, time off, and the policy handbook." },
+  { "id": "dept_it", "name": "IT", "head_id": "p_jess", "cost_center": "CC-110", "charter": "Laptops, SSO and email accounts, software licenses." },
+  { "id": "dept_workplace", "name": "Workplace", "head_id": "p_maya", "cost_center": "CC-120", "charter": "Rooms, desks, badges, office catering." },
+  { "id": "dept_finance", "name": "Finance & Procurement", "head_id": "p_hannah", "cost_center": "CC-130", "charter": "Budgets, purchase approvals, vendor onboarding, vendor payments." },
+  { "id": "dept_platform", "name": "Platform Engineering", "head_id": "p_marcus", "cost_center": "CC-200", "charter": "Cloud infrastructure, deploys, on-call, incident response." },
+  { "id": "dept_data_platform", "name": "Data Platform", "head_id": "p_raj", "cost_center": "CC-210", "charter": "Raw data ingestion, pipelines, and warehouse infrastructure." },
+  { "id": "dept_analytics_eng", "name": "Analytics Engineering", "head_id": "p_priya", "cost_center": "CC-220", "charter": "Curated data marts, dashboards, and analyst warehouse access." },
+  { "id": "dept_commerce", "name": "Commerce Engineering", "head_id": "p_nina", "cost_center": "CC-230", "charter": "Storefront, cart, and checkout product code." }
+]

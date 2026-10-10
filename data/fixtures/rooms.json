@@ -1,0 +1,8 @@
+[
+  { "id": "rm_commons", "name": "The Commons", "floor": 1, "capacity": 30, "features": ["catering allowed", "projector", "whiteboard", "kitchen access"] },
+  { "id": "rm_studio", "name": "Studio", "floor": 2, "capacity": 16, "features": ["projector", "video conferencing"] },
+  { "id": "rm_harbor", "name": "Harbor", "floor": 2, "capacity": 12, "features": ["video conferencing", "whiteboard"] },
+  { "id": "rm_atlas", "name": "Atlas", "floor": 3, "capacity": 8, "features": ["video conferencing"] },
+  { "id": "rm_summit", "name": "Summit", "floor": 3, "capacity": 6, "features": ["whiteboard"] },
+  { "id": "rm_nook", "name": "The Nook", "floor": 3, "capacity": 4, "features": ["phone booth"] }
+]
