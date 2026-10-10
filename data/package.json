@@ -10,6 +10,13 @@
     "snowflake:verify": "node --experimental-strip-types --no-warnings snowflake/verify.ts",
     "snowflake:load": "node --experimental-strip-types --no-warnings snowflake/load.ts",
     "snowflake:roles": "node --experimental-strip-types --no-warnings snowflake/roles.ts",
-    "snowflake:test-roles": "node --experimental-strip-types --no-warnings snowflake/test-roles.ts"
+    "snowflake:test-roles": "node --experimental-strip-types --no-warnings snowflake/test-roles.ts",
+    "tiger:seed": "node --experimental-strip-types --no-warnings tiger/seed.ts"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
   }
 }
