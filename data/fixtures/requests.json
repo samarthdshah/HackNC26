@@ -2920,6 +2920,310 @@
     ]
   },
   {
+    "id": "req_0076",
+    "task_type": "benefits_question",
+    "title": "Does the dental plan cover orthodontics?",
+    "requester_id": "p_victor",
+    "created_at": "2026-05-27T10:12:00-04:00",
+    "status": "resolved",
+    "resolved_at": "2026-05-28T13:12:37-04:00",
+    "resolved_by": "p_andre",
+    "resolution": "Covered at 50% after deductible, up to a $1,500 lifetime max.",
+    "hops": [
+      {
+        "seq": 1,
+        "from": "p_victor",
+        "to": "dept_people",
+        "at": "2026-05-27T10:12:00-04:00",
+        "outcome": "bounced",
+        "note": "Not us. Benefits questions go to HR.",
+        "redirect_to": "dept_hr"
+      },
+      {
+        "seq": 2,
+        "from": "dept_people",
+        "to": "dept_hr",
+        "at": "2026-05-27T15:30:00-04:00",
+        "outcome": "forwarded",
+        "note": "Passing to our benefits generalist."
+      },
+      {
+        "seq": 3,
+        "from": "dept_hr",
+        "to": "p_andre",
+        "at": "2026-05-28T11:06:00-04:00",
+        "outcome": "handled",
+        "note": "Covered at 50% after deductible, up to a $1,500 lifetime max."
+      }
+    ]
+  },
+  {
+    "id": "req_0077",
+    "task_type": "contract_review",
+    "title": "Review Greenleaf catering master agreement",
+    "requester_id": "p_maya",
+    "created_at": "2026-06-10T14:05:00-04:00",
+    "status": "resolved",
+    "resolved_at": "2026-06-13T09:41:37-04:00",
+    "resolved_by": "p_imani",
+    "resolution": "Indemnity clause redlined. Agreement signed by both sides.",
+    "vendor_id": "v_greenleaf",
+    "hops": [
+      {
+        "seq": 1,
+        "from": "p_maya",
+        "to": "dept_finance",
+        "at": "2026-06-10T14:05:00-04:00",
+        "outcome": "bounced",
+        "note": "We cut the PO, but contract terms are Legal.",
+        "redirect_to": "dept_legal"
+      },
+      {
+        "seq": 2,
+        "from": "dept_finance",
+        "to": "dept_legal",
+        "at": "2026-06-11T12:29:00-04:00",
+        "outcome": "forwarded",
+        "note": "Vendor agreements go to Imani."
+      },
+      {
+        "seq": 3,
+        "from": "dept_legal",
+        "to": "p_imani",
+        "at": "2026-06-13T06:11:00-04:00",
+        "outcome": "handled",
+        "note": "Indemnity clause redlined. Agreement signed by both sides."
+      }
+    ]
+  },
+  {
+    "id": "req_0078",
+    "task_type": "leave_request",
+    "title": "Parental leave starting in August",
+    "requester_id": "p_elena",
+    "created_at": "2026-06-29T09:40:00-04:00",
+    "status": "resolved",
+    "resolved_at": "2026-06-30T21:04:37-04:00",
+    "resolved_by": "p_andre",
+    "resolution": "Leave approved from Aug 17 for 12 weeks. Raj notified to plan coverage.",
+    "hops": [
+      {
+        "seq": 1,
+        "from": "p_elena",
+        "to": "dept_people",
+        "at": "2026-06-29T09:40:00-04:00",
+        "outcome": "bounced",
+        "note": "Leave is handled by HR, not People Ops.",
+        "redirect_to": "dept_hr"
+      },
+      {
+        "seq": 2,
+        "from": "dept_people",
+        "to": "dept_hr",
+        "at": "2026-06-29T17:28:00-04:00",
+        "outcome": "forwarded",
+        "note": "Andre will set up the leave plan."
+      },
+      {
+        "seq": 3,
+        "from": "dept_hr",
+        "to": "p_andre",
+        "at": "2026-06-30T19:40:00-04:00",
+        "outcome": "handled",
+        "note": "Leave approved from Aug 17 for 12 weeks. Raj notified to plan coverage."
+      }
+    ]
+  },
+  {
+    "id": "req_0079",
+    "task_type": "nda_request",
+    "title": "NDA for checkout usability study participants",
+    "requester_id": "p_sam",
+    "created_at": "2026-07-15T11:20:00-04:00",
+    "status": "resolved",
+    "resolved_at": "2026-07-15T18:38:37-04:00",
+    "resolved_by": "p_imani",
+    "resolution": "Participant NDA template sent, cleared for 12 participants.",
+    "hops": [
+      {
+        "seq": 1,
+        "from": "p_sam",
+        "to": "dept_legal",
+        "at": "2026-07-15T11:20:00-04:00",
+        "outcome": "forwarded",
+        "note": "Standard participant NDA. Imani has the template."
+      },
+      {
+        "seq": 2,
+        "from": "dept_legal",
+        "to": "p_imani",
+        "at": "2026-07-15T17:50:00-04:00",
+        "outcome": "handled",
+        "note": "Participant NDA template sent, cleared for 12 participants."
+      }
+    ]
+  },
+  {
+    "id": "req_0080",
+    "task_type": "employee_relations",
+    "title": "Mediation over an on-call scheduling conflict",
+    "requester_id": "p_ken",
+    "created_at": "2026-08-05T15:30:00-04:00",
+    "status": "resolved",
+    "resolved_at": "2026-08-08T18:42:37-04:00",
+    "resolved_by": "p_teresa",
+    "resolution": "Mediation held. Rotation swap agreed and documented.",
+    "hops": [
+      {
+        "seq": 1,
+        "from": "p_ken",
+        "to": "p_jess",
+        "at": "2026-08-05T15:30:00-04:00",
+        "outcome": "forwarded",
+        "note": "This needs a neutral party. Sending to HR."
+      },
+      {
+        "seq": 2,
+        "from": "p_jess",
+        "to": "dept_hr",
+        "at": "2026-08-06T10:24:00-04:00",
+        "outcome": "forwarded",
+        "note": "Teresa will run the mediation."
+      },
+      {
+        "seq": 3,
+        "from": "dept_hr",
+        "to": "p_teresa",
+        "at": "2026-08-08T14:42:00-04:00",
+        "outcome": "handled",
+        "note": "Mediation held. Rotation swap agreed and documented."
+      }
+    ]
+  },
+  {
+    "id": "req_0081",
+    "task_type": "contract_review",
+    "title": "Northwind Devices renewal terms",
+    "requester_id": "p_jess",
+    "created_at": "2026-08-26T09:05:00-04:00",
+    "status": "resolved",
+    "resolved_at": "2026-08-28T17:11:37-04:00",
+    "resolved_by": "p_imani",
+    "resolution": "Renewal approved with a 30-day termination clause.",
+    "vendor_id": "v_northwind",
+    "hops": [
+      {
+        "seq": 1,
+        "from": "p_jess",
+        "to": "dept_finance",
+        "at": "2026-08-26T09:05:00-04:00",
+        "outcome": "forwarded",
+        "note": "PO ready. Renewal needs Legal sign-off."
+      },
+      {
+        "seq": 2,
+        "from": "dept_finance",
+        "to": "dept_legal",
+        "at": "2026-08-27T05:11:00-04:00",
+        "outcome": "forwarded",
+        "note": "Sending to Felix for review."
+      },
+      {
+        "seq": 3,
+        "from": "dept_legal",
+        "to": "p_felix",
+        "at": "2026-08-27T14:47:00-04:00",
+        "outcome": "bounced",
+        "note": "Vendor renewals are Imani's. Rerouting.",
+        "redirect_to": "p_imani"
+      },
+      {
+        "seq": 4,
+        "from": "p_felix",
+        "to": "p_imani",
+        "at": "2026-08-28T14:35:00-04:00",
+        "outcome": "handled",
+        "note": "Renewal approved with a 30-day termination clause."
+      }
+    ]
+  },
+  {
+    "id": "req_0082",
+    "task_type": "benefits_question",
+    "title": "How do I add a dependent to my health plan?",
+    "requester_id": "p_zoe",
+    "created_at": "2026-09-16T13:45:00-04:00",
+    "status": "resolved",
+    "resolved_at": "2026-09-17T13:21:37-04:00",
+    "resolved_by": "p_andre",
+    "resolution": "Dependent added. Coverage starts Oct 1.",
+    "hops": [
+      {
+        "seq": 1,
+        "from": "p_zoe",
+        "to": "dept_people",
+        "at": "2026-09-16T13:45:00-04:00",
+        "outcome": "bounced",
+        "note": "Not us, try HR.",
+        "redirect_to": "dept_hr"
+      },
+      {
+        "seq": 2,
+        "from": "dept_people",
+        "to": "dept_hr",
+        "at": "2026-09-16T17:57:00-04:00",
+        "outcome": "forwarded",
+        "note": "Andre handles plan changes."
+      },
+      {
+        "seq": 3,
+        "from": "dept_hr",
+        "to": "p_andre",
+        "at": "2026-09-17T11:27:00-04:00",
+        "outcome": "handled",
+        "note": "Dependent added. Coverage starts Oct 1."
+      }
+    ]
+  },
+  {
+    "id": "req_0083",
+    "task_type": "nda_request",
+    "title": "Mutual NDA with warehouse migration consultant",
+    "requester_id": "p_raj",
+    "created_at": "2026-09-24T10:00:00-04:00",
+    "status": "resolved",
+    "resolved_at": "2026-09-26T09:54:37-04:00",
+    "resolved_by": "p_imani",
+    "resolution": "Mutual NDA countersigned.",
+    "hops": [
+      {
+        "seq": 1,
+        "from": "p_raj",
+        "to": "dept_finance",
+        "at": "2026-09-24T10:00:00-04:00",
+        "outcome": "bounced",
+        "note": "NDAs are Legal. We only handle the payment side.",
+        "redirect_to": "dept_legal"
+      },
+      {
+        "seq": 2,
+        "from": "dept_finance",
+        "to": "dept_legal",
+        "at": "2026-09-25T07:18:00-04:00",
+        "outcome": "forwarded",
+        "note": "Imani will draft the mutual NDA."
+      },
+      {
+        "seq": 3,
+        "from": "dept_legal",
+        "to": "p_imani",
+        "at": "2026-09-26T08:42:00-04:00",
+        "outcome": "handled",
+        "note": "Mutual NDA countersigned."
+      }
+    ]
+  },
+  {
     "id": "req_demo_leo",
     "task_type": "data_access",
     "title": "Warehouse access for my first analysis",

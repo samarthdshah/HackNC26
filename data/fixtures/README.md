@@ -8,13 +8,13 @@ Times are ISO 8601 in America/New_York (`-04:00`). History runs 2026-05-01 to 20
 | File | Contents |
 |---|---|
 | `company.json` | Name, timezone, demo date |
-| `departments.json` | 8 departments with `head_id` |
-| `people.json` | 20 people: `department_id`, `role`, `manager_id`, `status` (`active`/`out`), `out_until`, `delegate_id`, `access_role`, `skills` |
+| `departments.json` | 10 departments with `head_id` (HR and Legal are 9 and 10) |
+| `people.json` | 24 people: `department_id`, `role`, `manager_id`, `status` (`active`/`out`), `out_until`, `delegate_id`, `access_role`, `skills` |
 | `rooms.json`, `bookings.json` | Rooms and today's bookings |
 | `vendors.json`, `budgets.json` | Vendors and Q4 budget lines |
 | `policies.json` | Handbook sections (`id`, `title`, `text`) for Cortex |
 | `edges.json` | Starting org map as `OrgEdge` records. `from: "agent"` means the agent's first route for that task type |
-| `requests.json` | Past requests with hop chains (`from`, `to`, `at`, `outcome`, `redirect_to`), plus Leo's open demo request |
+| `requests.json` | Past requests with hop chains (`from`, `to`, `at`, `outcome`, `redirect_to`), plus Leo's open demo request. `req_0076`-`req_0083` are the HR and Legal requests, added later, so ids are not in date order |
 
 Hop outcomes: `forwarded` (did their part, passed it on), `bounced` (not theirs, see `redirect_to`), `delegated` (out, see `redirect_to`), `handled` (closed it).
 
