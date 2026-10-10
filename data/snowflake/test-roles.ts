@@ -115,6 +115,47 @@ const TESTS: Test[] = [
     expect: "refused",
     check: refused,
   })),
+  // Lane A reference data through PHOTON_FINANCE (inherits EMPLOYEE): every non-person table.
+  ...[
+    ["company", "1"], ["departments", "10"], ["rooms", "6"], ["vendors", "6"], ["budgets", "8"], ["policies", "11"],
+  ].map(([table, n]): Test => ({
+    name: `FINANCE reads ${table}`,
+    role: "PHOTON_FINANCE",
+    sql: `SELECT COUNT(*) FROM ${table}`,
+    expect: `${n} rows`,
+    check: (r) => firstCell(r) === n,
+  })),
+  {
+    name: "APP reads resolution_by_task_type",
+    role: "PHOTON_APP",
+    sql: `SELECT COUNT(*), SUM(request_count),
+                 MAX(IFF(task_type = 'onboarding', request_count || ' / ' || avg_hops, NULL)),
+                 COUNT_IF(task_type IN ('leave_request', 'benefits_question', 'employee_relations'))
+          FROM resolution_by_task_type`,
+    expect: "17 types, 83 requests, onboarding 14 / 6.43 hops, 3 HR types",
+    check: (r) => r.ok && r.rows[0].join(", ") === "17, 83, 14 / 6.43, 3",
+  },
+  ...[
+    ["VP", "PHOTON_VP"],
+    ["MANAGER", "PHOTON_MANAGER"],
+    ["EMPLOYEE", "PHOTON_EMPLOYEE"],
+  ].map(([who, role]): Test => ({
+    name: `${who} reads resolution_by_task_type`,
+    role,
+    sql: "SELECT COUNT(*) FROM resolution_by_task_type",
+    expect: "refused",
+    check: refused,
+  })),
+  {
+    name: "WAYFINDER_AGENT granted roles",
+    role: "ACCOUNTADMIN",
+    sql: "SHOW GRANTS TO USER WAYFINDER_AGENT",
+    expect: "PHOTON_APP + 6 tier roles",
+    check: (r) =>
+      r.ok &&
+      r.rows.map((row) => row[3]).sort().join(",") ===
+        "PHOTON_APP,PHOTON_EMPLOYEE,PHOTON_FINANCE,PHOTON_HR,PHOTON_HR_HEAD,PHOTON_MANAGER,PHOTON_VP",
+  },
 ];
 
 function describe(r: SqlResult): string {
