@@ -30,7 +30,12 @@ function col(name: string, type: string, field = name): Column {
   return [name, type, `v:${field}::${type}`];
 }
 
-const requests = fixture("requests") as { hops: unknown[] }[];
+const requests = fixture("requests") as { task_type: string; hops: unknown[] }[];
+
+// Request types whose text only HR may read. hr_sensitive feeds the hr_text masking policy in roles.sql,
+// which cannot share task_type with the hr_rows row access policy.
+const HR_TYPES = ["leave_request", "benefits_question", "employee_relations"];
+const hrSensitive: Column = ["hr_sensitive", "BOOLEAN", `v:task_type::STRING IN (${HR_TYPES.map((t) => `'${t}'`).join(", ")})`];
 
 const TABLES: Table[] = [
   {
@@ -147,6 +152,7 @@ const TABLES: Table[] = [
       col("vendor_id", "STRING"),
       col("amount_usd", "NUMBER(12,2)"),
       ["hop_count", "INTEGER", "ARRAY_SIZE(v:hops)"],
+      hrSensitive,
     ],
   },
   {
@@ -156,6 +162,8 @@ const TABLES: Table[] = [
     from: ", LATERAL FLATTEN(input => r.value:hops) h",
     columns: [
       ["request_id", "STRING", "v:id::STRING"],
+      ["task_type", "STRING", "v:task_type::STRING"],
+      hrSensitive,
       ["seq", "INTEGER", "h.value:seq::INTEGER"],
       ["from_id", "STRING", "h.value:from::STRING"],
       ["to_id", "STRING", "h.value:to::STRING"],
@@ -196,5 +204,18 @@ for (const t of TABLES) {
   if (!match) mismatches++;
   console.log(`${t.name.padEnd(15)} ${String(expected).padStart(7)}  ${String(count).padStart(9)}${match ? "" : "  MISMATCH"}`);
 }
-console.log(mismatches ? `${mismatches} table(s) mismatched` : "All row counts match.");
+
+const hrRequests = requests.filter((r) => HR_TYPES.includes(r.task_type));
+const hrExpected: Record<string, number> = {
+  requests: hrRequests.length,
+  request_hops: hrRequests.reduce((n, r) => n + r.hops.length, 0),
+};
+for (const [table, expected] of Object.entries(hrExpected)) {
+  const [[count]] = await mustSql(`SELECT COUNT_IF(hr_sensitive) FROM ${table}`, ctx);
+  const match = Number(count) === expected;
+  if (!match) mismatches++;
+  console.log(`${table} hr_sensitive: fixture ${expected}, snowflake ${count}${match ? "" : "  MISMATCH"}`);
+}
+console.log(mismatches ? `${mismatches} check(s) mismatched` : "All row counts match.");
+console.log("Tables were replaced: run snowflake:roles to reapply grants and policies.");
 process.exit(mismatches ? 1 : 0);

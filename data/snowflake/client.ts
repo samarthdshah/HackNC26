@@ -34,6 +34,7 @@ export type SqlResult =
 
 export type SqlOptions = {
   bindings?: Record<string, { type: string; value: string }>;
+  role?: string; // Overrides SNOWFLAKE_ROLE for this statement.
   database?: string;
   schema?: string;
 };
