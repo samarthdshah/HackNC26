@@ -87,3 +87,19 @@ If a gate slips, everyone works on it together before moving to the next phase.
 - **Should ship:** Nessie, Solana, ElevenLabs calls, consent intros, Plan view + Wallet, full Aero styling, simple Darwin
 - **Stretch:** Lab / Time Machine, multilingual voice, policy-doc → rules, campus mode
 - **Out of scope:** real company systems, real money, production-grade security
+
+## Repo layout
+
+Package manager: npm workspaces (`apps/*`, `packages/*`), Node 20+. Darwin is Python.
+
+| Folder | Owner | Contents |
+|---|---|---|
+| `apps/agent/` | A | Agent server: Spectrum, Gemini tool loop, approvals, ElevenLabs, Nessie, Solana |
+| `apps/web/` | B | Next.js site, Mycelium graph and matching, Insights, landing page |
+| `packages/shared/` | all | Shared TypeScript contracts: `OrgEdge`, `Event`, `LiveUpdate`, `ToolName` (draft) |
+| `data/fixtures/` | C | Simulated company fixtures (JSON → Snowflake / Tiger Data) |
+| `services/darwin/` | C | Python replay + evolution API; `models.py` mirrors the shared contracts |
+
+Note: `data/fixtures/` and `packages/shared/` replace `data/seed/` and `packages/types/` from the planned layout above.
+
+Setup: `npm install`, then `npm run typecheck`. Copy `.env.example` to `.env` for keys.
