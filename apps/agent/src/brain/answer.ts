@@ -7,6 +7,7 @@ import { describePerson, nameOf, resolveEntity } from "../org/entities.ts";
 import { checkPermission } from "../tools/permission.ts";
 import { route } from "../tools/route.ts";
 import { listRequests, snapshot } from "../graph/runner.ts";
+import { newHireSetup, requestHistory } from "../data/insights.ts";
 import { taskTypes } from "../org/map.ts";
 import { toolLoop, type LoopTool } from "./gemini.ts";
 
@@ -57,6 +58,20 @@ function tools(asker: string): LoopTool[] {
       },
     },
     {
+      name: "new_hire_setup_metrics",
+      description:
+        "Why new hires take long to get set up: average days and hops for the last 10 onboardings, which departments bounce requests, " +
+        "and the slowest handoffs. Runs in Snowflake as the asker's role; VP-only.",
+      parameters: z.object({}),
+      run: () => newHireSetup(asker),
+    },
+    {
+      name: "request_history",
+      description: "Resolved request counts, average hours and hops by task type, from Snowflake as the asker's role (managers and up).",
+      parameters: z.object({ task_type: z.string().optional() }),
+      run: ({ task_type }) => requestHistory(asker, task_type as string | undefined),
+    },
+    {
       name: "my_requests",
       description: "The asker's live requests and where each one stands.",
       parameters: z.object({}),
@@ -77,7 +92,11 @@ export async function answer(asker: string, question: string): Promise<string> {
   const me = getPerson(asker);
   const system = `You are Wayfinder, ${company.name}'s internal coordinator, answering in iMessage.
 The asker is ${me ? describePerson(me) : asker}. Today is ${new Date().toISOString().slice(0, 10)}.
-Use tools for facts; never guess names or policies. Answer in 1-3 short sentences, plain text, cite policy ids when relevant.`;
+Use tools for facts; never guess names, numbers or policies. Answer in 1-3 short sentences, plain text, cite policy ids when relevant.
+For metrics, give the headline number, then the biggest cause with its share of time. For new-hire setup, also name the
+department that bounces requests most and where it sends them.
+If a tool returns refused: true, Snowflake denied the asker's role. Say so plainly (e.g. "Snowflake doesn't give your role access
+to that"), never hint at the numbers, and suggest asking their manager. The data is simulated; say so only if asked.`;
   const { text } = await toolLoop(question, tools(asker), system);
   return text;
 }

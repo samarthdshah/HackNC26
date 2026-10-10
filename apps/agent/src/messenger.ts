@@ -86,8 +86,9 @@ export async function openGroup(personIds: string[], title: string, requestId?: 
   };
 }
 
-/** Post a status line to the war-room group, if one is set. */
-export async function postWarRoom(text: string, requestId?: string): Promise<void> {
+/** Post a status line to the war-room group, if one is set. HR matters are never posted. */
+export async function postWarRoom(text: string, requestId?: string, sensitive = false): Promise<void> {
+  if (sensitive) return;
   emit("war_room_post", "agent", { text }, { request_id: requestId });
   if (sink) return void (await sink("war_room", text));
   if (warRoom) await warRoom.send(text);

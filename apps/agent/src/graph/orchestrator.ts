@@ -18,7 +18,7 @@ import { ask, askJson } from "../brain/gemini.ts";
 import { getPerson } from "../data/fixtures.ts";
 import { emit } from "../events.ts";
 import { postWarRoom, sendTo } from "../messenger.ts";
-import { firstName, nameOf } from "../org/entities.ts";
+import { firstName, isSensitive, nameOf } from "../org/entities.ts";
 import { taskTypes } from "../org/map.ts";
 import { critiquePlan, proposePlan } from "../tools/plan.ts";
 import { OrchestratorState, type Launch, type OState, type OUpdate, type Resume, type Step, type Waiting } from "./state.ts";
@@ -61,7 +61,7 @@ async function understand(s: OState): Promise<Command> {
   );
   const request = { ...s.request, title: u.title, task_type: u.task_type, amount_usd: u.amount_usd };
   if (u.question) return new Command({ update: { request, log: [`asked: ${u.question}`] }, goto: "clarify" });
-  emit("request_created", s.request.requester, { goal: s.request.goal, title: u.title, task_type: u.task_type }, { request_id: s.request.id });
+  emit("request_created", s.request.requester, { goal: s.request.goal, title: u.title, task_type: u.task_type, amount_usd: u.amount_usd }, { request_id: s.request.id });
   return new Command({ update: { request }, goto: "planner" });
 }
 
@@ -114,7 +114,7 @@ async function announce(s: OState): Promise<OUpdate> {
   ev(s, "plan_created", { steps: s.steps, revisions: s.planRounds - 1 });
   const lines = s.steps.map((x) => `${AGENT_LABEL[x.kind]} ${x.description}${x.depends_on.length ? ` (after ${x.depends_on.join(", ")})` : ""}`);
   await tell(s, s.steps.length === 1 ? `On it: ${s.steps[0].description}` : `On it. Plan:\n${lines.map((l, i) => `${i + 1}. ${l}`).join("\n")}`);
-  await postWarRoom(`📋 ${s.request.title} (${nameOf(s.request.requester)}): ${s.steps.length} steps`, s.request.id);
+  await postWarRoom(`📋 ${s.request.title} (${nameOf(s.request.requester)}): ${s.steps.length} steps`, s.request.id, isSensitive(s.request.task_type));
   return {};
 }
 
@@ -254,7 +254,7 @@ async function wrapUp(s: OState): Promise<OUpdate> {
   } else if (s.outcome === "done") {
     await tell(s, `${icon} All set: ${title}.`);
   }
-  await postWarRoom(`${icon} ${title}: ${s.outcome}`, s.request.id);
+  await postWarRoom(`${icon} ${title}: ${s.outcome}`, s.request.id, isSensitive(s.request.task_type));
   ev(s, `request_${s.outcome === "done" ? "resolved" : s.outcome}`, { steps: s.steps });
   return {};
 }

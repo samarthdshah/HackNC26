@@ -23,9 +23,15 @@ const RsvpState = Annotation.Root({
 });
 type S = typeof RsvpState.State;
 
-// Group handles can't live in checkpointed state, so keep them per thread here.
+// Group handles can't live in checkpointed state, so keep them per thread here
+// and reopen on demand (e.g. after a restart; iMessage returns the same group).
 const groups = new Map<string, Awaited<ReturnType<typeof openGroup>>>();
 const groupKey = (s: S) => `${s.request.id}/${s.step.id}`;
+async function groupFor(s: S) {
+  const key = groupKey(s);
+  if (!groups.has(key)) groups.set(key, await openGroup([s.request.requester, ...s.invitees], s.request.title ?? "RSVP", s.request.id));
+  return groups.get(key)!;
+}
 
 function resolveInvitees(s: S): Command {
   const raw = s.step.audience ?? "";
@@ -74,7 +80,7 @@ async function readAnswer(text: string): Promise<Answer> {
 
 async function onRsvp(s: S): Promise<Command> {
   const msg = s.incoming!;
-  const group = groups.get(groupKey(s));
+  const group = await groupFor(s);
   const pending = () => s.invitees.filter((p) => !answers[p]);
   let answers = s.answers;
 
@@ -90,7 +96,7 @@ async function onRsvp(s: S): Promise<Command> {
   answers = { ...s.answers, [msg.from]: answer };
   const yes = Object.values(answers).filter((a) => a === "yes").length;
   ev(s, "rsvp_received", { from: msg.from, answer, yes });
-  await group?.send(`${firstName(msg.from)}: ${answer === "yes" ? "✅" : answer === "no" ? "❌" : "🤔"} · ${yes} going so far`);
+  await group.send(`${firstName(msg.from)}: ${answer === "yes" ? "✅" : answer === "no" ? "❌" : "🤔"} · ${yes} going so far`);
 
   return new Command({ update: { answers }, goto: pending().length ? "await_rsvps" : "finalize" });
 }
@@ -99,7 +105,7 @@ async function finalize(s: S) {
   const yes = Object.entries(s.answers).filter(([, a]) => a === "yes").map(([p]) => p);
   const silent = s.invitees.filter((p) => !s.answers[p]);
   await tell(s, `Headcount: ${yes.length} (${yes.map(firstName).join(", ")})${silent.length ? `. No reply from ${silent.map(firstName).join(", ")}` : ""}.`);
-  await groups.get(groupKey(s))?.send(`Final headcount: ${yes.length}. Thanks all!`);
+  await (await groupFor(s)).send(`Final headcount: ${yes.length}. Thanks all!`);
   groups.delete(groupKey(s));
   ev(s, "rsvp_closed", { headcount: yes.length, yes, no_reply: silent });
   return {

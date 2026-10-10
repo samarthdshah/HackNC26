@@ -3,6 +3,7 @@
 
 export {};
 process.env.REMINDER_MS ??= "600000";
+process.env.TIGER_DISABLED = "1"; // never write test traffic into the team's Tiger tables
 
 const { initMessenger } = await import("../src/messenger.ts");
 const { handleInbound } = await import("../src/graph/supervisor.ts");
@@ -10,13 +11,16 @@ const { bind } = await import("../src/org/directory.ts");
 const { nameOf } = await import("../src/org/entities.ts");
 const { allEdges, resetMap } = await import("../src/org/map.ts");
 const { idle, resetRunner } = await import("../src/graph/runner.ts");
+const { loadOrgData } = await import("../src/data/org.ts");
 
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
 initMessenger({ sink: (to, text) => console.log(`   📨 → ${nameOf(to)}: ${text}`) });
+const org = await loadOrgData();
+console.log(dim(`org data: ${org.source} (${org.detail})`));
 resetMap();
 resetRunner();
 
-const cast = ["leo", "raj", "tom", "priya", "sam", "nina", "maya", "victor", "dana", "ken", "jess", "elena"];
+const cast = ["leo", "raj", "tom", "priya", "sam", "nina", "maya", "victor", "dana", "ken", "jess", "elena", "teresa", "andre"];
 for (const name of cast) bind(`p_${name}`, { platform: "sim", id: name });
 
 async function say(who: string, text: string) {
@@ -47,6 +51,15 @@ const scenarios: Record<string, [string, string][]> = {
   "Budget transfer between departments": [
     ["nina", "move $600 from Commerce's team events budget to Workplace to cover the offsite catering"],
     ["dana", "approved"],
+  ],
+  "VP question: Snowflake decides who sees metrics": [
+    ["dana", "Why do new hires take so long to get set up?"],
+    ["leo", "Why do new hires take so long to get set up?"],
+    ["nina", "how long do catering requests usually take?"],
+  ],
+  "HR request stays out of the war room": [
+    ["victor", "I need to request two weeks of parental leave starting next month"],
+    ["andre", "done, approved and logged in the leave system"],
   ],
   "Delegate: owner hands it to a teammate": [
     ["sam", "the checkout orders pipeline failed overnight, dashboards are empty"],

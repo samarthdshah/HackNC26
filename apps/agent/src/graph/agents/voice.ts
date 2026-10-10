@@ -12,7 +12,7 @@ import { z } from "zod";
 import { ask, askJson } from "../../brain/gemini.ts";
 import type { Vendor } from "../../data/fixtures.ts";
 import { postWarRoom, sendVoiceTo } from "../../messenger.ts";
-import { firstName } from "../../org/entities.ts";
+import { firstName, isSensitive } from "../../org/entities.ts";
 import { tts } from "../../voice/elevenlabs.ts";
 import { placeCall, type CallTranscript } from "../../voice/calls.ts";
 import { agentBase, last } from "../state.ts";
@@ -84,7 +84,7 @@ async function report(s: S) {
   } catch {
     await tell(s, script);
   }
-  await postWarRoom(`📞 ${s.request.title}: ${s.vendor!.name} confirmed${label}. ${d.summary}`, s.request.id);
+  await postWarRoom(`📞 ${s.request.title}: ${s.vendor!.name} confirmed${label}. ${d.summary}`, s.request.id, isSensitive(s.request.task_type));
   return {
     result: {
       status: "done" as const,

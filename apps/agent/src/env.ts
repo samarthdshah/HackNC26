@@ -60,4 +60,21 @@ export const env = {
     vendorPhone: optional("VENDOR_PHONE"),
   },
   briefingAt: optional("BRIEFING_AT"), // "08:30" local time, empty = off
+  snowflake: {
+    account: optional("SNOWFLAKE_ACCOUNT"),
+    pat: optional("SNOWFLAKE_PAT"),
+    warehouse: optional("SNOWFLAKE_WAREHOUSE"),
+    database: optional("SNOWFLAKE_DATABASE", "PHOTON"),
+    schema: optional("SNOWFLAKE_SCHEMA", "ORG"),
+    // Startup reads (directory, budgets, vendors, policies): least role that sees them all.
+    orgRole: optional("SNOWFLAKE_ORG_ROLE", "PHOTON_FINANCE"),
+    // Service role allowed to read PERSON_ROLES and switch into tier roles.
+    appRole: optional("SNOWFLAKE_APP_ROLE", "PHOTON_APP"),
+  },
+  tiger: {
+    url: optional("TIGER_DATABASE_URL"),
+    password: optional("TIGER_PASSWORD"),
+    // Only if your network intercepts TLS and certificate verification fails
+    insecureTls: optional("TIGER_TLS_INSECURE") === "1",
+  },
 } as const;

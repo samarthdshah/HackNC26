@@ -12,7 +12,7 @@ import { askJson } from "../../brain/gemini.ts";
 import { getPerson } from "../../data/fixtures.ts";
 import { env } from "../../env.ts";
 import { postWarRoom, sendTo } from "../../messenger.ts";
-import { firstName, isTeam, nameOf, resolveEntity } from "../../org/entities.ts";
+import { firstName, isSensitive, isTeam, nameOf, resolveEntity } from "../../org/entities.ts";
 import { learnDelegate } from "../../org/map.ts";
 import { draft } from "../../tools/draft.ts";
 import { checkPermission } from "../../tools/permission.ts";
@@ -66,7 +66,7 @@ async function askApprover(s: S) {
   await sendTo(approver, text, s.request.id);
   ev(s, "approval_requested", { approver, amount_usd: a.amount_usd, reason: a.reason });
   if (!a.ask) await tell(s, `$${a.amount_usd} needs sign-off from ${nameOf(approver)}. ${a.reason}`);
-  await postWarRoom(`🟡 ${s.request.title}: waiting on ${nameOf(approver)} to approve $${a.amount_usd}`, s.request.id);
+  await postWarRoom(`🟡 ${s.request.title}: waiting on ${nameOf(approver)} to approve $${a.amount_usd}`, s.request.id, isSensitive(s.request.task_type));
   return { approval: { ...a, ask: text } };
 }
 
@@ -130,7 +130,7 @@ async function onAnswer(s: S): Promise<Command> {
   }
   const delegate = verdict.kind === "delegate" || verdict.kind === "redirect" ? resolveEntity(verdict.target) : undefined;
   if (delegate && !isTeam(delegate)) {
-    learnDelegate(approver, delegate, "purchase_approval", verdict.until);
+    learnDelegate(approver, delegate, "purchase_approval", verdict.until, s.request.id);
     ev(s, "delegated", { from: approver, to: delegate, until: verdict.until });
     const approvers = a.approvers.map((x, i) => (i === a.index ? delegate : x));
     return new Command({ update: { verdict, approval: { ...a, approvers, reminders: 0 } }, goto: "ask_approver" });

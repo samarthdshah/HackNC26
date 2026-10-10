@@ -1,10 +1,12 @@
-// Every side effect the agent takes goes through emit(). For now events land in a
-// local JSONL file; Tiger Data (Lane C) and the website push (Lane B) plug in here.
+// Every side effect the agent takes goes through emit(). Events land in a local
+// JSONL file and in Tiger Data (when its tables exist); Lane B's live push
+// subscribes with onLiveUpdate().
 
 import { randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Event, LiveUpdate, OrgEdge } from "@wayfinder/shared";
+import { writeEdge, writeEvent } from "./data/tiger.ts";
 
 const logDir = fileURLToPath(new URL("../logs/", import.meta.url));
 mkdirSync(logDir, { recursive: true });
@@ -30,13 +32,15 @@ export function emit(
 ): Event {
   const event: Event = { id: randomUUID(), ts: new Date().toISOString(), type, actor, payload, ...extra };
   appendFileSync(logDir + "events.jsonl", JSON.stringify(event) + "\n");
+  writeEvent(event);
   publish({ kind: "event", ts: event.ts, data: event });
   return event;
 }
 
 /** An org map edge was created or changed. */
-export function emitEdge(edge: OrgEdge) {
+export function emitEdge(edge: OrgEdge, learnedFrom?: string) {
   const ts = new Date().toISOString();
   appendFileSync(logDir + "edges.jsonl", JSON.stringify({ ts, ...edge }) + "\n");
+  writeEdge(edge, learnedFrom);
   publish({ kind: "edge", ts, data: edge });
 }

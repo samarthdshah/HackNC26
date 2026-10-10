@@ -16,7 +16,7 @@ import { budgets, departments, getPerson, vendors } from "../../data/fixtures.ts
 import { postWarRoom } from "../../messenger.ts";
 import { billVendor, transferBetweenBudgets } from "../../money/nessie.ts";
 import { payVendor } from "../../money/solana.ts";
-import { nameOf } from "../../org/entities.ts";
+import { isSensitive, nameOf } from "../../org/entities.ts";
 import { checkPermission } from "../../tools/permission.ts";
 import { agentBase, last } from "../state.ts";
 import { ev, fromBriefing, tell, vendorFor } from "./common.ts";
@@ -155,7 +155,7 @@ async function receipt(s: S) {
   const link = p.explorer_url ? ` Receipt: ${p.explorer_url}` : "";
   const sim = p.simulated ? " (Nessie was unreachable, so this is on the local ledger for now)" : "";
   await tell(s, `💸 Paid ${p.to} $${p.amount_usd} via ${p.rail}.${link}${sim}`);
-  await postWarRoom(`💸 ${s.request.title}: $${p.amount_usd} → ${p.to} (${p.rail})`, s.request.id);
+  await postWarRoom(`💸 ${s.request.title}: $${p.amount_usd} → ${p.to} (${p.rail})`, s.request.id, isSensitive(s.request.task_type));
   return {
     result: {
       status: "done" as const,

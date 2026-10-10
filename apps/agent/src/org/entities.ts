@@ -20,7 +20,14 @@ const ALIASES: Record<string, string> = {
   "data platform": "dept_data_platform",
   "data eng": "dept_data_platform",
   "people ops": "dept_people",
-  hr: "dept_people",
+  onboarding: "dept_people",
+  hr: "dept_hr",
+  "human resources": "dept_hr",
+  benefits: "dept_hr",
+  payroll: "dept_hr",
+  legal: "dept_legal",
+  counsel: "dept_legal",
+  contracts: "dept_legal",
   it: "dept_it",
   workplace: "dept_workplace",
   facilities: "dept_workplace",
@@ -48,7 +55,8 @@ export function resolveEntity(text: string | undefined): string | undefined {
   const byFirst = people.filter((p) => norm(p.name).split(" ")[0] === q.split(" ")[0]);
   if (byFirst.length === 1) return byFirst[0].id;
 
-  for (const [alias, id] of Object.entries(ALIASES)) if (q.includes(alias)) return id;
+  // Whole words only: "it" must not match inside "with", nor "hr" inside "three".
+  for (const [alias, id] of Object.entries(ALIASES)) if (new RegExp(`\\b${alias}\\b`).test(q)) return id;
   return undefined;
 }
 
@@ -57,3 +65,7 @@ export function describePerson(p: Person): string {
   const out = p.status === "out" ? `, out until ${p.out_until?.slice(0, 10)} (delegate ${p.delegate_id ? nameOf(p.delegate_id) : "none"})` : "";
   return `${p.name} (${p.id}), ${p.role}, ${dept}${out}`;
 }
+
+/** HR matters stay out of war rooms and group threads (benefits, leave, employee relations). */
+const SENSITIVE_TASKS = new Set(["benefits_question", "leave_request", "employee_relations"]);
+export const isSensitive = (taskType: string | undefined) => Boolean(taskType && SENSITIVE_TASKS.has(taskType));

@@ -65,7 +65,8 @@ export async function payVendor(vendorId: string, amountUsd: number, memo: strin
   const payer = await wallet();
   const client = createClient()
     .use(signer(payer))
-    .use(solanaRpc({ rpcUrl: env.solana.rpcUrl, transactionConfig: { version: 1 } }));
+    // v0, not v1: devnet rejects v1 transfers with MaxLoadedAccountsDataSizeExceeded (checked by simulation).
+    .use(solanaRpc({ rpcUrl: env.solana.rpcUrl, transactionConfig: { version: 0 } }));
 
   const amount = lamports(usdToLamports(amountUsd));
   const destination = await vendorAddress(vendorId);

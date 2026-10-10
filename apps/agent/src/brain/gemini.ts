@@ -81,6 +81,7 @@ export async function toolLoop(
           output = tool ? await tool.run(tool.parameters.parse(fc.args ?? {})) : { error: `unknown tool ${fc.name}` };
         } catch (err) {
           output = { error: err instanceof Error ? err.message : String(err) };
+          console.warn(`[tool] ${fc.name} failed: ${(output as { error: string }).error}`);
         }
         return { functionResponse: { id: fc.id, name: fc.name, response: { output } } };
       }),

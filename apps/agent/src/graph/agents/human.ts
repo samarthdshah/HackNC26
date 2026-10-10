@@ -9,7 +9,7 @@ import { classifyReply } from "../../brain/classify.ts";
 import { getPerson } from "../../data/fixtures.ts";
 import { env } from "../../env.ts";
 import { postWarRoom, sendTo } from "../../messenger.ts";
-import { firstName, isTeam, nameOf, resolveEntity } from "../../org/entities.ts";
+import { firstName, isSensitive, isTeam, nameOf, resolveEntity } from "../../org/entities.ts";
 import { learnDelegate, learnRedirect, reinforce } from "../../org/map.ts";
 import { draft } from "../../tools/draft.ts";
 import { route } from "../../tools/route.ts";
@@ -40,7 +40,7 @@ async function routeNode(s: S): Promise<Command> {
   if (!r.owner) {
     return new Command({ update: { result: { status: "failed", summary: `No owner found for ${st.task_type}` } }, goto: END });
   }
-  ev(s, "routed", { task_type: st.task_type, chain: r.chain, confidence: r.confidence, source: r.source });
+  ev(s, "routed", { task_type: st.task_type, owner: r.owner, chain: r.chain, confidence: r.confidence, source: r.source });
   return new Command({ update: { assignment: { ...r, owner: r.owner, reminders: 0 }, hops: s.hops + 1 }, goto: "draft_ask" });
 }
 
@@ -71,7 +71,7 @@ async function dispatch(s: S) {
   const via = a.chain.length > 1 && isTeam(a.chain[0]) ? ` (${nameOf(a.chain[0])})` : "";
   const cover = a.delegated_from ? `, covering for ${firstName(a.delegated_from)}` : "";
   await tell(s, `Sent "${s.step.description}" to ${nameOf(a.owner)}${via}${cover}.`);
-  await postWarRoom(`🔵 ${s.request.title}: ${s.step.id} with ${nameOf(a.owner)}${via}`, s.request.id);
+  await postWarRoom(`🔵 ${s.request.title}: ${s.step.id} with ${nameOf(a.owner)}${via}`, s.request.id, isSensitive(s.request.task_type));
   return {};
 }
 
@@ -136,14 +136,14 @@ async function onReply(s: S): Promise<Command> {
         return new Command({ update: { verdict }, goto: "await_owner" });
       }
       if (verdict.kind === "delegate" && !isTeam(target)) {
-        learnDelegate(a.owner, target, st.task_type, verdict.until);
+        learnDelegate(a.owner, target, st.task_type, verdict.until, s.request.id);
         ev(s, "delegated", { from: a.owner, to: target, task_type: st.task_type, until: verdict.until });
         await tell(s, `${firstName(a.owner)} handed it to ${nameOf(target)}.`);
       } else {
-        const { demoted, learned } = learnRedirect("agent", entry, target, st.task_type);
+        const { demoted, learned } = learnRedirect("agent", entry, target, st.task_type, s.request.id);
         ev(s, "redirected", { from: entry, to: target, by, task_type: st.task_type, demoted, learned });
         await tell(s, `${firstName(by)} says it's not ${nameOf(entry)}, it's ${nameOf(target)}. Rerouting, and I'll remember that.`);
-        await postWarRoom(`🧠 Learned: ${st.task_type} → ${nameOf(target)} (not ${nameOf(entry)})`, s.request.id);
+        await postWarRoom(`🧠 Learned: ${st.task_type} → ${nameOf(target)} (not ${nameOf(entry)})`, s.request.id, isSensitive(st.task_type));
       }
       return new Command({
         update: {

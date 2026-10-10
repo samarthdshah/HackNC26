@@ -25,7 +25,7 @@ import { bind, personFor, type Handle } from "../org/directory.ts";
 import { describePerson, nameOf, resolveEntity } from "../org/entities.ts";
 import { allEdges, resetMap } from "../org/map.ts";
 import { tts } from "../voice/elevenlabs.ts";
-import { allPaused, listRequests, resetRunner, resume, snapshot, startRequest, waitingOn } from "./runner.ts";
+import { allPaused, listRequests, resetRunner, resume, settle, snapshot, startRequest, waitingOn } from "./runner.ts";
 
 const last = <T>(fallback: T) => Annotation<T>({ reducer: (_, next) => next, default: () => fallback });
 
@@ -141,6 +141,8 @@ const Triage = z.object({
 
 async function triage(s: S): Promise<Command> {
   const person = s.person!;
+  // A thread may be mid-run and about to ask this person something; let it pause first.
+  if (waitingOn(person).length === 0) await settle(6000);
   const pending = waitingOn(person);
   const text = s.text.trim();
 

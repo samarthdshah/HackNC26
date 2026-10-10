@@ -5,9 +5,12 @@ import type { Message, Space } from "spectrum-ts";
 import { scheduleBriefings } from "./brain/briefing.ts";
 import { env } from "./env.ts";
 import { emit } from "./events.ts";
+import { loadOrgData } from "./data/org.ts";
+import { restore } from "./graph/runner.ts";
 import { handleInbound } from "./graph/supervisor.ts";
 import { initMessenger, rememberSpace } from "./messenger.ts";
 import { allBindings } from "./org/directory.ts";
+import { syncMapFromTiger } from "./org/map.ts";
 import { startSpectrum } from "./spectrum/app.ts";
 
 const seen = new Set<string>();
@@ -25,6 +28,12 @@ async function handle(space: Space, message: Message): Promise<void> {
     emit("message_out", "agent", { text: reply, platform: message.platform });
   }
 }
+
+const org = await loadOrgData();
+console.log(`[agent] org data from ${org.source} (${org.detail})`);
+console.log(`[agent] org map from ${await syncMapFromTiger()}`);
+const restored = await restore();
+if (restored.requests) console.log(`[agent] restored ${restored.requests} requests, ${restored.waiting} waiting on people, ${restored.resumed} resumed`);
 
 const { app, imessageEnabled } = await startSpectrum();
 initMessenger({ app, imessageEnabled });

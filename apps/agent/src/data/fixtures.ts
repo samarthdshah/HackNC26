@@ -1,5 +1,6 @@
-// Read-only view over Lane C's JSON fixtures (data/fixtures). The brain only talks
-// to this module, so swapping in Snowflake / Tiger Data later is a one-file change.
+// The agent's in-memory org data. Starts from Lane C's JSON fixtures (data/fixtures)
+// and is replaced from Snowflake PHOTON.ORG at startup by loadOrgData() (data/org.ts).
+// Everything else imports from here; ES module live bindings carry the swap.
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -67,13 +68,42 @@ export interface Policy {
   text: string;
 }
 
-export const company = load<Company>("company.json");
-export const people = load<Person[]>("people.json");
-export const departments = load<Department[]>("departments.json");
-export const budgets = load<Budget[]>("budgets.json");
-export const vendors = load<Vendor[]>("vendors.json");
-export const policies = load<Policy[]>("policies.json");
+export interface Room {
+  id: string;
+  name: string;
+  floor: number;
+  capacity: number;
+  features: string[];
+}
+
+export let company = load<Company>("company.json");
+export let people = load<Person[]>("people.json");
+export let departments = load<Department[]>("departments.json");
+export let budgets = load<Budget[]>("budgets.json");
+export let vendors = load<Vendor[]>("vendors.json");
+export let policies = load<Policy[]>("policies.json");
+export let rooms = load<Room[]>("rooms.json");
+/** Chart edges seed the org map; live edges are owned by org/map.ts. */
 export const edges = load<OrgEdge[]>("edges.json");
+/** Person id -> Snowflake tier role (PHOTON.ORG.PERSON_ROLES). Empty until loaded. */
+export let personRoles: Record<string, string> = {};
+export let source: "fixtures" | "snowflake" = "fixtures";
+
+export interface OrgData {
+  company: Company;
+  people: Person[];
+  departments: Department[];
+  budgets: Budget[];
+  vendors: Vendor[];
+  policies: Policy[];
+  rooms: Room[];
+  personRoles: Record<string, string>;
+}
+
+export function setOrgData(data: OrgData) {
+  ({ company, people, departments, budgets, vendors, policies, rooms, personRoles } = data);
+  source = "snowflake";
+}
 
 export const getPerson = (id: string) => people.find((p) => p.id === id);
 export const getDepartment = (id: string) => departments.find((d) => d.id === id);
