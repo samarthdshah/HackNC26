@@ -4,8 +4,8 @@
 
 CREATE EXTENSION IF NOT EXISTS timescaledb;
 
-DROP FUNCTION IF EXISTS learn_edge(text, text, text, text, text, timestamptz);
-DROP TABLE IF EXISTS events, request_hops, bookings, org_edges, requests, actors CASCADE;
+DROP FUNCTION IF EXISTS learn_edge(text, text, text, text, text, timestamptz); -- dropped: A writes org_edges itself
+DROP TABLE IF EXISTS events, request_hops, bookings, org_edge_changes, org_edges, requests, actors CASCADE;
 
 -- Id-to-name and department lookup for Insights joins. Subset copy of the Snowflake directory; 'agent' is a row.
 CREATE TABLE actors (
@@ -65,7 +65,8 @@ SELECT create_hypertable('events', by_range('ts', INTERVAL '7 days'));
 CREATE INDEX ON events (request_id, ts DESC);
 CREATE INDEX ON events (type, ts DESC);
 
--- Shared type: OrgEdge. Natural key (from, to, task_type).
+-- Shared type: OrgEdge. Natural key (from, to, task_type). A computes the final confidence and upserts rows itself.
+-- Agent routes use from_id 'agent'; delegations are person to person with delegate_until.
 CREATE TABLE org_edges (
   from_id        text NOT NULL REFERENCES actors (id),  -- 'agent' = agent's first route for this task type
   to_id          text NOT NULL REFERENCES actors (id),
@@ -77,6 +78,23 @@ CREATE TABLE org_edges (
   learned_from   text,                                  -- request id; no FK so A can pass a request not stored yet
   PRIMARY KEY (from_id, to_id, task_type)
 );
+
+-- History of org_edges writes: A inserts one row per edge it creates or changes. previous_confidence is null for a new
+-- edge. No FK to org_edges (history outlives edges); reason and request_id are optional.
+CREATE TABLE org_edge_changes (
+  id                  bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  changed_at          timestamptz NOT NULL DEFAULT now(),
+  from_id             text NOT NULL REFERENCES actors (id),
+  to_id               text NOT NULL REFERENCES actors (id),
+  task_type           text NOT NULL,
+  previous_confidence real CHECK (previous_confidence BETWEEN 0 AND 1),
+  confidence          real NOT NULL CHECK (confidence BETWEEN 0 AND 1),
+  source              text NOT NULL CHECK (source IN ('chart', 'learned')),
+  delegate_until      timestamptz,
+  reason              text,                                  -- e.g. redirected, delegated, reinforced
+  request_id          text                                   -- no FK: live requests exist only as events
+);
+CREATE INDEX ON org_edge_changes (from_id, to_id, task_type, changed_at DESC);
 
 CREATE TABLE bookings (
   id                 text PRIMARY KEY,
@@ -270,52 +288,3 @@ WHERE status = 'resolved' AND outcome = 'bounced'
 UNION ALL
 SELECT 'agent_routing', 'saved', count(*)::int, 'resolved agent requests', round(coalesce(sum(saved), 0), 1)
 FROM agent;
-
--- "Not us, try X": lower the wrong edge, add or raise the right one, and log one edge_updated event per changed edge.
--- Step sizes (-0.3, +0.2, new at 0.8) are placeholders. Returns the changed edges.
-CREATE FUNCTION learn_edge(
-  p_from       text,
-  p_wrong_to   text,                 -- null when only adding (e.g. a delegate)
-  p_right_to   text,
-  p_task_type  text,
-  p_request_id text DEFAULT NULL,
-  p_until      timestamptz DEFAULT NULL
-) RETURNS SETOF org_edges
-LANGUAGE plpgsql AS $$
-DECLARE
-  e    org_edges;
-  prev real;
-BEGIN
-  IF p_wrong_to IS NOT NULL THEN
-    SELECT confidence INTO prev FROM org_edges
-    WHERE from_id = p_from AND to_id = p_wrong_to AND task_type = p_task_type FOR UPDATE;
-    IF FOUND THEN
-      UPDATE org_edges SET confidence = greatest(round((confidence - 0.3)::numeric, 2), 0)::real, updated_at = now()
-      WHERE from_id = p_from AND to_id = p_wrong_to AND task_type = p_task_type
-      RETURNING * INTO e;
-      INSERT INTO events (type, actor, request_id, payload)
-      VALUES ('edge_updated', 'agent', p_request_id, jsonb_strip_nulls(jsonb_build_object(
-        'from', e.from_id, 'to', e.to_id, 'task_type', e.task_type, 'confidence', e.confidence,
-        'source', e.source, 'delegate_until', e.delegate_until)) || jsonb_build_object('previous_confidence', prev));
-      RETURN NEXT e;
-    END IF;
-  END IF;
-
-  prev := NULL;
-  SELECT confidence INTO prev FROM org_edges
-  WHERE from_id = p_from AND to_id = p_right_to AND task_type = p_task_type FOR UPDATE;
-  INSERT INTO org_edges (from_id, to_id, task_type, confidence, source, delegate_until, learned_from)
-  VALUES (p_from, p_right_to, p_task_type, 0.8, 'learned', p_until, p_request_id)
-  ON CONFLICT (from_id, to_id, task_type) DO UPDATE SET
-    confidence     = least(round((org_edges.confidence + 0.2)::numeric, 2), 1)::real,
-    source         = 'learned',
-    delegate_until = EXCLUDED.delegate_until,
-    learned_from   = EXCLUDED.learned_from,
-    updated_at     = now()
-  RETURNING * INTO e;
-  INSERT INTO events (type, actor, request_id, payload)
-  VALUES ('edge_updated', 'agent', p_request_id, jsonb_strip_nulls(jsonb_build_object(
-    'from', e.from_id, 'to', e.to_id, 'task_type', e.task_type, 'confidence', e.confidence,
-    'source', e.source, 'delegate_until', e.delegate_until)) || jsonb_build_object('previous_confidence', prev));
-  RETURN NEXT e;
-END $$;

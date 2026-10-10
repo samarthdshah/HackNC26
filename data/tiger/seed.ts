@@ -20,7 +20,9 @@ function fixture(name: string): any {
 
 const departments: Row[] = fixture("departments");
 const people: Row[] = fixture("people");
-const requests: Row[] = fixture("requests");
+// Leo's request is created live by lane A (req_live_*), so it is not seeded: no request, hops, or events.
+const LIVE_ONLY = ["req_demo_leo"];
+const requests: Row[] = fixture("requests").filter((r: Row) => !LIVE_ONLY.includes(r.id));
 const edges: Row[] = fixture("edges");
 const bookings: Row[] = fixture("bookings");
 
@@ -140,7 +142,8 @@ function expect(label: string, actual: unknown, expected: unknown) {
 const client = new pg.Client({ connectionString: process.env.TIGER_DATABASE_URL });
 client.on("notice", (n) => console.log(`notice: ${n.message}`));
 await client.connect();
-const one = async (sql: string, params: unknown[] = []) => (await client.query(sql, params)).rows[0];
+const rows = async (sql: string, params: unknown[] = []) => (await client.query(sql, params)).rows;
+const one = async (sql: string, params: unknown[] = []) => (await rows(sql, params))[0];
 
 try {
   await client.query("BEGIN");
@@ -162,13 +165,12 @@ try {
 
   console.log("Demo rows:");
   const leo = await one(
-    `SELECT r.status, r.task_type, r.requester_id, count(h.*)::int AS hops,
-            string_agg(h.to_id || ' ' || h.outcome || ' -> ' || h.redirect_to, '; ') AS hop
-     FROM requests r JOIN request_hops h ON h.request_id = r.id WHERE r.id = 'req_demo_leo'
-     GROUP BY r.status, r.task_type, r.requester_id`,
+    `SELECT (SELECT count(*) FROM requests WHERE id = ANY($1))::int
+          + (SELECT count(*) FROM request_hops WHERE request_id = ANY($1))::int
+          + (SELECT count(*) FROM events WHERE request_id = ANY($1) OR payload->>'request_id' = ANY($1))::int AS n`,
+    [LIVE_ONLY],
   );
-  expect("req_demo_leo", leo && `${leo.status} ${leo.task_type} ${leo.requester_id} ${leo.hops} hop: ${leo.hop}`,
-    "open data_access p_leo 1 hop: dept_data_platform bounced -> dept_analytics_eng");
+  expect("req_demo_leo rows (requests + hops + events), created live by A", leo.n, 0);
   const priya = await one(
     `SELECT string_agg(task_type, ',' ORDER BY task_type) AS types FROM org_edges
      WHERE from_id = 'p_priya' AND to_id = 'p_tom' AND delegate_until = '2026-10-16T17:00:00-04:00'
@@ -195,20 +197,54 @@ try {
   expect("checkout incidents", `${checkout.n} direct ${checkout.direct} routed ${checkout.routed}`,
     "6 direct req_0017,req_0066 routed req_0004,req_0029,req_0043,req_0055");
 
-  // learn_edge smoke test on Leo's bounce, rolled back so the seed keeps the chart edges.
-  console.log("learn_edge (rolled back):");
-  await client.query("SAVEPOINT learn");
-  const learned = (
-    await client.query(
-      `SELECT to_id, confidence, source FROM learn_edge('agent', 'dept_data_platform', 'dept_analytics_eng', 'data_access', 'req_demo_leo')`,
-    )
-  ).rows.map((e) => `${e.to_id} ${e.confidence} ${e.source}`);
-  expect("edges", learned.join("; "), "dept_data_platform 0.4 chart; dept_analytics_eng 0.8 learned");
-  expect("edge_updated events", (await one("SELECT count(*)::int AS n FROM events WHERE type = 'edge_updated'")).n, 2);
-  await client.query("ROLLBACK TO SAVEPOINT learn");
+  // Edges: chart only, Priya's delegations the only dated edges, and Data Platform the agent's top data_access route.
+  console.log("org_edges:");
+  expect("non-chart edges", (await one("SELECT count(*)::int AS n FROM org_edges WHERE source <> 'chart'")).n, 0);
+  const dated = await one(
+    "SELECT string_agg(from_id || '->' || to_id || ' ' || task_type, '; ' ORDER BY task_type) AS e FROM org_edges WHERE delegate_until IS NOT NULL",
+  );
+  expect("delegate edges", dated.e, "p_priya->p_tom data_access; p_priya->p_tom purchase_approval");
+  const route = await rows(
+    `SELECT to_id, confidence, source FROM org_edges_current
+     WHERE from_id = 'agent' AND task_type = 'data_access' ORDER BY confidence DESC, to_id`,
+  );
+  expect("agent data_access routes", route.map((e) => `${e.to_id} ${e.confidence} ${e.source}`).join("; "), "dept_data_platform 0.7 chart");
+  expect(
+    "learned agent -> dept_analytics_eng data_access",
+    (await one("SELECT count(*)::int AS n FROM org_edges WHERE from_id = 'agent' AND to_id = 'dept_analytics_eng' AND task_type = 'data_access'")).n,
+    0,
+  );
+  expect("learn_edge function", (await one("SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'learn_edge'")).n, 0);
+
+  // org_edge_changes: empty at seed; A's write (upsert edge + history row, reason and request_id null) works. Rolled back.
+  console.log("org_edge_changes (write rolled back):");
+  const cols = await one(
+    `SELECT string_agg(column_name || ' ' || is_nullable, ', ' ORDER BY ordinal_position) AS c
+     FROM information_schema.columns WHERE table_name = 'org_edge_changes'`,
+  );
+  expect(
+    "columns",
+    cols.c,
+    "id NO, changed_at NO, from_id NO, to_id NO, task_type NO, previous_confidence YES, confidence NO, source NO, delegate_until YES, reason YES, request_id YES",
+  );
+  expect("rows at seed", (await one("SELECT count(*)::int AS n FROM org_edge_changes")).n, 0);
+  await client.query("SAVEPOINT a_write");
+  await client.query(
+    `INSERT INTO org_edges (from_id, to_id, task_type, confidence, source) VALUES ('agent', 'dept_data_platform', 'data_access', 0.4, 'chart')
+     ON CONFLICT (from_id, to_id, task_type) DO UPDATE SET confidence = EXCLUDED.confidence, updated_at = now()`,
+  );
+  await client.query(
+    `INSERT INTO org_edge_changes (from_id, to_id, task_type, previous_confidence, confidence, source)
+     VALUES ('agent', 'dept_data_platform', 'data_access', 0.7, 0.4, 'chart')`,
+  );
+  const change = await one(
+    `SELECT c.previous_confidence, c.confidence, e.confidence AS edge FROM org_edge_changes c
+     JOIN org_edges e USING (from_id, to_id, task_type)`,
+  );
+  expect("upsert + history row", `${change.previous_confidence} -> ${change.confidence}, edge ${change.edge}`, "0.7 -> 0.4, edge 0.4");
+  await client.query("ROLLBACK TO SAVEPOINT a_write");
 
   // Insights views must return the PLAN.md values.
-  const rows = async (sql: string, params: unknown[] = []) => (await client.query(sql, params)).rows;
   console.log("insights_new_hires:");
   const hire = await one("SELECT * FROM insights_new_hires");
   expect("last 10 onboarding", `${hire.requests} requests, ${hire.avg_days} days, ${hire.avg_hops} hops`, "10 requests, 4.01 days, 6.00 hops");
