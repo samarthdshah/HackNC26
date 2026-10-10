@@ -25,5 +25,13 @@
   { "from": "agent", "to": "dept_platform", "task_type": "infra_incident", "confidence": 0.95, "source": "chart" },
   { "from": "dept_platform", "to": "p_aisha", "task_type": "infra_incident", "confidence": 0.9, "source": "chart" },
   { "from": "agent", "to": "dept_people", "task_type": "policy_question", "confidence": 0.8, "source": "chart" },
-  { "from": "dept_people", "to": "p_grace", "task_type": "policy_question", "confidence": 0.75, "source": "chart" }
+  { "from": "dept_people", "to": "p_grace", "task_type": "policy_question", "confidence": 0.75, "source": "chart" },
+  { "from": "agent", "to": "dept_hr", "task_type": "benefits_question", "confidence": 0.9, "source": "chart" },
+  { "from": "agent", "to": "dept_hr", "task_type": "leave_request", "confidence": 0.9, "source": "chart" },
+  { "from": "agent", "to": "dept_hr", "task_type": "employee_relations", "confidence": 0.85, "source": "chart" },
+  { "from": "dept_hr", "to": "p_andre", "task_type": "benefits_question", "confidence": 0.85, "source": "chart" },
+  { "from": "dept_hr", "to": "p_andre", "task_type": "leave_request", "confidence": 0.85, "source": "chart" },
+  { "from": "agent", "to": "dept_legal", "task_type": "contract_review", "confidence": 0.9, "source": "chart" },
+  { "from": "agent", "to": "dept_legal", "task_type": "nda_request", "confidence": 0.9, "source": "chart" },
+  { "from": "dept_legal", "to": "p_imani", "task_type": "contract_review", "confidence": 0.85, "source": "chart" }
 ]
