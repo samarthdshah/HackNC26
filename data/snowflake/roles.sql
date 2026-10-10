@@ -88,7 +88,86 @@ SELECT
 FROM people;
 GRANT SELECT ON TABLE person_roles TO ROLE PHOTON_APP;
 
--- 6. Service user for lane A. No password; Lane C's owner creates its PAT in Snowsight.
+-- 6. VP metrics: Dana's "Why do new hires take so long to get set up?" from the last 10 resolved onboarding requests.
+--    One row per finding, keyed by section: 'summary' (avg days, avg hops), 'slowest_handoff' (ranked by avg hours
+--    until the receiver passed the request on or resolved it), 'bouncing_department' (ranked by bounces).
+--    Ids are resolved to department and person names; no request text, so HR masking never applies.
+--    Secure, so the definition is hidden from readers. Only PHOTON_VP (and PHOTON_APP above it) can read it.
+CREATE OR REPLACE SECURE VIEW vp_new_hire_setup AS
+  WITH last10 AS (
+    SELECT id, created_at, resolved_at, hop_count
+    FROM requests
+    WHERE task_type = 'onboarding' AND status = 'resolved'
+    ORDER BY created_at DESC
+    LIMIT 10
+  ),
+  actors AS (
+    SELECT id, name, name AS department FROM departments
+    UNION ALL
+    SELECT p.id, p.name, d.name FROM people p LEFT JOIN departments d ON d.id = p.department_id
+  ),
+  steps AS (
+    SELECT
+      h.request_id, h.seq, h.from_id, h.to_id, h.outcome, h.redirect_to,
+      DATEDIFF('second', h.at, COALESCE(LEAD(h.at) OVER (PARTITION BY h.request_id ORDER BY h.seq), l.resolved_at)) / 3600 AS hours
+    FROM request_hops h
+    JOIN last10 l ON l.id = h.request_id
+  ),
+  total AS (SELECT SUM(hours) AS hours FROM steps),
+  handoffs AS (
+    SELECT
+      IFF(s.seq = 1, 'Requester', f.name) AS from_name,
+      IFF(s.seq = 1, NULL, f.department) AS from_department,
+      t.name AS to_name,
+      t.department AS to_department,
+      COUNT(*) AS n,
+      AVG(s.hours) AS avg_hours,
+      SUM(s.hours) AS sum_hours
+    FROM steps s
+    JOIN actors f ON f.id = s.from_id
+    JOIN actors t ON t.id = s.to_id
+    GROUP BY 1, 2, 3, 4
+  ),
+  bounces AS (
+    SELECT
+      t.department,
+      COUNT(*) AS n,
+      COUNT(DISTINCT s.request_id) AS requests,
+      AVG(s.hours) AS avg_hours,
+      SUM(s.hours) AS sum_hours,
+      LISTAGG(DISTINCT r.name, ', ') WITHIN GROUP (ORDER BY r.name) AS bounced_to
+    FROM steps s
+    JOIN actors t ON t.id = s.to_id
+    LEFT JOIN actors r ON r.id = s.redirect_to
+    WHERE s.outcome = 'bounced'
+    GROUP BY 1
+  )
+  SELECT
+    'summary' AS section, 1 AS rank,
+    COUNT(*) AS requests,
+    ROUND(AVG(DATEDIFF('second', created_at, resolved_at)) / 86400, 2)::NUMBER(10, 2) AS avg_days,
+    ROUND(AVG(hop_count), 2)::NUMBER(10, 2) AS avg_hops,
+    NULL AS from_name, NULL AS from_department, NULL AS to_name, NULL AS to_department, NULL AS department, NULL AS bounced_to,
+    NULL AS handoffs, NULL AS bounces, NULL AS avg_hours, NULL AS total_hours, NULL AS pct_of_time
+  FROM last10
+  UNION ALL
+  SELECT
+    'slowest_handoff', ROW_NUMBER() OVER (ORDER BY h.avg_hours DESC, h.n DESC, h.from_name, h.to_name),
+    NULL, NULL, NULL,
+    h.from_name, h.from_department, h.to_name, h.to_department, NULL, NULL,
+    h.n, NULL, ROUND(h.avg_hours, 1), ROUND(h.sum_hours, 1), ROUND(100 * h.sum_hours / total.hours, 1)
+  FROM handoffs h, total
+  UNION ALL
+  SELECT
+    'bouncing_department', ROW_NUMBER() OVER (ORDER BY b.n DESC, b.sum_hours DESC, b.department),
+    b.requests, NULL, NULL,
+    NULL, NULL, NULL, NULL, b.department, b.bounced_to,
+    NULL, b.n, ROUND(b.avg_hours, 1), ROUND(b.sum_hours, 1), ROUND(100 * b.sum_hours / total.hours, 1)
+  FROM bounces b, total
+  ORDER BY 1 DESC, 2;
+GRANT SELECT ON VIEW vp_new_hire_setup TO ROLE PHOTON_VP;
+
+-- 7. Service user for lane A. No password; Lane C's owner creates its PAT in Snowsight.
 CREATE USER IF NOT EXISTS WAYFINDER_AGENT TYPE = SERVICE COMMENT = 'Lane A agent server (Wayfinder OS)';
 ALTER USER WAYFINDER_AGENT SET
   TYPE = SERVICE

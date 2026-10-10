@@ -82,6 +82,39 @@ const TESTS: Test[] = [
     check: (r) => r.ok && Math.abs(Number(r.rows[0][0]) - 4) <= 0.5 && Math.abs(Number(r.rows[0][1]) - 6) <= 0.5,
   },
   { name: "EMPLOYEE (Leo) asks the new-hire question", role: "PHOTON_EMPLOYEE", sql: VP_QUESTION, expect: "refused", check: refused },
+  {
+    name: "VP reads vp_new_hire_setup summary",
+    role: "PHOTON_VP",
+    sql: "SELECT requests, avg_days, avg_hops FROM vp_new_hire_setup WHERE section = 'summary'",
+    expect: "10, 4.01, 6.00",
+    check: (r) => r.ok && r.rows.length === 1 && r.rows[0].join(", ") === "10, 4.01, 6.00",
+  },
+  {
+    name: "VP reads vp_new_hire_setup slowest handoff",
+    role: "PHOTON_VP",
+    sql: "SELECT from_name, to_name, avg_hours FROM vp_new_hire_setup WHERE section = 'slowest_handoff' AND rank = 1",
+    expect: "IT, Analytics Engineering, 19.0",
+    check: (r) => r.ok && r.rows.length === 1 && r.rows[0].join(", ") === "IT, Analytics Engineering, 19.0",
+  },
+  {
+    name: "VP reads vp_new_hire_setup top bouncer",
+    role: "PHOTON_VP",
+    sql: "SELECT department, bounces, bounced_to FROM vp_new_hire_setup WHERE section = 'bouncing_department' AND rank = 1",
+    expect: "Data Platform, 6, Analytics Engineering",
+    check: (r) => r.ok && r.rows.length === 1 && r.rows[0].join(", ") === "Data Platform, 6, Analytics Engineering",
+  },
+  ...[
+    ["MANAGER", "PHOTON_MANAGER"],
+    ["HR_HEAD", "PHOTON_HR_HEAD"],
+    ["FINANCE", "PHOTON_FINANCE"],
+    ["EMPLOYEE", "PHOTON_EMPLOYEE"],
+  ].map(([who, role]): Test => ({
+    name: `${who} reads vp_new_hire_setup`,
+    role,
+    sql: "SELECT COUNT(*) FROM vp_new_hire_setup",
+    expect: "refused",
+    check: refused,
+  })),
 ];
 
 function describe(r: SqlResult): string {
