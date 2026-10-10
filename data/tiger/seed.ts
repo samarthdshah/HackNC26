@@ -24,7 +24,7 @@ const requests: Row[] = fixture("requests");
 const edges: Row[] = fixture("edges");
 const bookings: Row[] = fixture("bookings");
 
-// Same rule as snowflake/load.ts.
+// Same rule as snowflake/load.ts and the generated requests.hr_sensitive column; used to check the HR-masked views.
 const HR_TYPES = ["leave_request", "benefits_question", "employee_relations"];
 // Hop outcome -> event type for the backfilled feed.
 const HOP_EVENT: Record<string, string> = { forwarded: "forwarded", bounced: "bounced", delegated: "delegated", handled: "resolved" };
@@ -51,7 +51,6 @@ const requestRows = requests.map((r) => ({
   room_id: r.room_id ?? null,
   vendor_id: r.vendor_id ?? null,
   amount_usd: r.amount_usd ?? null,
-  hr_sensitive: HR_TYPES.includes(r.task_type),
 }));
 
 const hopRows = requests.flatMap((r) =>
@@ -118,7 +117,7 @@ const LOADS: [string, Row[], string][] = [
     requestRows,
     "id text, task_type text, title text, requester_id text, created_at timestamptz, status text, resolved_at timestamptz, " +
       "resolved_by text, resolution text, severity text, new_hire_name text, new_hire_id text, room_id text, vendor_id text, " +
-      "amount_usd numeric, hr_sensitive boolean",
+      "amount_usd numeric",
   ],
   ["request_hops", hopRows, "request_id text, seq int, from_id text, to_id text, at timestamptz, outcome text, redirect_to text, note text"],
   ["org_edges", edgeRows, "from_id text, to_id text, task_type text, confidence real, source text, delegate_until timestamptz"],
@@ -208,42 +207,83 @@ try {
   expect("edge_updated events", (await one("SELECT count(*)::int AS n FROM events WHERE type = 'edge_updated'")).n, 2);
   await client.query("ROLLBACK TO SAVEPOINT learn");
 
-  // PLAN.md 3.1 and 3.2.
-  console.log("Insights:");
-  const hire = await one(
-    `WITH last10 AS (
-       SELECT r.id, r.created_at, r.resolved_at,
-              (SELECT count(*) FROM request_hops h WHERE h.request_id = r.id) AS hops
-       FROM requests r
-       WHERE r.task_type = 'onboarding' AND r.status = 'resolved'
-       ORDER BY r.created_at DESC
-       LIMIT 10
-     )
-     SELECT count(*)::int AS requests,
-            round(avg(extract(epoch FROM resolved_at - created_at)::numeric) / 86400, 2) AS avg_days,
-            round(avg(hops)::numeric, 2) AS avg_hops
-     FROM last10`,
-  );
-  expect("new hires (last 10): requests", hire.requests, 10);
-  expect("new hires (last 10): avg days", hire.avg_days, "4.01");
-  expect("new hires (last 10): avg hops", hire.avg_hops, "6.00");
-  const paths = (
-    await client.query(
-      `SELECT CASE WHEN a.department_id = 'dept_platform' THEN 'direct' ELSE 'routed' END AS path,
-              count(*)::int AS incidents,
-              round(avg(extract(epoch FROM r.resolved_at - r.created_at)::numeric) / 60) AS avg_minutes,
-              round(avg((SELECT count(*) FROM request_hops x WHERE x.request_id = r.id))::numeric, 1) AS avg_hops
-       FROM requests r
-       JOIN request_hops h ON h.request_id = r.id AND h.seq = 1
-       JOIN actors a ON a.id = h.to_id
-       WHERE r.task_type = 'checkout_incident' AND r.status = 'resolved'
-       GROUP BY 1
-       ORDER BY 1`,
-    )
-  ).rows;
+  // Insights views must return the PLAN.md values.
+  const rows = async (sql: string, params: unknown[] = []) => (await client.query(sql, params)).rows;
+  console.log("insights_new_hires:");
+  const hire = await one("SELECT * FROM insights_new_hires");
+  expect("last 10 onboarding", `${hire.requests} requests, ${hire.avg_days} days, ${hire.avg_hops} hops`, "10 requests, 4.01 days, 6.00 hops");
+
+  console.log("insights_checkout:");
+  const paths = await rows("SELECT * FROM insights_checkout");
   const path = (p: string) => paths.find((r) => r.path === p) ?? {};
-  expect("checkout direct", `${path("direct").incidents} incidents, ${path("direct").avg_minutes} min, ${path("direct").avg_hops} hops`, "2 incidents, 43 min, 2.0 hops");
-  expect("checkout routed", `${path("routed").incidents} incidents, ${path("routed").avg_minutes} min, ${path("routed").avg_hops} hops`, "4 incidents, 233 min, 3.8 hops");
+  for (const [p, want] of [["direct", "2 incidents, 43 min, 2.0 hops"], ["routed", "4 incidents, 233 min, 3.8 hops"]]) {
+    expect(p, `${path(p).incidents} incidents, ${path(p).avg_minutes} min, ${path(p).avg_hops} hops`, want);
+  }
+
+  console.log("insights_bottlenecks:");
+  const dp = await one("SELECT * FROM insights_bottlenecks WHERE department_id = 'dept_data_platform'");
+  expect("Data Platform", `${dp.bounces} of ${dp.hops_received} hops bounced, ${dp.bounce_hours} h`, "22 of 22 hops bounced, 341.3 h");
+  const top = await one("SELECT * FROM insights_bottlenecks WHERE rank = 1");
+  expect("rank 1 by total hours", `${top.department} ${top.total_hours} h`, "Analytics Engineering 829.7 h");
+  expect("departments", (await one("SELECT count(*)::int AS n FROM insights_bottlenecks")).n, 10);
+
+  console.log("insights_slowest_handoffs:");
+  for (const [scope, want] of [["new_hires", "IT -> Analytics Engineering, 4 handoffs, 19.0 h"], ["all", "Requester -> Finance & Procurement, 17 handoffs, 27.6 h"]]) {
+    const h = await one("SELECT * FROM insights_slowest_handoffs WHERE scope = $1 AND rank = 1", [scope]);
+    expect(`top (${scope})`, h && `${h.from_name} -> ${h.to_name}, ${h.handoffs} handoffs, ${h.avg_hours} h`, want);
+  }
+
+  console.log("insights_hours_saved:");
+  const saved = await rows("SELECT * FROM insights_hours_saved");
+  const metric = (m: string) => saved.find((r) => r.metric === m) ?? {};
+  for (const [m, want] of [
+    ["checkout_direct_paging", "saved 12.7 h over 4 routed checkout incidents"],
+    ["bounces", "lost 537.6 h over 36 bounced hops"],
+    ["agent_routing", "saved 0.0 h over 0 resolved agent requests"],
+  ]) {
+    expect(m, `${metric(m).kind} ${metric(m).hours} h over ${metric(m).basis_count} ${metric(m).basis}`, want);
+  }
+
+  // HR masking: the generated hr_sensitive matches load.ts, and no HR text reaches the public views.
+  console.log("HR-masked views:");
+  const hrIds = requests.filter((r) => HR_TYPES.includes(r.task_type)).map((r) => r.id);
+  const hrHops = requests.filter((r) => HR_TYPES.includes(r.task_type)).reduce((n, r) => n + r.hops.length, 0);
+  expect("hr_sensitive requests (load.ts rule)", (await one("SELECT string_agg(id, ',' ORDER BY id) AS ids FROM requests WHERE hr_sensitive")).ids, hrIds.sort().join(","));
+  const mask = "[visible to HR only]";
+  const req = await one(
+    `SELECT count(*)::int AS n,
+            count(*) FILTER (WHERE title = $1 AND resolution = $1)::int AS masked
+     FROM requests_public WHERE hr_sensitive`,
+    [mask],
+  );
+  expect("requests_public HR rows masked", `${req.masked} of ${req.n}`, `${hrIds.length} of ${hrIds.length}`);
+  const hop = await one(
+    `SELECT count(*)::int AS n, count(*) FILTER (WHERE note = $1)::int AS masked FROM request_hops_public WHERE hr_sensitive`,
+    [mask],
+  );
+  expect("request_hops_public HR notes masked", `${hop.masked} of ${hop.n}`, `${hrHops} of ${hrHops}`);
+  // HR fixture text that never appears on a non-HR request must not show anywhere in the public views.
+  const nonHr = requests.filter((r) => !HR_TYPES.includes(r.task_type));
+  const nonHrText = new Set(nonHr.flatMap((r) => [r.title, r.resolution, ...r.hops.map((h: Row) => h.note)]));
+  const hrText = [
+    ...new Set(
+      requests
+        .filter((r) => HR_TYPES.includes(r.task_type))
+        .flatMap((r) => [r.title, r.resolution, ...r.hops.map((h: Row) => h.note)])
+        .filter((t) => t && !nonHrText.has(t)),
+    ),
+  ];
+  const leaks = await one(
+    `SELECT (SELECT count(*) FROM requests_public WHERE title = ANY($1) OR resolution = ANY($1))::int
+          + (SELECT count(*) FROM request_hops_public WHERE note = ANY($1))::int AS n`,
+    [hrText],
+  );
+  expect(`HR-only strings found in public views (${hrText.length} checked)`, leaks.n, 0);
+  const plain = await one(
+    "SELECT count(*) FILTER (WHERE title = $1 OR resolution = $1)::int AS n FROM requests_public WHERE NOT hr_sensitive",
+    [mask],
+  );
+  expect("non-HR requests masked", plain.n, 0);
 
   if (failures.length) throw new Error(`${failures.length} check(s) failed: ${failures.join(", ")}`);
   await client.query("COMMIT");
