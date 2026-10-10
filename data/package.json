@@ -6,6 +6,8 @@
     "node": ">=22.6"
   },
   "scripts": {
-    "check": "node --experimental-strip-types --no-warnings check.ts"
+    "check": "node --experimental-strip-types --no-warnings check.ts",
+    "snowflake:verify": "node --experimental-strip-types --no-warnings snowflake/verify.ts",
+    "snowflake:load": "node --experimental-strip-types --no-warnings snowflake/load.ts"
   }
 }
