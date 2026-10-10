@@ -1,6 +1,6 @@
 {
   "name": "Photon",
-  "domain": "fernbrook.example",
+  "domain": "photon.example",
   "timezone": "America/New_York",
   "demo_date": "2026-10-10",
   "history_start": "2026-05-01",
