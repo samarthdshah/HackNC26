@@ -8,6 +8,8 @@
   "scripts": {
     "check": "node --experimental-strip-types --no-warnings check.ts",
     "snowflake:verify": "node --experimental-strip-types --no-warnings snowflake/verify.ts",
-    "snowflake:load": "node --experimental-strip-types --no-warnings snowflake/load.ts"
+    "snowflake:load": "node --experimental-strip-types --no-warnings snowflake/load.ts",
+    "snowflake:roles": "node --experimental-strip-types --no-warnings snowflake/roles.ts",
+    "snowflake:test-roles": "node --experimental-strip-types --no-warnings snowflake/test-roles.ts"
   }
 }
