@@ -134,6 +134,18 @@ SELECT h.request_id, r.task_type, r.hr_sensitive, h.seq, h.from_id, h.to_id, h.a
 FROM request_hops h
 JOIN requests r ON r.id = h.request_id;
 
+-- events with request text keys in payload (title, note, resolution) masked when the linked request is HR-sensitive.
+-- Other keys, and events of non-HR requests or with no request, pass through unchanged.
+CREATE VIEW events_public AS
+SELECT e.id, e.ts, e.type, e.actor, e.request_id, e.tool,
+       CASE WHEN r.hr_sensitive THEN e.payload || (
+         SELECT coalesce(jsonb_object_agg(k, to_jsonb('[visible to HR only]'::text)), '{}')
+         FROM jsonb_object_keys(e.payload) AS k
+         WHERE k IN ('title', 'note', 'resolution')
+       ) ELSE e.payload END AS payload
+FROM events e
+LEFT JOIN requests r ON r.id = e.request_id;
+
 -- Insights. Plain views over the live tables, so every new request, hop, or resolution changes the numbers.
 -- History stats use resolved requests only.
 

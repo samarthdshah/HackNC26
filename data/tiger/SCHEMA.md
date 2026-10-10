@@ -13,7 +13,7 @@ For lanes A (agent server) and B (website). Lane C owns this database. The desig
 - **Times:** all `timestamptz`. node-postgres returns JS `Date`. Use `.toISOString()` for the shared ISO 8601 strings.
 - **Numbers:** node-postgres returns `numeric` and `bigint` as **strings** (`"4.01"`, `"43"`). `int` and `real` come back as numbers. Every Insights value that is rounded is `numeric`, so call `Number(...)` before charting. Counts are cast to `int`.
 - **Live numbers:** the Insights views are plain views over the live tables, not cached. A new or resolved request changes them on the next query. History stats count only `status = 'resolved'` requests.
-- **HR text:** HR request types are `leave_request`, `benefits_question` and `employee_relations` (the same rule as Snowflake). For these, `title`, `resolution` and hop `note` show as `[visible to HR only]` in the `*_public` views. B and Darwin read those views, never the base tables.
+- **HR text:** HR request types are `leave_request`, `benefits_question` and `employee_relations` (the same rule as Snowflake). For these, `title`, `resolution` and hop `note` show as `[visible to HR only]` in the `*_public` views; in `events_public`, the `title`, `note` and `resolution` payload keys are masked. **B and Darwin read `requests_public`, `request_hops_public` and `events_public`, never `requests`, `request_hops` or `events`.**
 
 ## Tables
 
@@ -82,7 +82,7 @@ Shared `Event`. Primary key `(id, ts)`; `id` must be unique (UUID), but the data
 | `actor` | text | Person, team, or `agent` (no foreign key) |
 | `request_id` | text | |
 | `tool` | text | A `ToolName` or null |
-| `payload` | jsonb | Seed rows: `request_created` has `{seeded, task_type, title, requester_id, to}`, hop events `{seeded, seq, from, to, redirect_to, note}`. **Not HR-masked.** See open items |
+| `payload` | jsonb | Seed rows: `request_created` has `{seeded, task_type, title, requester_id, to}`, hop events `{seeded, seq, from, to, redirect_to, note}`. Not masked here; B and Darwin read `events_public` |
 
 ### org_edges
 
@@ -154,6 +154,7 @@ The seed tests this and rolls it back, so the seeded database still has the char
 
 | View | Use |
 |---|---|
+| `events_public` | `events` (same columns). For events of HR-sensitive requests, payload keys `title`, `note` and `resolution` become `[visible to HR only]`. Other keys, other events, and events with no request pass through unchanged. This is the activity feed: read it instead of `events` |
 | `requests_public` | `requests` with HR `title` and `resolution` masked |
 | `request_hops_public` | `request_hops` plus `task_type` and `hr_sensitive`, with HR `note` masked |
 | `org_edges_current` | `org_edges` without expired delegate edges. This is the live org map (Mycelium graph) |
@@ -197,6 +198,7 @@ The top four new-hire handoffs are within 1.1 h of each other (19.0 to 17.9 h), 
 These are open with lanes A and B; see PLAN.md section 7.
 
 - **Events-to-tables trigger** (PLAN 2.4). Until it exists, the Insights numbers move only if A writes `requests` (with `origin = 'agent'`) and `request_hops` directly. Writing to `events` alone does not change them.
-- **Live push** (`pg_notify`): nothing is sent yet. B polls `events` and `org_edges`, or A pushes.
-- **`events_feed`:** a masked view of `events`. Seed `payload.title` and `payload.note` contain HR text, so B should not render raw `events.payload` for HR requests until this exists.
+- **Live push** (`pg_notify`): nothing is sent yet. B polls `events_public` and `org_edges_current`, or A pushes.
 - **Roles** `wayfinder_agent` and `wayfinder_web`.
+
+**Payload keys for live events:** `events_public` masks only `title`, `note` and `resolution`. If A puts other free text from an HR request into `payload` (e.g. `text`, `message`), tell lane C so the view covers it.

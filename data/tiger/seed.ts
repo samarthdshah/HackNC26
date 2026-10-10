@@ -279,6 +279,33 @@ try {
     [hrText],
   );
   expect(`HR-only strings found in public views (${hrText.length} checked)`, leaks.n, 0);
+  const evLeaks = await one(
+    `SELECT count(*)::int AS n
+     FROM events_public e, jsonb_each_text(e.payload) AS kv, unnest($1::text[]) AS s
+     WHERE strpos(kv.value, s) > 0`,
+    [hrText],
+  );
+  expect(`HR-only strings found in events_public payloads (${hrText.length} checked)`, evLeaks.n, 0);
+  const hrEvents = await one(
+    `SELECT count(*)::int AS n,
+            count(*) FILTER (WHERE coalesce(p.payload->>'title', p.payload->>'note') = $1)::int AS masked
+     FROM events_public p JOIN requests r ON r.id = p.request_id
+     WHERE r.hr_sensitive`,
+    [mask],
+  );
+  expect("events_public HR events masked", `${hrEvents.masked} of ${hrEvents.n}`, `${hrIds.length + hrHops} of ${hrIds.length + hrHops}`);
+  const passthrough = await one(
+    `SELECT count(*)::int AS n,
+            count(*) FILTER (WHERE (e.id, e.ts, e.type, e.actor, e.request_id, e.tool, e.payload)
+                             IS DISTINCT FROM (p.id, p.ts, p.type, p.actor, p.request_id, p.tool, p.payload))::int AS changed
+     FROM events e
+     JOIN events_public p ON p.id = e.id AND p.ts = e.ts
+     LEFT JOIN requests r ON r.id = e.request_id
+     WHERE NOT coalesce(r.hr_sensitive, false)`,
+  );
+  const nonHrEvents = eventRows.filter((e) => !hrIds.includes(e.request_id)).length;
+  expect("events_public non-HR events identical to events", `${passthrough.changed} changed of ${passthrough.n}`, `0 changed of ${nonHrEvents}`);
+  expect("events_public rows", (await one("SELECT count(*)::int AS n FROM events_public")).n, eventRows.length);
   const plain = await one(
     "SELECT count(*) FILTER (WHERE title = $1 OR resolution = $1)::int AS n FROM requests_public WHERE NOT hr_sensitive",
     [mask],
