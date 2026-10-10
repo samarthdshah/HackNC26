@@ -2,7 +2,7 @@
 
 Owner: **Lane C**
 
-Simulated company "Fernbrook" as JSON. Static org data goes to Snowflake; requests and edges go to Tiger Data.
+Simulated company "Photon" as JSON. Static org data goes to Snowflake; requests and edges go to Tiger Data.
 Times are ISO 8601 in America/New_York (`-04:00`). History runs 2026-05-01 to 2026-10-09; the demo date is 2026-10-10.
 
 | File | Contents |
