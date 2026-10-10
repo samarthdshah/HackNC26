@@ -28,8 +28,6 @@ const bookings: Row[] = fixture("bookings");
 
 // Same rule as snowflake/load.ts and the generated requests.hr_sensitive column; used to check the HR-masked views.
 const HR_TYPES = ["leave_request", "benefits_question", "employee_relations"];
-// Hop outcome -> event type for the backfilled feed.
-const HOP_EVENT: Record<string, string> = { forwarded: "forwarded", bounced: "bounced", delegated: "delegated", handled: "resolved" };
 
 const actors = [
   ...departments.map((d) => ({ id: d.id, kind: "department", name: d.name, department_id: d.id })),
@@ -90,8 +88,9 @@ const bookingRows = bookings.map((b) => ({
   note: b.note,
 }));
 
-// Backfilled feed: one request_created per request, then one event per hop when its receiver acted
-// (the next hop, or resolution; the hop's own time if it is still the open last hop).
+// Backfilled feed: one request_created per request, then one "hop" event (A's shape) per hop when its receiver acted
+// (the next hop, or resolution; the hop's own time if it is still the open last hop). The events trigger ignores
+// them because the requests and hops are loaded first.
 const eventRows = requests.flatMap((r) => [
   {
     id: `seed_${r.id}_0`,
@@ -104,10 +103,10 @@ const eventRows = requests.flatMap((r) => [
   ...r.hops.map((h: Row, i: number) => ({
     id: `seed_${r.id}_${h.seq}`,
     ts: r.hops[i + 1]?.at ?? r.resolved_at ?? h.at,
-    type: HOP_EVENT[h.outcome],
+    type: "hop",
     actor: h.to,
     request_id: r.id,
-    payload: { seeded: true, seq: h.seq, from: h.from, to: h.to, redirect_to: h.redirect_to, note: h.note },
+    payload: { seeded: true, request_id: r.id, seq: h.seq, from: h.from, to: h.to, outcome: h.outcome, redirect_to: h.redirect_to, note: h.note },
   })),
 ]);
 
@@ -164,6 +163,28 @@ try {
 
   console.log("Row counts (tiger vs fixtures):");
   for (const [table, rows] of LOADS) expect(table, (await one(`SELECT count(*)::int AS n FROM ${table}`)).n, rows.length);
+
+  // Events trigger: present, runs as the owner, and derived nothing from the seed events (all ids already loaded).
+  console.log("Events trigger:");
+  const trig = await one(
+    `SELECT p.prosecdef AS definer, pg_get_userbyid(p.proowner) = current_user AS owner_fn,
+            (SELECT count(*)::int FROM pg_trigger t WHERE t.tgrelid = 'events'::regclass AND t.tgname = 'events_derive') AS triggers
+     FROM pg_proc p WHERE p.proname = 'events_derive'`,
+  );
+  expect("events_derive: security definer, owned by owner, triggers on events", trig && `${trig.definer} ${trig.owner_fn} ${trig.triggers}`, "true true 1");
+  expect("requests derived from seed events (origin agent)", (await one("SELECT count(*)::int AS n FROM requests WHERE origin = 'agent'")).n, 0);
+  const types = await one("SELECT string_agg(type || ' ' || n, ', ' ORDER BY type) AS t FROM (SELECT type, count(*) AS n FROM events GROUP BY type) x");
+  expect("event types", types.t, `hop ${hopRows.length}, request_created ${requestRows.length}`);
+  expect(
+    "hop events matching their request_hops row (seq, from, to, outcome, redirect_to)",
+    (await one(
+      `SELECT count(*)::int AS n FROM events e JOIN request_hops h
+         ON h.request_id = e.payload->>'request_id' AND h.seq = (e.payload->>'seq')::int AND h.from_id = e.payload->>'from'
+        AND h.to_id = e.payload->>'to' AND h.outcome = e.payload->>'outcome' AND h.redirect_to IS NOT DISTINCT FROM e.payload->>'redirect_to'
+       WHERE e.type = 'hop'`,
+    )).n,
+    hopRows.length,
+  );
 
   console.log("Demo rows:");
   const leo = await one(
@@ -343,6 +364,18 @@ try {
     [mask],
   );
   expect("events_public HR events masked", `${hrEvents.masked} of ${hrEvents.n}`, `${hrIds.length + hrHops} of ${hrIds.length + hrHops}`);
+  // HR events keep only structural keys; every other key (title, note, seeded, ...) is the placeholder.
+  const keys = await one(
+    `SELECT string_agg(DISTINCT k, ',' ORDER BY k) FILTER (WHERE v = e.payload->k) AS kept,
+            string_agg(DISTINCT k, ',' ORDER BY k) FILTER (WHERE v = to_jsonb($1::text)) AS masked,
+            count(*) FILTER (WHERE v <> e.payload->k AND v <> to_jsonb($1::text))::int AS other
+     FROM events_public p JOIN events e ON e.id = p.id AND e.ts = p.ts JOIN requests r ON r.id = p.request_id,
+          jsonb_each(p.payload) AS kv(k, v)
+     WHERE r.hr_sensitive`,
+    [mask],
+  );
+  expect("events_public HR keys kept / masked", `kept ${keys.kept}; masked ${keys.masked}; other ${keys.other}`,
+    "kept from,outcome,redirect_to,request_id,requester_id,seq,task_type,to; masked note,seeded,title; other 0");
   const passthrough = await one(
     `SELECT count(*)::int AS n,
             count(*) FILTER (WHERE (e.id, e.ts, e.type, e.actor, e.request_id, e.tool, e.payload)

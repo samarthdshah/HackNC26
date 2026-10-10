@@ -21,7 +21,7 @@ CREATE TABLE requests (
   title         text NOT NULL,
   requester_id  text NOT NULL REFERENCES actors (id),
   created_at    timestamptz NOT NULL,
-  status        text NOT NULL CHECK (status IN ('open', 'resolved')),
+  status        text NOT NULL CHECK (status IN ('open', 'resolved', 'denied', 'stuck')),
   resolved_at   timestamptz,
   resolved_by   text REFERENCES actors (id),
   resolution    text,
@@ -34,7 +34,7 @@ CREATE TABLE requests (
   -- Same rule as HR_TYPES in snowflake/load.ts. Generated, so requests A creates live are masked too.
   hr_sensitive  boolean GENERATED ALWAYS AS (task_type IN ('leave_request', 'benefits_question', 'employee_relations')) STORED,
   origin        text NOT NULL DEFAULT 'seed' CHECK (origin IN ('seed', 'agent')),
-  CHECK ((status = 'resolved') = (resolved_at IS NOT NULL))
+  CHECK ((status <> 'open') = (resolved_at IS NOT NULL))  -- resolved_at = when it left 'open' (resolved, denied, stuck)
 );
 
 CREATE TABLE request_hops (
@@ -64,6 +64,42 @@ CREATE TABLE events (
 SELECT create_hypertable('events', by_range('ts', INTERVAL '7 days'));
 CREATE INDEX ON events (request_id, ts DESC);
 CREATE INDEX ON events (type, ts DESC);
+
+-- Live path: A writes events only; this trigger derives requests and request_hops from them, so Insights move live.
+--   request_created                             -> requests row (origin 'agent', open); ignored if the id exists
+--   hop {request_id, seq, from, to, outcome, redirect_to?, note} -> request_hops row at ts; ignored if (request_id, seq) exists
+--   request_resolved / request_denied / request_stuck -> that request's status and resolved_at = ts
+-- SECURITY DEFINER (runs as the owner who applies this file) because wayfinder_agent cannot touch these tables.
+-- Never fails A's insert: any error rolls back only the derived write and raises a WARNING.
+CREATE OR REPLACE FUNCTION events_derive() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  p   jsonb := NEW.payload;
+  rid text;
+BEGIN
+  BEGIN
+    IF NEW.type = 'request_created' THEN
+      rid := coalesce(NEW.request_id, p->>'request_id');
+      INSERT INTO requests (id, task_type, title, requester_id, created_at, status, origin)
+      VALUES (rid, p->>'task_type', p->>'title', NEW.actor, NEW.ts, 'open', 'agent')
+      ON CONFLICT (id) DO NOTHING;
+    ELSIF NEW.type = 'hop' THEN
+      rid := coalesce(p->>'request_id', NEW.request_id);
+      INSERT INTO request_hops (request_id, seq, from_id, to_id, at, outcome, redirect_to, note)
+      SELECT rid, (p->>'seq')::int, p->>'from', p->>'to', NEW.ts, p->>'outcome', p->>'redirect_to', p->>'note'
+      WHERE NOT EXISTS (SELECT 1 FROM request_hops WHERE request_id = rid AND seq = (p->>'seq')::int);
+    ELSIF NEW.type IN ('request_resolved', 'request_denied', 'request_stuck') THEN
+      rid := coalesce(NEW.request_id, p->>'request_id');
+      -- status = event type without the 'request_' prefix: resolved, denied, stuck
+      UPDATE requests SET status = substr(NEW.type, 9), resolved_at = NEW.ts WHERE id = rid;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'events_derive skipped % event % (request %): % %', NEW.type, NEW.id, rid, SQLSTATE, SQLERRM;
+  END;
+  RETURN NULL;
+END $$;
+DROP TRIGGER IF EXISTS events_derive ON events;
+CREATE TRIGGER events_derive AFTER INSERT ON events FOR EACH ROW EXECUTE FUNCTION events_derive();
 
 -- Shared type: OrgEdge. Natural key (from, to, task_type). A computes the final confidence and upserts rows itself.
 -- Agent routes use from_id 'agent'; delegations are person to person with delegate_until.
@@ -152,14 +188,25 @@ SELECT h.request_id, r.task_type, r.hr_sensitive, h.seq, h.from_id, h.to_id, h.a
 FROM request_hops h
 JOIN requests r ON r.id = h.request_id;
 
--- events with request text keys in payload (title, note, resolution) masked when the linked request is HR-sensitive.
--- Other keys, and events of non-HR requests or with no request, pass through unchanged.
+-- events with HR-sensitive payloads masked: only structural keys (ids, task_type, from, to, outcome, seq, status, amounts,
+-- timestamps) keep their scalar values; every other key becomes '[visible to HR only]'. A request counts as HR when its
+-- requests row says so, or (if the trigger skipped it) when its request_created event or this event names an HR task type.
+-- Events of non-HR requests, or with no request, pass through unchanged.
 CREATE VIEW events_public AS
 SELECT e.id, e.ts, e.type, e.actor, e.request_id, e.tool,
-       CASE WHEN r.hr_sensitive THEN e.payload || (
-         SELECT coalesce(jsonb_object_agg(k, to_jsonb('[visible to HR only]'::text)), '{}')
-         FROM jsonb_object_keys(e.payload) AS k
-         WHERE k IN ('title', 'note', 'resolution')
+       CASE WHEN coalesce(r.hr_sensitive, false)
+              OR e.payload->>'task_type' IN ('leave_request', 'benefits_question', 'employee_relations')
+              OR EXISTS (SELECT 1 FROM events c
+                         WHERE c.request_id = e.request_id AND c.type = 'request_created'
+                           AND c.payload->>'task_type' IN ('leave_request', 'benefits_question', 'employee_relations'))
+       THEN (
+         SELECT coalesce(jsonb_object_agg(k, CASE
+                  WHEN (k IN ('id', 'task_type', 'from', 'to', 'redirect_to', 'outcome', 'seq', 'status',
+                              'amount', 'amount_usd', 'ts', 'delegate_until')
+                        OR k LIKE '%\_id' OR k LIKE '%\_at')
+                       AND jsonb_typeof(v) NOT IN ('object', 'array')
+                  THEN v ELSE to_jsonb('[visible to HR only]'::text) END), '{}')
+         FROM jsonb_each(e.payload) AS kv(k, v)
        ) ELSE e.payload END AS payload
 FROM events e
 LEFT JOIN requests r ON r.id = e.request_id;

@@ -1,12 +1,12 @@
 # Tiger Data schema reference
 
-For lanes A (agent server) and B (website). Lane C owns this database. The design and open questions are in [PLAN.md](PLAN.md).
+For lanes A (agent server) and B (website). Lane C owns this database. **This file is the contract.** [PLAN.md](PLAN.md) is the earlier design and is superseded.
 
 - Tiger Data: Postgres 18 with TimescaleDB 2.30. Everything is in the `public` schema.
 - Built by `data/tiger/schema.sql` and loaded by `npm --prefix data run tiger:seed`. The seed drops and recreates everything and fails without committing if any demo row or Insights number is wrong.
 - All data is simulated (the fictional company Photon). The demo date is 2026-10-10.
 - **Access:** each lane has its own login; see [Logins](#logins). Connection details and passwords come from lane C directly, never from this file.
-- **Who writes what:** A writes events only (plus edges and bookings). A computes each edge's final confidence and upserts `org_edges` itself, with one `org_edge_changes` row per change. There is no database-side learning function.
+- **Who writes what:** A writes events only (plus edges and bookings). A trigger on `events` turns A's `request_created`, `hop` and `request_resolved`/`_denied`/`_stuck` events into `requests` and `request_hops` rows, so Insights move live (see [Live path](#live-path-events-trigger)). A computes each edge's final confidence and upserts `org_edges` itself, with one `org_edge_changes` row per change. There is no database-side learning function.
 
 ## Things to know before querying
 
@@ -14,11 +14,11 @@ For lanes A (agent server) and B (website). Lane C owns this database. The desig
 - **Times:** all `timestamptz`. node-postgres returns JS `Date`. Use `.toISOString()` for the shared ISO 8601 strings.
 - **Numbers:** node-postgres returns `numeric` and `bigint` as **strings** (`"4.01"`, `"43"`). `int` and `real` come back as numbers. Every Insights value that is rounded is `numeric`, so call `Number(...)` before charting. Counts are cast to `int`.
 - **Live numbers:** the Insights views are plain views over the live tables, not cached. A new or resolved request changes them on the next query. History stats count only `status = 'resolved'` requests.
-- **HR text:** HR request types are `leave_request`, `benefits_question` and `employee_relations` (the same rule as Snowflake). For these, `title`, `resolution` and hop `note` show as `[visible to HR only]` in the `*_public` views; in `events_public`, the `title`, `note` and `resolution` payload keys are masked. **B and Darwin read `requests_public`, `request_hops_public` and `events_public`, never `requests`, `request_hops` or `events`.**
+- **HR text:** HR request types are `leave_request`, `benefits_question` and `employee_relations` (the same rule as Snowflake). For these, `title`, `resolution` and hop `note` show as `[visible to HR only]` in the `*_public` views. In `events_public`, an HR event keeps only structural payload keys and every other key shows the placeholder (see [Views](#views)). **B and Darwin read `requests_public`, `request_hops_public` and `events_public`, never `requests`, `request_hops` or `events`.**
 
 ## Logins
 
-Defined in `data/tiger/roles.sql`. `npm --prefix data run tiger:roles` creates or updates both roles and sets their passwords. `tiger:seed` re-applies the grants after it recreates the tables, so a reseed never needs a separate step. `npm --prefix data run tiger:test-roles` connects as each role and checks 46 allowed and denied actions.
+Defined in `data/tiger/roles.sql`. `npm --prefix data run tiger:roles` creates or updates both roles and sets their passwords. `tiger:seed` re-applies the grants after it recreates the tables, so a reseed never needs a separate step. `npm --prefix data run tiger:test-roles` connects as each role and checks 46 allowed and denied actions, then plays a live request as `wayfinder_agent` (see [Live path](#live-path-events-trigger)); 56 checks in all.
 
 | Login | Lane | Granted | Everything else |
 |---|---|---|---|
@@ -27,7 +27,8 @@ Defined in `data/tiger/roles.sql`. `npm --prefix data run tiger:roles` creates o
 
 Notes for lane A:
 
-- `wayfinder_agent` cannot read `events`, so `INSERT ... RETURNING` on `events` fails. Generate the event `id` (UUID) in the app and insert it.
+- **Generate every event `id` (UUID) in the app.** `wayfinder_agent` cannot read `events`, so `INSERT ... RETURNING` on `events` fails.
+- **Emit one `hop` event per routing step** (not `forwarded`/`bounced`/`delegated`/`resolved` types), with the payload in [Live path](#live-path-events-trigger). Without it, live requests have no hops and Insights do not move.
 - `org_edges` upserts (`INSERT ... ON CONFLICT DO UPDATE`) work. `org_edge_changes` is insert-only; `id` comes from the sequence.
 
 Notes for lane B and Darwin:
@@ -47,8 +48,8 @@ Env vars by lane:
 | Table | Kind | Rows at seed | Holds |
 |---|---|---|---|
 | `actors` | plain | 35 | Id → name and department, for joins: 10 departments, 24 people, `agent` |
-| `requests` | plain | 83 | Request history. Leo's demo request is not seeded; A creates it live |
-| `request_hops` | hypertable on `at` | 255 | Each request's routing chain |
+| `requests` | plain | 83 | Request history, plus live requests derived from A's events. Leo's demo request is not seeded; A creates it live |
+| `request_hops` | hypertable on `at` | 255 | Each request's routing chain, plus live hops derived from A's `hop` events |
 | `events` | hypertable on `ts` | 338 | Event log (shared `Event`). Seed rows are backfilled history |
 | `org_edges` | plain | 35 | Org map (shared `OrgEdge`). All `chart` at seed |
 | `org_edge_changes` | plain | 0 | History of every edge A creates or changes |
@@ -69,19 +70,19 @@ The directory itself (email, title, manager, out-of-office) is in Snowflake.
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | text PK | `req_0001`…`req_0083` (seeded history only) |
+| `id` | text PK | `req_0001`…`req_0083` (seeded history); live ids like `req_live_001` |
 | `task_type` | text | e.g. `onboarding`, `data_access`, `checkout_incident` |
 | `title` | text | HR text: masked in `requests_public` |
 | `requester_id` | text → actors | |
 | `created_at` | timestamptz | |
-| `status` | text | `open` or `resolved` |
-| `resolved_at` | timestamptz | Set exactly when `status = 'resolved'` (enforced) |
+| `status` | text | `open`, `resolved`, `denied` or `stuck`. Seed rows are `open` or `resolved` |
+| `resolved_at` | timestamptz | When the request left `open` (resolved, denied or stuck). Set exactly when `status <> 'open'` (enforced) |
 | `resolved_by` | text → actors | |
 | `resolution` | text | HR text: masked in `requests_public` |
 | `severity`, `new_hire_name`, `new_hire_id`, `room_id`, `vendor_id` | text | Optional details. Rooms and vendors live in Snowflake |
 | `amount_usd` | numeric(12,2) | |
 | `hr_sensitive` | boolean, generated | Computed from `task_type`. Do not insert it |
-| `origin` | text | `seed` (history) or `agent` (created live; used by `insights_hours_saved`). Nothing writes `agent` rows yet: A writes events only |
+| `origin` | text | `seed` (history) or `agent` (created by the events trigger from A's `request_created`; used by `insights_hours_saved`) |
 
 ### request_hops
 
@@ -93,24 +94,24 @@ Primary key `(request_id, seq, at)`.
 | `seq` | int | 1, 2, 3… |
 | `from_id` | text → actors | Hop 1 is from the requester. After that, it is the previous hop's `to_id` |
 | `to_id` | text → actors | Who received it |
-| `at` | timestamptz | When `to_id` received it |
+| `at` | timestamptz | When `to_id` received it. Live hops take the `hop` event's `ts` |
 | `outcome` | text | What `to_id` did: `pending`, `forwarded`, `bounced` ("not us"), `delegated` (out), `handled` (closed it) |
 | `redirect_to` | text → actors | Set on `bounced` and `delegated`: where to go instead |
 | `note` | text | HR text: masked in `request_hops_public` |
 
 ### events
 
-Shared `Event`. Primary key `(id, ts)`; `id` must be unique (UUID), but the database cannot enforce that alone.
+Shared `Event`. Primary key `(id, ts)`; `id` must be unique (UUID), but the database cannot enforce that alone. Every insert fires the `events_derive` trigger.
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | text | Defaults to a UUID. Seed rows are `seed_<request>_<n>` |
+| `id` | text | A generates it (UUID). The default exists only as a fallback. Seed rows are `seed_<request>_<n>` |
 | `ts` | timestamptz | Defaults to `now()` |
-| `type` | text | Seed uses `request_created`, `forwarded`, `bounced`, `delegated`, `resolved`. A writes `request_created`, `hop`, `routed`, `redirected`, `delegated`, `step_done`, `approval_requested`, `approved`, `denied`, `payment_sent`, `request_resolved`, `request_denied`, `request_stuck` |
+| `type` | text | Seed uses `request_created` and `hop`. A writes `request_created`, `hop`, `routed`, `redirected`, `delegated`, `step_done`, `approval_requested`, `approved`, `denied`, `payment_sent`, `request_resolved`, `request_denied`, `request_stuck` |
 | `actor` | text | Person, team, or `agent` (no foreign key) |
 | `request_id` | text | Live ids look like `req_live_001`. They exist only in `events` |
 | `tool` | text | A `ToolName` or null |
-| `payload` | jsonb | Seed rows: `request_created` has `{seeded, task_type, title, requester_id, to}`, hop events `{seeded, seq, from, to, redirect_to, note}`. A's `hop` event: `{request_id, seq, from, to, outcome, redirect_to?, note}`, with `outcome` one of `forwarded`, `bounced`, `delegated`, `handled`. Not masked here; B and Darwin read `events_public` |
+| `payload` | jsonb | `request_created`: `{task_type, title, ...}`. `hop`: `{request_id, seq, from, to, outcome, redirect_to?, note}`, with `outcome` one of `forwarded`, `bounced`, `delegated`, `handled`. Seed rows add `seeded: true` (and `requester_id`, `to` on `request_created`). Not masked here; B and Darwin read `events_public` |
 
 ### org_edges
 
@@ -129,7 +130,7 @@ Shared `OrgEdge`. Primary key `(from_id, to_id, task_type)`. Seed: 35 edges, all
 
 ### org_edge_changes
 
-One row per edge A creates or changes. No foreign key to `org_edges`, so history outlives edges. Shape derived from the shared `OrgEdge`; A has not confirmed it yet.
+One row per edge A creates or changes. No foreign key to `org_edges`, so history outlives edges. Shape derived from the shared `OrgEdge`. This shape is the contract; A writes to it as below.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -189,7 +190,7 @@ The seed runs this pattern on `agent → dept_data_platform` (0.7 → 0.4) and r
 
 | View | Use |
 |---|---|
-| `events_public` | `events` (same columns). For events of HR-sensitive requests, payload keys `title`, `note` and `resolution` become `[visible to HR only]`. Other keys, other events, and events with no request pass through unchanged. This is the activity feed: read it instead of `events` |
+| `events_public` | `events` (same columns). For events of HR-sensitive requests, the payload keeps only structural keys: `id`, any `*_id`, `task_type`, `from`, `to`, `redirect_to`, `outcome`, `seq`, `status`, `amount`, `amount_usd`, `ts`, any `*_at`, `delegate_until` (scalar values only). Every other key (`title`, `note`, `text`, `message`, `seeded`, ...) becomes `[visible to HR only]`. A request counts as HR from its `requests` row, or from an HR `task_type` on its `request_created` event or the event itself if the trigger skipped the row. Non-HR events and events with no request pass through unchanged. This is the activity feed: read it instead of `events` |
 | `requests_public` | `requests` with HR `title` and `resolution` masked |
 | `request_hops_public` | `request_hops` plus `task_type` and `hr_sensitive`, with HR `note` masked |
 | `org_edges_current` | `org_edges` without expired delegate edges. Not granted to `wayfinder_web`: B reads `org_edges` and applies the same filter for the Mycelium graph |
@@ -228,12 +229,25 @@ Values at seed (checked by `tiger:seed`):
 
 The top four new-hire handoffs are within 1.1 h of each other (19.0 to 17.9 h), so the rank-1 handoff wins by a thin margin.
 
-## Not built yet
+## Live path (events trigger)
 
-These are open with lanes A and B; see PLAN.md section 7.
+`events_derive` is an `AFTER INSERT` row trigger on `events`. Its function is `SECURITY DEFINER`, owned by lane C's owner login, so it writes tables `wayfinder_agent` cannot touch. It is applied by `schema.sql` (safe to rerun).
 
-- **Events-to-tables trigger** (PLAN 2.4). A writes events only, so until the trigger exists live requests do not reach `requests` or `request_hops` and the Insights numbers do not move during the demo.
+| A's event | Payload A sends | What the trigger writes |
+|---|---|---|
+| `request_created` | `{task_type, title}`; `request_id` column set | `requests` row: `id` = `request_id`, `requester_id` = `actor`, `created_at` = `ts`, `status = 'open'`, `origin = 'agent'`. Ignored if the id exists |
+| `hop` | `{request_id, seq, from, to, outcome, redirect_to?, note}` | `request_hops` row at `ts`. Ignored if `(request_id, seq)` exists |
+| `request_resolved`, `request_denied`, `request_stuck` | `request_id` column set | That request's `status` (`resolved`/`denied`/`stuck`) and `resolved_at = ts` |
+
+Rules for A:
+
+- Send `request_created` before any `hop` for that request, with `actor` = the requester (`p_*`). `from`, `to`, `redirect_to` and the requester must be ids in `actors`.
+- A `hop` event's `ts` becomes `request_hops.at`, read as the time `to` received the request.
+- The trigger never makes A's insert fail. On any error (unknown actor, missing `seq` or `title`, bad `outcome`) the event is still stored, the derived write is skipped, and Postgres sends a `WARNING` (`events_derive skipped ...`). Log notices from node-postgres to see them.
+- Other event types are stored only.
+
+`tiger:test-roles` checks this as `wayfinder_agent`: it plays `req_live_test` (created; hop bounced Data Platform → Analytics Engineering; hop handled; resolved), checks the request and hops appear, that `insights_bottlenecks`, `insights_slowest_handoffs` and `insights_hours_saved` change (`agent_routing` 0 → 1 request), that a bad hop is skipped with the insert intact, that replays are ignored, and that an HR test request leaks nothing through `events_public`, `requests_public` or `request_hops_public`. Then the owner deletes the test rows and checks the Insights are back to the seed values.
 
 **Live updates:** A pushes them to the website over SSE (`GET /live`). Tiger sends no notifications. B queries the Tiger views directly.
 
-**Payload keys for live events:** `events_public` masks only `title`, `note` and `resolution`. If A puts other free text from an HR request into `payload` (e.g. `text`, `message`), tell lane C so the view covers it.
+**Payload keys for live events:** `events_public` masks every non-structural key on HR events, so free text under any key name (`text`, `message`, ...) is covered. A structural key name (e.g. `status`, any `*_id`) must not carry free text.
