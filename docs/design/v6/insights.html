@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wayfinder Insights</title>
+<link rel="stylesheet" href="shared/aero.css">
+<style>
+html,body{overflow-x:hidden}
+canvas#bubbles{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+main{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:30px 28px 140px}
+
+header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:22px;color:#fff;text-shadow:0 1px 3px rgb(0 40 100/.35)}
+header.top .k{color:rgb(255 255 255/.9)}
+header.top .page-title{line-height:1.2;padding-top:.22em}
+header.top .page-title{font-size:56px}
+header.top .page-sub{color:rgb(255 255 255/.92);max-width:560px;font-size:16px}
+header.top .when{display:flex;gap:10px;align-items:center}
+
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}
+.span2{grid-column:1 / -1}
+.card .body{padding:16px 18px 18px}
+.bar .sub{margin-left:auto;font-weight:400;font-size:13px;color:#F0F8FF}
+
+/* KPI tiles */
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.tile{padding:12px 14px 10px;border-radius:12px;background:rgb(255 255 255/.5);border:1px solid rgb(255 255 255/.8);box-shadow:inset 0 1px 0 #fff,0 2px 8px rgb(0 40 100/.08);display:grid;gap:4px}
+.tile .num{font-size:30px;font-weight:300;line-height:1.05;letter-spacing:-.01em;white-space:nowrap}
+.tile .num small{font-size:15px;color:var(--ink-2);font-weight:400}
+.tile .foot{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.tile .chip{white-space:nowrap;font-size:11px;padding:2px 7px}
+.spark{flex:1 1 auto;min-width:40px;max-width:84px;height:26px;overflow:visible}
+.spark .ln{fill:none;stroke:var(--accent);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.spark .ar{fill:var(--accent-soft);opacity:.22}
+.spark .end{fill:#fff;stroke:var(--accent);stroke-width:1.5}
+
+/* Gain radial */
+.gain-wrap{position:relative;border-radius:12px;overflow:hidden;aspect-ratio:750/500;
+  background:radial-gradient(120% 90% at 30% 0%,rgb(255 255 255/.35),transparent 55%),linear-gradient(150deg,var(--accent-hi) 0%,var(--accent) 50%,var(--accent-lo) 100%);
+  box-shadow:inset 0 1px 0 rgb(255 255 255/.8),inset 0 -20px 40px rgb(0 30 80/.18)}
+.gain-wrap::before{content:"";position:absolute;top:0;left:3%;width:94%;height:42%;border-radius:0 0 50% 50%;pointer-events:none;background:linear-gradient(rgb(255 255 255/.28),transparent)}
+#gain{position:relative;width:100%;height:100%;display:block;visibility:hidden}
+#gain .nm{font:600 14px var(--font);fill:#fff;letter-spacing:.04em}
+#gain .nm tspan{font-weight:400;fill:rgb(255 255 255/.8);letter-spacing:0}
+#gain .jt{font:400 13px var(--font);fill:rgb(255 255 255/.9)}
+#gain .val{font:600 11px var(--font);fill:var(--ink);opacity:0}
+#gain #gainTxt{font:600 15px var(--font);fill:var(--ink)}
+.card-actions{display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:10px}
+
+/* Skill bars */
+.skills{display:grid;gap:9px}
+.skill-row{display:grid;grid-template-columns:118px minmax(0,1fr);align-items:center;gap:10px;font-size:14px;font-weight:600}
+.skill{position:relative;height:30px;border-radius:10px;overflow:hidden;background:rgb(255 255 255/.55);box-shadow:inset 0 1px 3px rgb(0 40 100/.22),0 1px 0 rgb(255 255 255/.8)}
+.skill .fill{position:absolute;inset:0 auto 0 0;width:var(--w);border-radius:10px;transform-origin:left;
+  background:linear-gradient(180deg,rgb(255 255 255/.55),rgb(255 255 255/.12) 49%,transparent 50%),linear-gradient(90deg,var(--accent-lo),var(--accent-hi));
+  box-shadow:inset 0 0 0 1px rgb(255 255 255/.45),2px 0 8px rgb(0 40 100/.2)}
+.skills:not(.go) .fill{transform:translateX(-102%)}
+.skills.go .fill{animation:skills 1.25s cubic-bezier(.17,.67,0,1) both;animation-delay:calc(var(--i) * 70ms)}
+@keyframes skills{0%{transform:translateX(-102%);opacity:0}100%{transform:translateX(0);opacity:1}}
+.skill .lab{position:relative;z-index:1;display:flex;justify-content:flex-end;align-items:center;height:100%;padding:0 10px;font-size:13px;font-weight:600}
+.skill .lab .h{color:var(--ink);text-shadow:0 1px 0 rgb(255 255 255/.7)}
+
+/* Recharts */
+.chart{height:280px}
+.tip{padding:10px 12px;font-size:13px;min-width:150px}
+.tip .t{font-weight:600;margin-bottom:4px}
+.tip .r{display:flex;justify-content:space-between;gap:14px;color:var(--ink-2)}
+.tip .r b{color:var(--ink);font-weight:600}
+.tip .r i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
+.recharts-cartesian-axis-tick-value{font-family:var(--font)}
+.legend{display:flex;gap:16px;font-size:13px;color:var(--ink-2);margin-bottom:6px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+
+/* Chord */
+.chord-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px;align-items:center}
+#chord{width:100%;max-height:520px;display:block}
+#chord .grp path{stroke:#fff;stroke-width:1.5;cursor:pointer;transition:opacity .3s}
+#chord .rib{stroke:rgb(255 255 255/.8);stroke-width:.6;transition:opacity .3s;fill-opacity:.62}
+#chord text{font:600 12px var(--font);fill:var(--ink)}
+#chord.iso .rib{opacity:.07}
+#chord.iso .rib.on{opacity:1}
+#chord.iso .grp path{opacity:.35}
+#chord.iso .grp.on path{opacity:1}
+.detail .big{font-size:34px;font-weight:300;line-height:1.1}
+.detail .rows{margin-top:12px}
+.detail .row .v{margin-left:auto;font-weight:600}
+
+@media (max-width:1000px){ .kpis{grid-template-columns:repeat(3,minmax(0,1fr))} }
+@media (max-width:700px){
+  main{padding:18px 12px 120px}
+  header.top{flex-direction:column;align-items:flex-start}
+  header.top .page-title{font-size:40px}
+  .grid{grid-template-columns:minmax(0,1fr)}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .chord-grid{grid-template-columns:minmax(0,1fr)}
+  .skill-row{grid-template-columns:100px minmax(0,1fr)}
+  .chart{height:240px}
+}
+</style>
+</head>
+<body data-page="glow">
+<canvas id="bubbles" aria-hidden="true"></canvas>
+<main>
+  <header class="top">
+    <div>
+      <h1 class="page-title" data-tour="1|Insights|What Wayfinder has paid back across the org over the last 12 weeks.">Insights</h1>
+      <p class="page-sub">What Wayfinder saved the org in the last 12 weeks.</p>
+    </div>
+    <div class="when"><span class="chip info">Last 12 weeks</span><span class="chip">● Live from Tiger Data</span></div>
+  </header>
+
+  <div class="grid">
+    <section class="milk still card span2 title-card" aria-labelledby="kpiH" data-tour="2|At a glance|The six numbers that matter. Each sparkline shows the 12-week trend.">
+      <div class="bar" id="kpiH">At a glance<span class="live"><i></i>live</span></div>
+      <div class="body"><div class="kpis" id="kpis"></div></div>
+    </section>
+
+    <section class="milk still card" aria-labelledby="gainH" data-tour="3|Gain|The departments that got the most time back. Each arc is one department.">
+      <div class="bar" id="gainH">Gain · top departments<span class="sub">hours saved</span></div>
+      <div class="body">
+        <div class="gain-wrap">
+          <svg id="gain" viewBox="0 0 750 500" role="img" aria-label="Radial graph of hours saved by the top five departments">
+            <defs>
+              <filter id="goo" color-interpolation-filters="sRGB">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
+                <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="goo"/>
+                <feBlend in="SourceGraphic" in2="goo"/>
+              </filter>
+            </defs>
+            <g id="base-lines" opacity=".18" fill="none" stroke="#fff" stroke-miterlimit="10" stroke-width="25">
+              <path d="M430.5,250A55.5,55.5,0,1,1,375,194.5"/><path d="M470.5,250A95.5,95.5,0,1,1,375,154.5"/><path d="M510.5,250A135.5,135.5,0,1,1,375,114.5"/>
+              <path d="M550.5,250A175.5,175.5,0,1,1,375,74.5"/><path d="M590.5,250C590.5,369,494,465.5,375,465.5S159.5,369,159.5,250,256,34.5,375,34.5"/>
+            </g>
+            <g id="mid-lines" opacity=".44" fill="none" stroke="#fff" stroke-miterlimit="10" stroke-width="4">
+              <path d="M445,250a70,70,0,1,1-70-70"/><path d="M485,250A110,110,0,1,1,375,140"/><path d="M525,250A150,150,0,1,1,375,100"/>
+              <path d="M565,250c0,104.93-85.07,190-190,190S185,354.93,185,250,270.07,60,375,60"/><path d="M605,250c0,127-103,230-230,230S145,377,145,250,248,20,375,20"/>
+            </g>
+            <g id="top-lines" fill="none" stroke="#fff" stroke-miterlimit="10" stroke-width="4" stroke-linecap="round">
+              <path class="line" d="M375,180a70,70,0,1,0,70,70"/><path class="line" d="M375,140A110,110,0,1,0,485,250"/><path class="line" d="M375,100A150,150,0,1,0,525,250"/>
+              <path class="line" d="M375,60c-104.93,0-190,85.070-190,190s85.07,190,190,190,190-85.07,190-190"/><path class="line" d="M375,20C248,20,145,123,145,250S248,480,375,480,605,377,605,250"/>
+            </g>
+            <g id="horz-lines" fill="none" stroke="#fff" stroke-miterlimit="10" stroke-width="4">
+              <line x1="375" y1="180" x2="456" y2="180"/><line x1="375" y1="140" x2="456" y2="140"/><line x1="375" y1="100" x2="456" y2="100"/>
+              <line x1="375" y1="60" x2="456" y2="60"/><line x1="375" y1="20" x2="456" y2="20"/>
+            </g>
+            <g id="people"></g>
+            <g filter="url(#goo)">
+              <g id="circles" fill="#fff">
+                <circle class="circ" r="15"/><circle class="circ" r="15"/><circle class="circ" r="15"/><circle class="circ" r="15"/><circle class="circ" r="15"/>
+              </g>
+              <circle id="center-circ" cx="375" cy="250" r="30.5" fill="#fff"/>
+            </g>
+            <text id="gainTxt" x="375" y="255" text-anchor="middle">GAIN</text>
+            <g id="vals"></g>
+          </svg>
+        </div>
+        <div class="card-actions"><span class="muted" style="font-size:13px">Arc length = share of the top department’s hours saved</span><button class="pill ghost" id="replay">↻ Replay</button></div>
+      </div>
+    </section>
+
+    <section class="milk still card" aria-labelledby="skH">
+      <div class="bar" id="skH">Hours saved by department<span class="sub" id="skTotal"></span></div>
+      <div class="body"><div class="skills" id="skills"></div></div>
+    </section>
+
+    <section class="milk still card" aria-labelledby="arH">
+      <div class="bar" id="arH">Requests vs resolved<span class="sub">per week</span></div>
+      <div class="body"><div class="legend" id="arLegend"></div><div class="chart" id="area"></div></div>
+    </section>
+
+    <section class="milk still card" aria-labelledby="brH" data-tour="4|Fewer hops|How many people a request bounced through before Wayfinder, and after.">
+      <div class="bar" id="brH">Hops before vs after Wayfinder<span class="sub">avg per request</span></div>
+      <div class="body"><div class="legend" id="brLegend"></div><div class="chart" id="bars"></div></div>
+    </section>
+
+    <section class="milk still card span2" aria-labelledby="chH" data-tour="5|Where requests flow|Who sends work to whom. Hover a department to isolate its routes.">
+      <div class="bar" id="chH">Where requests flow<span class="sub">department → department, routed by Wayfinder</span></div>
+      <div class="body">
+        <div class="chord-grid">
+          <svg id="chord" viewBox="-310 -300 620 600" role="img" aria-label="Chord diagram of request routing between departments"></svg>
+          <div class="detail" id="detail" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script src="shared/aero.js"></script>
+<script src="shared/data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/DrawSVGPlugin.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/MotionPathPlugin.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/recharts@2.12.7/umd/Recharts.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const RM = Aero.RM, S = WF.stats;
+gsap.registerPlugin(DrawSVGPlugin, MotionPathPlugin);
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const SHORT = {lead:'Lead', sales:'Sales', ops:'Ops', fin:'Finance', legal:'Legal', eng:'Eng', data:'Data Plat', analytics:'Analytics', people:'People'};
+const onView = (el, fn, threshold = .35) => {
+  if (!('IntersectionObserver' in window)) return fn();
+  let done = false; const go = () => { if (done) return; done = true; io.disconnect(); fn(); };
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) go(); }), {threshold});
+  io.observe(el);
+  // belt and braces: if it is already on screen at load, start without waiting for the observer
+  addEventListener('load', () => { const r = el.getBoundingClientRect(); if (r.top < innerHeight * (1 - threshold) && r.bottom > 0) go(); }, {once:true});
+};
+
+/* ============ Soap bubbles drifting behind (v4's rising bubbles, in 2D) ============ */
+const cv = $('bubbles'), cx = cv.getContext('2d'); let BW, BH, bubbles = [];
+function sizeBubbles() { const d = Math.min(devicePixelRatio, 2); BW = innerWidth; BH = innerHeight; cv.width = BW * d; cv.height = BH * d; cx.setTransform(d, 0, 0, d, 0, 0); }
+function seedBubbles() { const n = Math.round(Math.min(34, BW / 40)); bubbles = Array.from({length:n}, () => ({x:Math.random() * BW, y:Math.random() * BH, r:6 + Math.random() * (Math.random() < .12 ? 46 : 22), v:.15 + Math.random() * .45, ph:Math.random() * 6.28})); }
+function drawBubbles(t) {
+  cx.clearRect(0, 0, BW, BH);
+  for (const b of bubbles) {
+    if (!RM) { b.y -= b.v; b.x += Math.sin(t * .0004 + b.ph) * .25; if (b.y < -b.r * 2) { b.y = BH + b.r * 2; b.x = Math.random() * BW; } }
+    const g = cx.createRadialGradient(b.x, b.y, b.r * .6, b.x, b.y, b.r);
+    g.addColorStop(0, 'rgba(255,255,255,0.03)'); g.addColorStop(.85, 'rgba(255,255,255,0.12)'); g.addColorStop(1, 'rgba(255,255,255,0.45)');
+    cx.fillStyle = g; cx.beginPath(); cx.arc(b.x, b.y, b.r, 0, 6.283); cx.fill();
+    const hue = (t * .02 + b.ph * 57) % 360;   // iridescent rim
+    cx.strokeStyle = `hsla(${hue},90%,80%,0.35)`; cx.lineWidth = 1.2; cx.beginPath(); cx.arc(b.x, b.y, b.r - .6, Math.PI * .1, Math.PI * .9); cx.stroke();
+    cx.fillStyle = 'rgba(255,255,255,0.75)'; cx.beginPath(); cx.ellipse(b.x - b.r * .38, b.y - b.r * .42, b.r * .22, b.r * .12, -.6, 0, 6.283); cx.fill();
+  }
+  if (!RM) requestAnimationFrame(drawBubbles);
+}
+sizeBubbles(); seedBubbles(); requestAnimationFrame(drawBubbles);
+addEventListener('resize', () => { sizeBubbles(); if (RM) drawBubbles(0); });
+
+/* ============ 1 · KPI tiles ============ */
+const ser = WF.series;
+const KPIS = [
+  {k:'Hours saved', to:S.hoursSaved, f:v => fmt(v), suf:'h', spark:ser.map(d => d.hoursSaved), chip:'+38% QoQ'},
+  {k:'Requests routed', to:S.requestsRouted, f:v => fmt(v), spark:ser.map(d => d.requests), chip:`${fmt(ser.at(-1).requests)} this wk`},
+  {k:'Median resolve', to:100, f:v => `${Math.floor(v / 60)} h ${Math.round(v % 60)} m`, spark:ser.map(d => 10 - d.hops), chip:'was 4.2 d'},
+  {k:'Intros made', to:S.introsMade, f:v => fmt(v), spark:ser.map(d => Math.round(d.resolved * .06)), chip:'Mycelium', cls:'info'},
+  {k:'Approvals by text', to:S.approvalsByText, f:v => fmt(v), spark:ser.map(d => Math.round(d.resolved * .25)), chip:'no portals'},
+  {k:'Avg hops', from:S.avgHopsBefore, to:S.avgHopsAfter, f:v => v.toFixed(1), pre:`<small>${S.avgHopsBefore} → </small>`, spark:ser.map(d => d.hops), chip:`−${Math.round((1 - S.avgHopsAfter / S.avgHopsBefore) * 100)}%`},
+];
+function sparkPath(vals, w = 84, h = 26) {
+  const lo = Math.min(...vals), hi = Math.max(...vals), sx = w / (vals.length - 1), y = v => h - 2 - (v - lo) / (hi - lo || 1) * (h - 4);
+  const pts = vals.map((v, i) => [i * sx, y(v)]), line = 'M' + pts.map(p => p.map(n => n.toFixed(1)).join(',')).join('L');
+  return {line, area:`${line}L${w},${h}L0,${h}Z`, end:pts.at(-1)};
+}
+$('kpis').innerHTML = KPIS.map((t, i) => { const p = sparkPath(t.spark);
+  return `<div class="tile"><div class="k">${t.k}</div><div class="num">${t.pre ?? ''}<span id="kv${i}">${t.f(t.from ?? 0)}</span>${t.suf ? `<small> ${t.suf}</small>` : ''}</div>
+    <div class="foot"><span class="chip ${t.cls ?? ''}">${t.chip}</span><svg class="spark" viewBox="0 0 84 26" aria-hidden="true"><path class="ar" d="${p.area}"/><path class="ln" d="${p.line}"/><circle class="end" cx="${p.end[0]}" cy="${p.end[1]}" r="2.6"/></svg></div></div>`; }).join('');
+onView($('kpis'), () => KPIS.forEach((t, i) => { const o = {v:t.from ?? 0}, el = $(`kv${i}`); if (RM) { el.textContent = t.f(t.to); return; }
+  gsap.to(o, {v:t.to, duration:1.6, delay:i * .08, ease:'power3.out', onUpdate:() => el.textContent = t.f(o.v)}); }), .2);
+
+/* ============ 2 · Gain radial graph (pasted pen, ported to GSAP 3) ============ */
+const top5 = [...WF.byDept].sort((a, b) => b.hoursSaved - a.hoursSaved).slice(0, 5).reverse();   // inner ring = smallest
+const maxH = top5.at(-1).hoursSaved, percs = top5.map(d => d.hoursSaved / maxH);
+const ringY = [180, 140, 100, 60, 20];
+const svgNS = 'http://www.w3.org/2000/svg', mk = (tag, attrs, parent) => { const e = document.createElementNS(svgNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; };
+top5.forEach((d, i) => {
+  const g = mk('g', {class:'person'}, $('people')), y = ringY[i];
+  const nm = mk('text', {class:'nm', x:484, y:y + 3}, g); nm.textContent = d.name.toUpperCase();
+  const ts = mk('tspan', {dx:8}, nm); ts.textContent = WF.dept(d.id).subs[0].name;
+  const jt = mk('text', {class:'jt', x:484, y:y + 21}, g); jt.textContent = `${d.hoursSaved} h saved · ${d.requests} requests`;
+  const v = mk('text', {class:'val', 'text-anchor':'middle', 'dominant-baseline':'central'}, $('vals')); v.textContent = d.hoursSaved;
+});
+const lines = [...document.querySelectorAll('#top-lines .line')], circs = [...document.querySelectorAll('#circles .circ')], vals = [...document.querySelectorAll('#vals .val')];
+// the pen placed values on the circles once they stopped: same idea, measured from the arc
+vals.forEach((v, i) => { const L = lines[i], p = L.getPointAtLength(L.getTotalLength() * percs[i]); v.setAttribute('x', p.x); v.setAttribute('y', p.y); });
+
+gsap.set('#gain', {visibility:'visible'});
+gsap.set('#center-circ', {transformOrigin:'50% 50%'});
+gsap.set('#horz-lines line', {transformOrigin:'0% 50%'});
+const base = .7;
+function buildGain() {
+  const tl = gsap.timeline({paused:true});
+  tl.fromTo('#center-circ', {scale:0}, {scale:1, duration:base, delay:.2, ease:'elastic.out(0.5,0.4)'}, .15)
+    .fromTo('#gainTxt', {opacity:0}, {opacity:1, duration:.3, ease:'none'}, '-=0.5')
+    // circles rise out of the centre to the top of their ring (the pen's staggerFrom y)
+    .fromTo(circs, {x:375, y:250, opacity:0}, {x:375, y:i => ringY[i], opacity:1, duration:base * 3, ease:'power3.inOut', stagger:.15}, '-=0.8')
+    .fromTo('#base-lines path', {drawSVG:'0% 0%'}, {drawSVG:'0% 100%', duration:base, ease:'power2.inOut', stagger:.15}, '-=1.3')
+    .fromTo('#mid-lines path', {drawSVG:'0% 0%'}, {drawSVG:'0% 100%', duration:base, ease:'power2.inOut', stagger:.15}, '-=1.1')
+    .fromTo(lines, {drawSVG:'0% 0%'}, {drawSVG:i => `0% ${percs[i] * 100}%`, duration:base * 2, ease:'power3.inOut', stagger:.15}, '-=0.3')
+    .fromTo('#horz-lines line', {scaleX:0}, {scaleX:1, duration:base / 2, ease:'power2.out', stagger:.15}, '-=2.4')
+    .fromTo('#people .person', {opacity:0, x:20}, {opacity:1, x:0, duration:base / 2, ease:'power2.out', stagger:.1}, '-=2.2');
+  // circles ride their arcs (MotionPathPlugin replaces pathDataToBezier + bezier tweens)
+  circs.forEach((c, i) => tl.to(c, {motionPath:{path:lines[i], start:0, end:percs[i]}, duration:base * 2, ease:'power3.inOut', immediateRender:false}, i === 0 ? '-=2' : '-=1.85'));
+  tl.fromTo(vals, {opacity:0}, {opacity:1, duration:.5, ease:'none'});
+  return tl;
+}
+const gainTl = buildGain();
+gsap.set(circs, {x:375, y:250, opacity:0}); gsap.set(['#base-lines path', '#mid-lines path', '#top-lines path'], {drawSVG:'0% 0%'}); gsap.set('#center-circ', {scale:0});
+gsap.set(['#people .person', '#gainTxt', '#vals .val'], {opacity:0}); gsap.set('#horz-lines line', {scaleX:0});
+const playGain = () => RM ? gainTl.progress(1) : gainTl.restart();
+onView($('gain'), playGain);
+$('replay').addEventListener('click', playGain);
+
+/* ============ 3 · Skill bars → hours saved by department ============ */
+const maxDept = Math.max(...WF.byDept.map(d => d.hoursSaved));
+$('skTotal').textContent = `${fmt(WF.byDept.reduce((n, d) => n + d.hoursSaved, 0))} h total`;
+$('skills').innerHTML = [...WF.byDept].sort((a, b) => b.hoursSaved - a.hoursSaved).map((d, i) => `
+  <div class="skill-row" role="img" aria-label="${d.name}: ${d.hoursSaved} hours saved"><span>${d.name}</span>
+    <div class="skill" style="--w:${(d.hoursSaved / maxDept * 100).toFixed(1)}%;--i:${i}"><span class="fill"></span><div class="lab"><span class="h">${d.hoursSaved} h</span></div></div></div>`).join('');
+onView($('skills'), () => $('skills').classList.add('go'));
+
+/* ============ 4 + 5 · Recharts ============ */
+const h = React.createElement, R = Recharts;
+const colors = () => ({hi:Aero.css('--accent-hi'), mid:Aero.css('--accent'), lo:Aero.css('--accent-lo'), soft:Aero.css('--accent-soft'), ink:Aero.css('--ink'), ink2:Aero.css('--ink-2'), grey:'#9DB0C3', person:Aero.css('--person')});
+const Tip = ({active, payload, label}) => !active || !payload?.length ? null :
+  h('div', {className:'milk still tip'}, h('div', {className:'t'}, label),
+    payload.map(p => h('div', {className:'r', key:p.dataKey}, h('span', null, h('i', {style:{background:!String(p.color).startsWith('url') ? p.color : p.dataKey === 'before' ? '#9DB0C3' : Aero.css('--accent')}}), p.name), h('b', null, p.value))));
+const axis = c => ({tick:{fill:c.ink2, fontSize:12}, axisLine:{stroke:'rgba(11,42,74,.18)'}, tickLine:false});
+function AreaCard({c}) {
+  return h(R.ResponsiveContainer, {width:'100%', height:'100%'},
+    h(R.AreaChart, {data:WF.series, margin:{top:8, right:8, left:-14, bottom:0}},
+      h('defs', null,
+        h('linearGradient', {id:'gReq', x1:0, y1:0, x2:0, y2:1}, h('stop', {offset:'0%', stopColor:c.hi, stopOpacity:.75}), h('stop', {offset:'100%', stopColor:c.hi, stopOpacity:.05})),
+        h('linearGradient', {id:'gRes', x1:0, y1:0, x2:0, y2:1}, h('stop', {offset:'0%', stopColor:c.person, stopOpacity:.55}), h('stop', {offset:'100%', stopColor:c.person, stopOpacity:.03}))),
+      h(R.CartesianGrid, {stroke:'rgba(255,255,255,.7)', vertical:false}),
+      h(R.XAxis, {dataKey:'week', ...axis(c)}), h(R.YAxis, axis(c)),
+      h(R.Tooltip, {content:h(Tip), cursor:{stroke:'rgba(255,255,255,.9)', strokeWidth:2}}),
+      h(R.Area, {type:'monotone', dataKey:'requests', name:'Requests', stroke:c.lo, strokeWidth:2.4, fill:'url(#gReq)', isAnimationActive:!RM, animationDuration:1400, activeDot:{r:5, stroke:'#fff', strokeWidth:2}}),
+      h(R.Area, {type:'monotone', dataKey:'resolved', name:'Resolved', stroke:c.person, strokeWidth:2.4, fill:'url(#gRes)', isAnimationActive:!RM, animationDuration:1400, animationBegin:200, activeDot:{r:5, stroke:'#fff', strokeWidth:2}})));
+}
+const barData = WF.byDept.map(d => ({name:SHORT[d.id], before:d.hopsBefore, after:d.hopsAfter}));
+function BarCard({c}) {
+  return h(R.ResponsiveContainer, {width:'100%', height:'100%'},
+    h(R.BarChart, {data:barData, margin:{top:8, right:8, left:-20, bottom:0}, barGap:3},
+      h('defs', null,
+        h('linearGradient', {id:'gAfter', x1:0, y1:0, x2:0, y2:1}, h('stop', {offset:'0%', stopColor:c.hi}), h('stop', {offset:'100%', stopColor:c.lo})),
+        h('linearGradient', {id:'gBefore', x1:0, y1:0, x2:0, y2:1}, h('stop', {offset:'0%', stopColor:'#C3D1DE'}), h('stop', {offset:'100%', stopColor:'#8CA0B4'}))),
+      h(R.CartesianGrid, {stroke:'rgba(255,255,255,.7)', vertical:false}),
+      h(R.XAxis, {dataKey:'name', ...axis(c), interval:0, tick:{fill:c.ink2, fontSize:11}}), h(R.YAxis, axis(c)),
+      h(R.Tooltip, {content:h(Tip), cursor:{fill:'rgba(255,255,255,.35)'}}),
+      h(R.Bar, {dataKey:'before', name:'Before', fill:'url(#gBefore)', radius:[6, 6, 0, 0], isAnimationActive:!RM, animationDuration:1100}),
+      h(R.Bar, {dataKey:'after', name:'With Wayfinder', fill:'url(#gAfter)', radius:[6, 6, 0, 0], isAnimationActive:!RM, animationDuration:1100, animationBegin:250})));
+}
+const areaRoot = ReactDOM.createRoot($('area')), barRoot = ReactDOM.createRoot($('bars'));
+const sw = bg => `<i class="dot" style="background:${bg}"></i>`;
+function renderCharts() {
+  const c = colors();
+  $('arLegend').innerHTML = `<span>${sw(c.lo)}Requests</span><span>${sw(c.person)}Resolved</span>`;
+  $('brLegend').innerHTML = `<span>${sw('#9DB0C3')}Before</span><span>${sw(`linear-gradient(${c.hi},${c.lo})`)}With Wayfinder</span>`;
+  areaRoot.render(h(AreaCard, {c})); barRoot.render(h(BarCard, {c}));
+}
+let chartsShown = false;
+onView($('area'), () => { chartsShown = true; renderCharts(); }, .15);
+
+/* ============ 6 · d3 chord: department → department routing ============ */
+const ids = WF.org.map(d => d.id), n = ids.length, matrix = Array.from({length:n}, () => new Array(n).fill(0));
+WF.routing.forEach(([a, b, v]) => { matrix[ids.indexOf(a)][ids.indexOf(b)] += v; });
+// v6: one 3-colour family (primary → secondary → warm) instead of nine unrelated hues
+const chordColors = () => d3.quantize(d3.interpolateRgbBasis([Aero.css('--c-primary'), Aero.css('--c-secondary'), Aero.css('--c-warm')]), matrix.length);
+const svg = d3.select('#chord'), R0 = 205, R1 = 226;
+let chords, cols, pinned = null;
+function drawChord() {
+  cols = chordColors(); svg.selectAll('*').remove();
+  chords = d3.chordDirected().padAngle(.045).sortSubgroups(d3.descending)(matrix);
+  const defs = svg.append('defs'), gl = defs.append('radialGradient').attr('id', 'arcGloss');
+  gl.append('stop').attr('offset', '86%').attr('stop-color', '#fff').attr('stop-opacity', 0); gl.append('stop').attr('offset', '100%').attr('stop-color', '#fff').attr('stop-opacity', .55);
+  const ribbon = d3.ribbonArrow().radius(R0 - 4).headRadius(10), arc = d3.arc().innerRadius(R0).outerRadius(R1);
+  svg.append('g').selectAll('path').data(chords).join('path').attr('class', 'rib').attr('d', ribbon).attr('fill', d => cols[d.source.index])
+    .append('title').text(d => `${WF.org[d.source.index].name} → ${WF.org[d.target.index].name}: ${d.source.value} requests`);
+  const g = svg.append('g').selectAll('g').data(chords.groups).join('g').attr('class', 'grp');
+  g.append('path').attr('d', arc).attr('fill', d => cols[d.index]);
+  g.append('path').attr('d', arc).attr('fill', 'url(#arcGloss)').style('pointer-events', 'none');
+  g.append('text').each(d => d.mid = (d.startAngle + d.endAngle) / 2)
+    .attr('transform', d => `rotate(${d.mid * 180 / Math.PI - 90}) translate(${R1 + 10}) ${d.mid > Math.PI ? 'rotate(180)' : ''}`)
+    .attr('text-anchor', d => d.mid > Math.PI ? 'end' : 'start').attr('dy', '.35em').text(d => SHORT[ids[d.index]]);
+  g.on('mouseenter', (e, d) => isolate(d.index)).on('mouseleave', () => isolate(pinned)).on('click', (e, d) => { pinned = pinned === d.index ? null : d.index; isolate(pinned); });
+  if (!RM) svg.selectAll('.rib').attr('opacity', 0).transition().duration(900).delay((d, i) => i * 40).attr('opacity', null);
+  isolate(pinned);
+}
+function isolate(i) {
+  const on = i != null; svg.classed('iso', on);
+  svg.selectAll('.rib').classed('on', d => on && (d.source.index === i || d.target.index === i));
+  svg.selectAll('.grp').classed('on', d => on && d.index === i);
+  detail(i);
+}
+function detail(i) {
+  const el = $('detail');
+  if (i == null) {
+    const top = [...WF.routing].sort((a, b) => b[2] - a[2]).slice(0, 4), total = WF.routing.reduce((s, r) => s + r[2], 0);
+    el.innerHTML = `<div class="k">All departments</div><div class="big">${fmt(total)} <small class="muted" style="font-size:16px">routed requests</small></div>
+      <p class="page-sub" style="margin-top:4px">Hover or tap a department to isolate its routes. Arrows point to who answered.</p>
+      <div class="rows">${top.map(([a, b, v]) => `<div class="row"><span class="dot" style="background:${cols[ids.indexOf(a)]}"></span><div><div class="t">${WF.dept(a).name} → ${WF.dept(b).name}</div><div class="s">busiest lane</div></div><span class="v">${v}</span></div>`).join('')}</div>`;
+    return;
+  }
+  const d = WF.org[i], out = WF.routing.filter(r => r[0] === d.id), inn = WF.routing.filter(r => r[1] === d.id), bd = WF.byDept[i];
+  const sum = a => a.reduce((s, r) => s + r[2], 0);
+  const rows = [...out.map(r => ({lbl:`→ ${WF.dept(r[1]).name}`, s:'sends to', v:r[2], c:ids.indexOf(r[1])})), ...inn.map(r => ({lbl:`← ${WF.dept(r[0]).name}`, s:'receives from', v:r[2], c:ids.indexOf(r[0])}))].sort((a, b) => b.v - a.v).slice(0, 5);
+  el.innerHTML = `<div class="k">${d.subs.map(s => s.name).join(' · ')}</div><div class="big" style="display:flex;align-items:center;gap:10px"><span class="dot" style="width:18px;height:18px;background:${cols[i]}"></span>${d.name}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><span class="chip info">${sum(out)} sent</span><span class="chip info">${sum(inn)} received</span><span class="chip">${bd.hopsBefore} → ${bd.hopsAfter} hops</span><span class="chip">${bd.hoursSaved} h saved</span></div>
+    <div class="rows">${rows.map(r => `<div class="row"><span class="dot" style="background:${cols[r.c]}"></span><div><div class="t">${r.lbl}</div><div class="s">${r.s}</div></div><span class="v">${r.v}</span></div>`).join('')}</div>`;
+}
+onView($('chord'), drawChord, .15);
+
+/* ============ Theme: re-render chart colours (CSS-var parts re-tint on their own) ============ */
+Aero.onTheme(() => { if (chartsShown) renderCharts(); if (chords) drawChord(); });
+
+setTimeout(() => innerWidth > 1100 && Aero.toast('route', 'Insights refreshed', `${fmt(S.hoursSaved)} hours handed back`, `avg hops <span class="hops">${S.avgHopsBefore} → ${S.avgHopsAfter}</span>`), RM ? 0 : 1800);
+setTimeout(Aero.hideToast, RM ? 4000 : 7500);
+})();
+</script>
+</body>
+</html>

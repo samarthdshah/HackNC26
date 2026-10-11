@@ -1,0 +1,765 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wayfinder OS Visual Exploration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;800&family=IBM+Plex+Mono:wght@400;500&family=Nunito:wght@600;700;800&family=Source+Sans+3:wght@400;600&family=Sora:wght@400;600&family=Manrope:wght@400;500;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Public+Sans:wght@400;600&display=swap">
+<style>
+/* Layout: a single reading column (~70ch) for argument; mockups break out to a wider 1180px band so the app frames read at real scale. */
+:root{
+  --bg:#F3F6F4; --fg:#16201C; --muted:#56645E; --line:#D6DED9; --card:#FFFFFF; --accent:#1D7466; --chip:#E7EEEA;
+  --f-display:"Hanken Grotesk",ui-sans-serif,system-ui,sans-serif;
+  --f-body:"Hanken Grotesk",ui-sans-serif,system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --read:70ch; --wide:1180px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1412; --fg:#E4EBE7; --muted:#93A29B; --line:#25302B; --card:#151D1A; --accent:#5DC2AF; --chip:#1C2622; color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0E1412; --fg:#E4EBE7; --muted:#93A29B; --line:#25302B; --card:#151D1A; --accent:#5DC2AF; --chip:#1C2622; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 var(--f-body);padding-inline:16px;padding-block:0 64px}
+a{color:var(--accent)}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.read{max-width:var(--read);margin-inline:auto}
+.wide{max-width:var(--wide);margin-inline:auto}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:clamp(2.4rem,6vw,4.2rem);font-weight:800;letter-spacing:-.03em}
+h2{font-size:clamp(1.7rem,3.4vw,2.4rem);font-weight:800;letter-spacing:-.02em}
+h3{font-size:1.15rem;font-weight:600}
+p{margin:0}
+.eyebrow{font:500 12px/1.4 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{font-size:1.2rem;line-height:1.55;color:var(--fg)}
+.muted{color:var(--muted)}
+section{padding-block:56px 8px;display:grid;gap:22px}
+.stack{display:grid;gap:14px}
+
+/* hero */
+.hero{padding-block:64px 24px;display:grid;gap:22px}
+.dirstrip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:10px}
+.dirstrip a{display:grid;gap:8px;text-decoration:none;color:var(--fg);padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.dirstrip a:hover{border-color:var(--accent)}
+.band{display:flex;height:40px;border-radius:6px;overflow:hidden}
+.band span{flex:1}
+.dirstrip b{font-family:var(--f-display);font-size:1.05rem}
+.dirstrip small{color:var(--muted);font-size:.85rem;line-height:1.4}
+@media (max-width:640px){.dirstrip{grid-template-columns:1fr}}
+
+/* principles */
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:720px){.two{grid-template-columns:1fr}}
+.box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px;display:grid;gap:10px;min-width:0}
+.box ul{margin:0;padding-left:18px;display:grid;gap:8px}
+.box li::marker{color:var(--muted)}
+
+.claim{border-left:3px solid var(--accent);padding:4px 0 4px 18px;display:grid;gap:8px}
+
+/* direction header */
+.dir-head{display:grid;gap:10px}
+.dir-head .tag{font:500 12px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.specs{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}
+@media (max-width:860px){.specs{grid-template-columns:1fr}}
+.swatches{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:520px){.swatches{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.sw{display:grid;gap:4px;font-size:.78rem;line-height:1.3;min-width:0}
+.sw i{display:block;height:46px;border-radius:6px;border:1px solid rgba(0,0,0,.08)}
+.sw b{font-weight:600}
+.sw code{font:400 .74rem var(--f-mono);color:var(--muted)}
+.specimen{display:grid;gap:6px;padding:16px;border-radius:8px;min-width:0}
+.rules{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:.95rem;margin:0}
+.rules dt{font:500 11px/1.9 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.rules dd{margin:0}
+
+/* mockup frames */
+.mock{display:grid;gap:8px}
+.mock figcaption{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;font-size:.88rem;color:var(--muted)}
+.mock figcaption b{color:var(--fg);font-weight:600}
+figure{margin:0}
+.frame{position:relative;width:100%;aspect-ratio:16/10;overflow:hidden;border-radius:10px;border:1px solid var(--line);max-width:100%}
+.frame > .app{position:absolute;top:0;left:0;transform-origin:0 0;transform:scale(var(--s,.5))}
+.hint{font:500 11px var(--f-mono);letter-spacing:.04em;color:var(--accent)}
+
+.verdict{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.verdict{grid-template-columns:1fr}}
+.verdict .box{font-size:.93rem}
+.verdict h3{font-size:.95rem}
+
+/* comparison */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:.93rem}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font:500 11px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.dots{font-family:var(--f-mono);letter-spacing:2px;color:var(--accent);white-space:nowrap;font-variant-numeric:tabular-nums}
+.dots s{text-decoration:none;color:var(--line)}
+
+.diagram{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;overflow-x:auto}
+.diagram svg{display:block;width:100%;min-width:520px;height:auto}
+ol.q{margin:0;padding-left:22px;display:grid;gap:10px}
+.sources{font-size:.9rem;display:grid;gap:6px;padding-left:18px;margin:0}
+
+/* ===== shared app chrome (inside mockups, 1280x800 design canvas) ===== */
+.app{width:1280px;height:800px;display:grid;grid-template-columns:76px 1fr;background:var(--a-bg);color:var(--a-ink);font-family:var(--a-fb);font-size:14px;line-height:1.45;overflow:hidden}
+.app button{font:inherit;color:inherit;cursor:pointer}
+.rail{display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 0;border-right:1px solid var(--a-line)}
+.rail .logo{width:36px;height:36px;margin-bottom:18px}
+.rail .it{width:60px;display:grid;justify-items:center;gap:3px;padding:8px 0;border-radius:12px;font-size:10px;color:var(--a-muted);text-align:center;line-height:1.15}
+.rail .it svg{width:22px;height:22px}
+.rail .it.on{color:var(--a-ink);background:var(--a-railon)}
+.panel{background:var(--a-panel);border:1px solid var(--a-pline);border-radius:var(--a-r);min-width:0;min-height:0}
+.ph{font:var(--a-labelfont);letter-spacing:var(--a-labells);text-transform:var(--a-labeltt);color:var(--a-muted)}
+.disp{font-family:var(--a-fd)}
+
+.home{display:grid;grid-template-columns:1fr 330px;grid-template-rows:auto 1fr auto;gap:18px;padding:26px 30px;min-height:0}
+.home header{grid-column:1/-1;display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+.home h4{margin:0;font-family:var(--a-fd);font-size:30px;font-weight:var(--a-fdw);letter-spacing:var(--a-fdls);line-height:1.1}
+.home .sub{color:var(--a-muted);margin-top:4px}
+.ask{width:430px;display:flex;align-items:center;gap:10px;padding:12px 16px;color:var(--a-muted)}
+.ask svg{width:18px;height:18px;flex:none;color:var(--a-accent)}
+.viz{position:relative;padding:14px 16px 8px;display:grid;grid-template-rows:auto 1fr}
+.viz .vh{display:flex;justify-content:space-between;align-items:baseline}
+.viz svg{width:100%;height:100%;display:block}
+.side{display:grid;grid-template-rows:auto 1fr;gap:14px;min-height:0}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{padding:12px 14px;display:grid;gap:2px}
+.stat .n{font-family:var(--a-fd);font-size:30px;font-weight:var(--a-fdw);line-height:1.1;font-variant-numeric:tabular-nums}
+.stat .l{font-size:12px;color:var(--a-ink)}
+.stat .d{font-size:11.5px;color:var(--a-muted)}
+.feed{padding:14px 16px;display:grid;gap:10px;align-content:start}
+.feed .ev{display:grid;grid-template-columns:10px 1fr auto;gap:10px;align-items:start;font-size:13px}
+.feed .ev i{width:8px;height:8px;border-radius:50%;margin-top:6px;background:var(--a-flow)}
+.feed .ev i.wait{background:var(--a-signal)}
+.feed .ev i.done{background:var(--a-muted)}
+.feed .ev time{font-size:11.5px;color:var(--a-muted);font-variant-numeric:tabular-nums}
+.entries{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.entry{padding:14px 18px;display:grid;gap:4px;text-align:left}
+.entry b{font-family:var(--a-fd);font-size:17px;font-weight:var(--a-fdw)}
+.entry span{font-size:13px;color:var(--a-muted)}
+.entry .go{font-size:12px;color:var(--a-accent);font-weight:600}
+
+.uni{display:grid;grid-template-columns:1fr 330px;grid-template-rows:auto 1fr 124px;gap:14px;padding:20px 24px;min-height:0}
+.ubar{grid-column:1/-1;display:flex;gap:14px;align-items:center}
+.ubar h4{margin:0 10px 0 0;font-family:var(--a-fd);font-size:24px;font-weight:var(--a-fdw);letter-spacing:var(--a-fdls);white-space:nowrap}
+.search{flex:1;display:flex;align-items:center;gap:8px;padding:0 14px;height:42px}
+.search svg{width:16px;height:16px;color:var(--a-muted);flex:none}
+.search input{flex:1;border:0;background:transparent;font:inherit;color:var(--a-ink);outline:none;height:100%}
+.search input::placeholder{color:var(--a-muted)}
+.lens{display:flex;padding:4px;gap:4px;height:42px}
+.lens button{border:0;background:transparent;padding:0 14px;border-radius:calc(var(--a-r) - 4px);color:var(--a-muted);font-weight:600}
+.lens button.on{background:var(--a-lenson);color:var(--a-lensonfg)}
+.graph{position:relative;padding:8px;display:grid}
+.graph svg{width:100%;height:100%;display:block}
+.graph .node{cursor:pointer}
+.legend{position:absolute;left:16px;bottom:12px;display:flex;gap:14px;font-size:11.5px;color:var(--a-muted)}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:18px;height:3px;border-radius:2px}
+.uside{grid-row:2/4;grid-column:2;display:grid;grid-template-rows:auto 1fr;gap:14px;min-height:0}
+.prof{padding:16px;display:grid;gap:10px;align-content:start}
+.prof .who{display:flex;gap:12px;align-items:center}
+.av{width:46px;height:46px;flex:none;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:15px;background:var(--a-avbg);color:var(--a-avfg)}
+.prof .nm{font-family:var(--a-fd);font-size:19px;font-weight:var(--a-fdw);line-height:1.15}
+.prof .rl{font-size:12.5px;color:var(--a-muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:11.5px;padding:3px 9px;border-radius:999px;background:var(--a-chip);color:var(--a-ink)}
+.chip.hit{background:var(--a-accent);color:var(--a-onaccent)}
+.tie{font-size:12.5px;color:var(--a-ink)}
+.tie em{font-style:normal;color:var(--a-muted)}
+.hist{display:grid;gap:4px;font-size:12px;color:var(--a-muted)}
+.sig{display:grid;grid-template-columns:repeat(8,6px);gap:3px}
+.sig i{width:6px;height:6px;border-radius:50%}
+.reqs{padding:14px 16px;display:grid;gap:6px;align-content:start;overflow:hidden}
+.req{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 10px;border:0;background:transparent;border-radius:calc(var(--a-r) - 6px);text-align:left;font-size:13px}
+.req.on{background:var(--a-chip)}
+.pill{font-size:10.5px;padding:2px 8px;border-radius:999px;white-space:nowrap;border:1px solid currentColor}
+.pill.move{color:var(--a-flowtext)} .pill.wait{color:var(--a-signaltext)} .pill.done{color:var(--a-muted)}
+.strip{padding:12px 18px;display:grid;grid-template-rows:auto 1fr;gap:6px}
+.steps{display:flex;align-items:flex-start}
+.step{flex:1;display:grid;gap:2px;position:relative;padding-top:20px;font-size:12px;min-width:0}
+.step::before{content:"";position:absolute;top:6px;left:0;right:0;height:2px;background:var(--a-line)}
+.step.past::before{background:var(--a-flow)}
+.step:last-child::before{right:auto;width:12px}
+.step .dot{position:absolute;top:1px;left:0;width:12px;height:12px;border-radius:50%;background:var(--a-panel);border:2px solid var(--a-line)}
+.step.past .dot{background:var(--a-flow);border-color:var(--a-flow)}
+.step.now .dot{background:var(--a-signal);border-color:var(--a-signal);box-shadow:0 0 0 4px var(--a-signalhalo)}
+.step b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.step span{color:var(--a-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px}
+
+/* ---- Direction A: Daylight Delta ---- */
+.m-delta{--a-bg:linear-gradient(178deg,#D8EEF9 0%,#EDF7F8 48%,#E5F2E1 100%);--a-ink:#12324A;--a-muted:#4E6B80;--a-line:rgba(18,50,74,.12);
+  --a-panel:rgba(255,255,255,.74);--a-pline:rgba(255,255,255,.95);--a-r:20px;--a-fd:"Nunito",ui-rounded,system-ui,sans-serif;--a-fdw:800;--a-fdls:-.01em;
+  --a-fb:"Source Sans 3",system-ui,sans-serif;--a-labelfont:700 12px/1.4 "Nunito",sans-serif;--a-labells:.02em;--a-labeltt:none;
+  --a-accent:#1A7FB0;--a-onaccent:#fff;--a-flow:#0FB5AE;--a-flowtext:#0E7C77;--a-signal:#F2B33D;--a-signaltext:#9A6500;--a-signalhalo:rgba(242,179,61,.25);
+  --a-chip:#E3F1F8;--a-railon:rgba(255,255,255,.8);--a-lenson:#12324A;--a-lensonfg:#fff;--a-avbg:linear-gradient(160deg,#BDE6F7,#9FD8C4);--a-avfg:#12324A}
+.m-delta .panel{box-shadow:0 10px 30px rgba(18,50,74,.07),inset 0 1px 0 rgba(255,255,255,.9)}
+.m-delta .rail{background:rgba(255,255,255,.35)}
+
+/* ---- Direction B: Night Canopy ---- */
+.m-canopy{--a-bg:radial-gradient(ellipse 80% 70% at 55% 35%,#0D2128 0%,#071318 60%,#050D10 100%);--a-ink:#DDEFEA;--a-muted:#8FB0AA;--a-line:#1B3A40;
+  --a-panel:rgba(12,30,36,.82);--a-pline:#1A363C;--a-r:14px;--a-fd:"Sora",system-ui,sans-serif;--a-fdw:600;--a-fdls:-.02em;
+  --a-fb:"Manrope",system-ui,sans-serif;--a-labelfont:600 10.5px/1.4 "Sora",sans-serif;--a-labells:.14em;--a-labeltt:uppercase;
+  --a-accent:#5EF2D6;--a-onaccent:#06211C;--a-flow:#5EF2D6;--a-flowtext:#5EF2D6;--a-signal:#C38BFF;--a-signaltext:#C38BFF;--a-signalhalo:rgba(195,139,255,.22);
+  --a-chip:#15323A;--a-railon:#12292F;--a-lenson:#1E4A4C;--a-lensonfg:#DDEFEA;--a-avbg:#12292F;--a-avfg:#5EF2D6}
+.m-canopy .rail{background:rgba(5,13,16,.6)}
+
+/* ---- Direction C: Field Atlas ---- */
+.m-atlas{--a-bg:#EEF0E7;--a-ink:#1E2B24;--a-muted:#5A6A5F;--a-line:rgba(30,43,36,.22);
+  --a-panel:#F8F9F3;--a-pline:rgba(30,43,36,.28);--a-r:3px;--a-fd:"Newsreader",Georgia,serif;--a-fdw:600;--a-fdls:-.01em;
+  --a-fb:"Public Sans",system-ui,sans-serif;--a-labelfont:500 10.5px/1.4 "IBM Plex Mono",monospace;--a-labells:.1em;--a-labeltt:uppercase;
+  --a-accent:#2B54C9;--a-onaccent:#fff;--a-flow:#2B54C9;--a-flowtext:#2B54C9;--a-signal:#C7362F;--a-signaltext:#C7362F;--a-signalhalo:rgba(199,54,47,.18);
+  --a-chip:#E2E7D8;--a-railon:#E2E7D8;--a-lenson:#1E2B24;--a-lensonfg:#F8F9F3;--a-avbg:#E2E7D8;--a-avfg:#1E2B24;
+  background-image:linear-gradient(rgba(30,43,36,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(30,43,36,.05) 1px,transparent 1px);background-size:40px 40px}
+.m-atlas .stat .n{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:26px}
+.m-atlas .home h4,.m-atlas .ubar h4{font-style:italic;font-weight:400}
+
+/* motion: only when the viewer allows it */
+@media (prefers-reduced-motion:no-preference){
+  .flow{animation:flow 1.4s linear infinite}
+  @keyframes flow{to{stroke-dashoffset:-32}}
+  .march{animation:march 2.6s linear infinite}
+  @keyframes march{to{stroke-dashoffset:-22}}
+  .breathe{animation:breathe 3.4s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+  @keyframes breathe{50%{transform:scale(1.5);opacity:.15}}
+  .ripple{animation:ripple 4s ease-out infinite;transform-box:fill-box;transform-origin:center}
+  .ripple.r2{animation-delay:2s}
+  @keyframes ripple{from{transform:scale(.6);opacity:.7}to{transform:scale(2.4);opacity:0}}
+}
+</style>
+
+<header class="hero read">
+  <p class="eyebrow">Wayfinder OS · Visual exploration · Home &amp; Living Universe · October 2026</p>
+  <h1>What does a living organization look like?</h1>
+  <p class="lede">Three directions for Wayfinder's visual identity, each tested on the two screens that matter first. They all start from the same brief (optimistic technology, organic form, a world where everything is connected) and land in different places.</p>
+  <p class="muted">Every mockup below uses the same mock organization: Maya Okafor, a product design lead, her 20 collaborators across 5 departments, and 6 requests in various states. Only the visual language changes, so you can compare them fairly. The mockups are live: click people, switch lenses, and search.</p>
+  <nav class="dirstrip" aria-label="Directions">
+    <a href="#delta"><span class="band"><span style="background:#D8EEF9"></span><span style="background:#1C8FC4"></span><span style="background:#0FB5AE"></span><span style="background:#3FA34D"></span><span style="background:#F2B33D"></span><span style="background:#12324A"></span></span><b>A · Daylight Delta</b><small>Frutiger Aero, matured. The org as a watershed.</small></a>
+    <a href="#canopy"><span class="band"><span style="background:#071318"></span><span style="background:#2F6F6A"></span><span style="background:#5EF2D6"></span><span style="background:#9BD36A"></span><span style="background:#C38BFF"></span><span style="background:#DDEFEA"></span></span><b>B · Night Canopy</b><small>Pandora at night. Light only where something is happening.</small></a>
+    <a href="#atlas"><span class="band"><span style="background:#EEF0E7"></span><span style="background:#DCE5C9"></span><span style="background:#A9B79A"></span><span style="background:#2B54C9"></span><span style="background:#C7362F"></span><span style="background:#1E2B24"></span></span><b>C · Field Atlas</b><small>The challenger. A naturalist's map of your org.</small></a>
+  </nav>
+</header>
+
+<section class="read" id="principles">
+  <p class="eyebrow">Research</p>
+  <h2>What the references actually teach</h2>
+  <p>Frutiger Aero (roughly 2005–2013, named after Adrian Frutiger's typeface and Windows Vista's Aero) is remembered for its surfaces: gloss, glass, bubbles, aurora wallpapers, sky-blue gradients. Underneath those surfaces sit a few ideas that hold up much better than the surfaces do. Avatar's Pandora shares the strongest of them. Its whole world is one connected network, and its light is functional rather than decorative.</p>
+  <div class="two">
+    <div class="box">
+      <h3>Principles worth keeping</h3>
+      <ul>
+        <li><b>Technology as hopeful.</b> The interface feels like it's on your side. Bright, open, unhurried.</li>
+        <li><b>Nature and tech as one system.</b> Not a leaf texture over a dashboard, but the data itself behaving like something that grows, flows and rests.</li>
+        <li><b>Daylight legibility.</b> Aero worked because it was bright and clear: humanist type, generous space, soft depth.</li>
+        <li><b>The network is the landscape</b> (Pandora). On Pandora the forest <i>is</i> the network. For Wayfinder, the org map is the ground you stand on, not a chart floating in a card.</li>
+        <li><b>Light carries meaning</b> (Pandora). Bioluminescence there signals, warns, and identifies; each Na'vi has a unique pattern of glowing dots. Glow should be information.</li>
+      </ul>
+    </div>
+    <div class="box">
+      <h3>Motifs to leave behind</h3>
+      <ul>
+        <li><b>Gloss and specular highlights.</b> They date the work to 2007 instantly and add visual noise to dense data.</li>
+        <li><b>Glass over photography.</b> Frosted panels on busy imagery hurt contrast, and graphs need calm ground.</li>
+        <li><b>Decorative orbs, bokeh and lens flare.</b> In a graph UI, every round glowing thing reads as a node. Decoration becomes false data.</li>
+        <li><b>Saturated sky-blue everything.</b> The classic Aero blues (#29B6F6, #039BE5) fail text contrast on white.</li>
+        <li><b>Neon-on-black "AI network" imagery.</b> It's the Pandora cliché, and it's also how every AI product already looks.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="read" id="assumptions">
+  <p class="eyebrow">Challenging the brief</p>
+  <h2>Three assumptions worth questioning</h2>
+  <div class="claim">
+    <h3>1. Relationships and requests shouldn't share one graph</h3>
+    <p>They're different kinds of thing. Relationships change slowly and are about <i>who is near whom</i>; they're spatial. A request is a sequence that moves through people over days; it's temporal. Drawing both as lines in one network gives you a hairball where nobody can tell a friendship from a handoff.</p>
+    <p>So every direction below uses the same structure. The relationship map is the stable <b>ground</b>. Requests are <b>routes</b> drawn across that ground when you switch to the Requests lens, and a <b>timeline strip</b> shows each route's steps in order: handoff, review, approval, done.</p>
+  </div>
+  <figure class="diagram" aria-label="Diagram: relationships as space, requests as time">
+    <svg viewBox="0 0 760 190" role="img">
+      <title>Relationships are the map, requests are routes over time</title>
+      <g fill="none" stroke="var(--line)" stroke-width="1.5">
+        <ellipse cx="110" cy="92" rx="78" ry="56"/><ellipse cx="200" cy="66" rx="40" ry="32"/>
+      </g>
+      <g fill="var(--muted)">
+        <circle cx="80" cy="80" r="5"/><circle cx="118" cy="62" r="5"/><circle cx="140" cy="110" r="5"/><circle cx="92" cy="122" r="5"/><circle cx="196" cy="58" r="5"/><circle cx="214" cy="80" r="5"/>
+      </g>
+      <g stroke="var(--muted)" stroke-width="1" opacity=".6"><line x1="80" y1="80" x2="118" y2="62"/><line x1="118" y1="62" x2="140" y2="110"/><line x1="92" y1="122" x2="140" y2="110"/><line x1="118" y1="62" x2="196" y2="58"/></g>
+      <text x="110" y="176" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)" letter-spacing="1">RELATIONSHIPS · WHERE</text>
+      <text x="380" y="88" text-anchor="middle" font-family="Hanken Grotesk, sans-serif" font-size="13" fill="var(--fg)">a lens lays one</text>
+      <text x="380" y="106" text-anchor="middle" font-family="Hanken Grotesk, sans-serif" font-size="13" fill="var(--fg)">over the other</text>
+      <path d="M300 96 H330 M430 96 H460" stroke="var(--accent)" stroke-width="1.5" fill="none"/>
+      <path d="M455 91 L462 96 L455 101" stroke="var(--accent)" stroke-width="1.5" fill="none"/>
+      <path d="M480 96 H730" stroke="var(--line)" stroke-width="2"/>
+      <path d="M480 96 H640" stroke="var(--accent)" stroke-width="2.5"/>
+      <g font-family="Hanken Grotesk, sans-serif" font-size="11.5" fill="var(--fg)" text-anchor="middle">
+        <circle cx="490" cy="96" r="6" fill="var(--accent)"/><text x="490" y="124">Request</text>
+        <circle cx="565" cy="96" r="6" fill="var(--accent)"/><text x="565" y="124">Handoff</text>
+        <circle cx="640" cy="96" r="7" fill="var(--card)" stroke="var(--accent)" stroke-width="3"/><text x="640" y="124">Approval</text>
+        <circle cx="720" cy="96" r="6" fill="var(--card)" stroke="var(--line)" stroke-width="2"/><text x="720" y="124">Done</text>
+      </g>
+      <text x="605" y="176" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)" letter-spacing="1">REQUESTS · WHEN</text>
+    </svg>
+  </figure>
+  <div class="claim">
+    <h3>2. Home's centerpiece should be about you and today, not the whole org</h3>
+    <p>A beautiful whole-company network on Home looks impressive once and tells you nothing on the tenth visit. Each direction instead centers Home on <b>your</b> neighborhood and what is moving through it right now. Every animated mark corresponds to a real request, so the hero visual doubles as a status readout.</p>
+  </div>
+  <div class="claim">
+    <h3>3. "Living" should mean change over time, not glow</h3>
+    <p>What makes a network feel alive is that it grows and fades. Ties you haven't used in months get fainter, new collaborators appear, and requests visibly travel. All three directions encode recency this way (faded marks are people you haven't worked with lately; hollow marks are people you've never worked with), so the map changes week to week without any ambient effects.</p>
+  </div>
+</section>
+
+<!-- ============ DIRECTION A ============ -->
+<section class="wide" id="delta">
+  <div class="read dir-head" style="margin-inline:0;max-width:var(--read)">
+    <span class="tag">Direction A</span>
+    <h2>Daylight Delta</h2>
+    <p class="lede">Frutiger Aero, matured: the morning light and optimism without the gloss. Your organization is a watershed. Relationships are streams, departments are pools, and requests flow downstream like water.</p>
+  </div>
+  <div class="specs">
+    <div class="box">
+      <p class="eyebrow">Palette</p>
+      <div class="swatches" id="sw-delta"></div>
+    </div>
+    <div class="box">
+      <p class="eyebrow">Type</p>
+      <div class="specimen" style="background:linear-gradient(178deg,#D8EEF9,#E5F2E1);color:#12324A">
+        <span style="font:800 26px/1.1 Nunito,sans-serif;letter-spacing:-.01em">Priya handed off to Sam</span>
+        <span style="font:400 15px/1.5 'Source Sans 3',sans-serif">Nunito 800 for headings has the rounded warmth of Aero. Source Sans 3 for body is the closest open cousin to Frutiger.</span>
+      </div>
+      <dl class="rules">
+        <dt>Material</dt><dd>Matte frost. Panels are 74% white with a hairline highlight, no gloss and no blur over imagery.</dd>
+        <dt>Light</dt><dd>Morning sky, cool at the top and greener toward the ground. Shadows are long and soft.</dd>
+        <dt>Motion</dt><dd>Water only moves where a request is moving. Ripples mark you as the source.</dd>
+      </dl>
+    </div>
+  </div>
+  <figure class="mock"><figcaption><span><b>Home</b>: you are the spring at the top; each stream's width is how much you work with that department.</span><span class="hint">Animated</span></figcaption><div class="frame" data-mock="home" data-dir="delta"></div></figure>
+  <figure class="mock"><figcaption><span><b>Living Universe</b>: Relationships lens. Streams from you to each person; faint means it's been a while.</span><span class="hint">Click people · switch lens · search</span></figcaption><div class="frame" data-mock="uni" data-dir="delta"></div></figure>
+  <div class="verdict">
+    <div class="box"><h3>Strengths</h3><p>The closest fit to the emotional brief. It's warm, bright and optimistic, and it reads instantly to anyone with Aero nostalgia. The water metaphor explains handoffs for free, since things flow downstream to whoever has them next.</p></div>
+    <div class="box"><h3>Weaknesses</h3><p>Pools crowd quickly past ~8 people per department. Without discipline it slides back into pastiche (one gloss highlight and it's 2008 again). Water implies one direction, but some requests loop back upstream.</p></div>
+    <div class="box"><h3>Usability</h3><p>Aero blues are weak on white. Text uses the deeper #1A7FB0 and graphics keep the lighter blues, and signals rely on shape (ring, sun) as well as color. A dark mode needs its own design, since a night-time watershed is a different picture.</p></div>
+  </div>
+</section>
+
+<!-- ============ DIRECTION B ============ -->
+<section class="wide" id="canopy">
+  <div class="read dir-head" style="margin-inline:0;max-width:var(--read)">
+    <span class="tag">Direction B</span>
+    <h2>Night Canopy</h2>
+    <p class="lede">Pandora's forest floor at night. Relationships are a root system spreading out from you. The ground stays dark and quiet, and light appears only where something is happening: mint for a request moving, violet for one waiting on approval.</p>
+  </div>
+  <div class="specs">
+    <div class="box">
+      <p class="eyebrow">Palette</p>
+      <div class="swatches" id="sw-canopy"></div>
+    </div>
+    <div class="box">
+      <p class="eyebrow">Type</p>
+      <div class="specimen" style="background:#0C1E24;color:#DDEFEA">
+        <span style="font:600 26px/1.1 Sora,sans-serif;letter-spacing:-.02em">Priya handed off to Sam</span>
+        <span style="font:400 15px/1.5 Manrope,sans-serif;color:#8FB0AA">Sora for headings is open and slightly futuristic without being sci-fi. Manrope for body stays readable at small sizes on dark ground.</span>
+      </div>
+      <dl class="rules">
+        <dt>Material</dt><dd>Dark, slightly blue soil. Panels are a step lighter, with hairline borders and no glow on chrome.</dd>
+        <dt>Light</dt><dd>Bioluminescence as signal only. If it glows, it's live. Every person also gets a unique dot "signature", after the Na'vi.</dd>
+        <dt>Motion</dt><dd>Pulses travel along roots in the direction of the handoff. Waiting approvals breathe slowly.</dd>
+      </dl>
+    </div>
+  </div>
+  <figure class="mock"><figcaption><span><b>Home</b>: roots spread from you. Pulses are requests in transit; the violet ring means one is waiting on you.</span><span class="hint">Animated</span></figcaption><div class="frame" data-mock="home" data-dir="canopy"></div></figure>
+  <figure class="mock"><figcaption><span><b>Living Universe</b>: Requests lens. The vendor contract lights its path through four people; everything else dims.</span><span class="hint">Click people · switch lens · search</span></figcaption><div class="frame" data-mock="uni" data-dir="canopy"></div></figure>
+  <div class="verdict">
+    <div class="box"><h3>Strengths</h3><p>The best signal clarity of the three: when the ground is dark, anything lit demands attention, so "what needs me?" is answered at a glance. It handles density well, because dim nodes cost almost nothing visually. It's the most cinematic option for a demo.</p></div>
+    <div class="box"><h3>Weaknesses</h3><p>Dark glowing networks are the default look of AI products right now, so it risks looking like everyone else. It's less "optimistic daylight" than the brief asks for. Long daytime work sessions on a dark UI are tiring for many people.</p></div>
+    <div class="box"><h3>Usability</h3><p>Contrast is strong (body text 15.7:1, muted text 7:1). Mint and violet stay distinguishable for the common color-vision deficiencies, but they should still pair with shape: pulse vs. ring. Glow has to be rationed, or the signal system collapses.</p></div>
+  </div>
+</section>
+
+<!-- ============ DIRECTION C ============ -->
+<section class="wide" id="atlas">
+  <div class="read dir-head" style="margin-inline:0;max-width:var(--read)">
+    <span class="tag">Direction C · the challenger</span>
+    <h2>Field Atlas</h2>
+    <p class="lede">The product is called Wayfinder, so draw it a map. The organization as a naturalist's survey: departments are terrain with contour lines, people are surveyed landmarks with names, and requests are trails with numbered waypoints. "Living" comes from growth and movement, not glow.</p>
+  </div>
+  <div class="specs">
+    <div class="box">
+      <p class="eyebrow">Palette</p>
+      <div class="swatches" id="sw-atlas"></div>
+    </div>
+    <div class="box">
+      <p class="eyebrow">Type</p>
+      <div class="specimen" style="background:#EEF0E7;color:#1E2B24">
+        <span style="font:italic 400 28px/1.1 Newsreader,Georgia,serif">Priya handed off to Sam</span>
+        <span style="font:500 11px/1.5 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#5A6A5F">WAYPOINT 3 OF 5 · LEGAL &amp; PRIVACY</span>
+        <span style="font:400 15px/1.5 'Public Sans',sans-serif">Newsreader italic for place names, as on a printed map. Plex Mono for survey labels. Public Sans for everything you read.</span>
+      </div>
+      <dl class="rules">
+        <dt>Material</dt><dd>Survey paper with a faint graticule. Square corners, ink hairlines, hatched regions.</dd>
+        <dt>Light</dt><dd>Flat and even, like a printed sheet. Depth comes from contour lines, not shadow.</dd>
+        <dt>Motion</dt><dd>Trails march slowly in their direction of travel. The map itself never moves, so it builds spatial memory.</dd>
+      </dl>
+    </div>
+  </div>
+  <figure class="mock"><figcaption><span><b>Home</b>: the same map as Living Universe, so Home is a zoomed-out view of a place you already know.</span><span class="hint">Animated</span></figcaption><div class="frame" data-mock="home" data-dir="atlas"></div></figure>
+  <figure class="mock"><figcaption><span><b>Living Universe</b>: Requests lens with a search for "contracts". Waypoints are numbered because order matters.</span><span class="hint">Click people · switch lens · search</span></figcaption><div class="frame" data-mock="uni" data-dir="atlas"></div></figure>
+  <div class="verdict">
+    <div class="box"><h3>Strengths</h3><p>The most original and the most legible of the three. Every person is labeled, and stable positions mean you learn where Legal "is". The wayfinding metaphor matches the product name and scales the way real maps do, by zoom level and generalization.</p></div>
+    <div class="box"><h3>Weaknesses</h3><p>It's the furthest from the Aero and Pandora feeling, quieter and more scholarly than optimistic. Label placement and contours are real engineering work. Without care it could feel like a GIS tool rather than a friendly coordinator.</p></div>
+    <div class="box"><h3>Usability</h3><p>The highest contrast and the least color-dependent: trails are dashed, waypoints numbered, "you are here" uses the map-standard red. It prints and screenshots cleanly, and works well for slides and reports.</p></div>
+  </div>
+</section>
+
+<section class="read" id="compare">
+  <p class="eyebrow">Comparison</p>
+  <h2>Side by side</h2>
+  <p class="muted">My assessment, out of five.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Criterion</th><th>A · Delta</th><th>B · Canopy</th><th>C · Atlas</th></tr></thead>
+      <tbody id="cmp"></tbody>
+    </table>
+  </div>
+</section>
+
+<section class="read" id="recommend">
+  <p class="eyebrow">Recommendation</p>
+  <h2>Build on Daylight Delta, and give it the Atlas's wayfinding</h2>
+  <p>Delta is the direction that delivers what you asked for emotionally: daylight, optimism, nature and technology as one system. Its weaknesses are crowding, pastiche, and a lack of structure for routes. The Atlas solves exactly those problems, so the recommendation is a hybrid with Delta as the visual language and three borrowed rules:</p>
+  <div class="box">
+    <ul>
+      <li><b>From Atlas:</b> stable positions, so Home and Living Universe share one map and people build spatial memory. Labels on everything. Request routes drawn as named trails with numbered waypoints.</li>
+      <li><b>From Canopy:</b> a dark theme designed as "the watershed at dusk", where light appears only for live signals. Also the signal grammar for the light theme: moving is a pulse, waiting is a ring, done is quiet.</li>
+      <li><b>Kept from all three:</b> recency as opacity, relationships as ground and requests as routes, and no decorative orbs. If something moves or glows, it's data.</li>
+    </ul>
+  </div>
+  <p>If you want to take the bigger creative risk, Field Atlas is the strongest standalone identity here and the most distinctive in its market. I'd keep it in play for the first prototype round.</p>
+</section>
+
+<section class="read" id="questions">
+  <p class="eyebrow">Before the design spec</p>
+  <h2>Open questions</h2>
+  <ol class="q">
+    <li><b>Who is the primary user?</b> An individual coordinating their own requests, or an ops lead watching many? That decides how dense Living Universe has to be.</li>
+    <li><b>How big is the org in the prototype?</b> Twenty people flatters every direction. I'd suggest stress-testing with ~300 people and 40 requests before choosing.</li>
+    <li><b>Stable map or live layout?</b> I recommend stable positions (spatial memory) over a force-directed layout that reshuffles each visit.</li>
+    <li><b>Light-first or dark-first?</b> The recommendation assumes light-first with a designed dark theme.</li>
+    <li><b>Where does the Agent live?</b> As an ask bar inside Home and Universe (as mocked here), as its own area only, or both?</li>
+  </ol>
+</section>
+
+<section class="read" id="sources">
+  <p class="eyebrow">Sources</p>
+  <ul class="sources">
+    <li><a href="https://chrislemke.github.io/website_designs/designs/Frutiger_Aero.html">Frutiger Aero design reference (chrislemke)</a>: palette, materials, lighting</li>
+    <li><a href="https://skeuoss.net/blogs/aesthetics/frutiger-aero">Frutiger Aero (skeuoss)</a>: history, Neo-Aero revival</li>
+    <li><a href="https://cari.institute/aesthetics/frutiger-aero">Frutiger Aero (CARI Institute)</a>: dating, key elements</li>
+    <li><a href="https://www.domusweb.it/en/design/2023/03/06/the-world-of-avatar-is-an-incredible-design-work-applied-to-nature.html">The world of Avatar is design applied to nature (Domus)</a>: function-first creature design, light as color source</li>
+    <li><a href="https://en.wikipedia.org/wiki/Pandora_(Avatar)">Pandora (Wikipedia)</a>: Eywa and the Tree of Souls as network interfaces</li>
+    <li><a href="https://james-camerons-avatar.fandom.com/wiki/Bioluminescence">Bioluminescence (Avatar Wiki)</a>: light as signal, individual patterns</li>
+    <li><a href="https://trends.daisyui.com/trend/solarpunk/">Solarpunk UI trend (daisyUI)</a> and <a href="https://sciphijournal.org/index.php/2021/09/30/on-solarpunk">On Solarpunk (SciPhi Journal)</a>: adjacent optimistic-ecological aesthetics</li>
+  </ul>
+</section>
+
+<script>
+(function(){
+const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- mock organization ---------- */
+const DEPTS=[{id:'des',name:'Product Design'},{id:'eng',name:'Platform Engineering'},{id:'leg',name:'Legal & Privacy'},{id:'fin',name:'Finance'},{id:'ppl',name:'People Ops'}];
+const DN=Object.fromEntries(DEPTS.map(d=>[d.id,d.name]));
+const ME={id:'me',name:'Maya Okafor',role:'Product Design Lead',dept:'des'};
+const P=[
+['jonah','Jonah Reyes','UX Researcher','des',['Usability testing','Research ops','Survey design'],9,3],
+['lena','Lena Fischer','Design Systems Lead','des',['Design tokens','Accessibility','Figma'],12,1],
+['tomas','Tomás Silva','Content Designer','des',['UX writing','Localization'],6,8],
+['aiko','Aiko Tanaka','Motion Designer','des',['Prototyping','Motion'],4,21],
+['ravi','Ravi Menon','Staff Engineer, Platform','eng',['APIs','Data pipelines','Access control'],7,12],
+['grace','Grace Liu','Frontend Lead','eng',['React','Accessibility','Performance'],10,2],
+['omar','Omar Haddad','Security Engineer','eng',['Threat modeling','Security review'],5,1],
+['nina','Nina Petrova','Data Analyst','eng',['SQL','Dashboards','Experiments'],3,22],
+['priya','Priya Natarajan','Commercial Counsel','leg',['Vendor contracts','Negotiation','MSAs'],6,1],
+['sam','Sam Whitaker','Privacy Officer','leg',['GDPR','Data processing agreements'],4,1],
+['elena','Elena Park','Compliance Analyst','leg',['SOC 2','Policy review'],1,70],
+['marcus','Marcus Bell','Paralegal','leg',['Contract intake','E-signature'],2,15],
+['daniel','Daniel Osei','FP&A Manager','fin',['Budget approvals','Forecasting'],5,9],
+['hannah','Hannah Cole','Procurement Lead','fin',['Vendor onboarding','Purchase orders','Supplier contracts'],6,1],
+['luis','Luis Ortega','Accounts Payable','fin',['Invoicing','Payments'],1,95],
+['mei','Mei Chen','Finance Business Partner','fin',['Headcount costing','Planning'],3,1],
+['fatima','Fatima Diallo','HR Business Partner','ppl',['Headcount planning','Org design'],5,3],
+['chris','Chris Novak','Design Recruiter','ppl',['Portfolio review','Hiring'],4,40],
+['zoe','Zoe Adams','Learning & Development','ppl',['Workshops','Onboarding'],2,35],
+['ben','Ben Carter','People Analytics','ppl',['Engagement data','Survey design'],0,null]
+].map(a=>({id:a[0],name:a[1],role:a[2],dept:a[3],skills:a[4],ties:a[5],days:a[6]}));
+const PM=Object.fromEntries(P.map(p=>[p.id,p])); PM.me=ME;
+const REQS=[
+{id:'r1',title:'Vendor contract · research panel',status:'move',label:'In progress',at:3,route:[['me','You requested','Sep 29'],['hannah','Procurement intake','Sep 30'],['priya','Legal review','Oct 3'],['sam','Privacy approval','now'],['daniel','Budget approval','next'],['me','Countersign','']]},
+{id:'r2',title:'Q1 headcount · 2 designers',status:'move',label:'In progress',at:2,route:[['me','You requested','Oct 6'],['fatima','HR review','Oct 7'],['mei','Cost model','now'],['daniel','Budget approval','next'],['chris','Open roles','']]},
+{id:'r3',title:'Accessibility audit handoff',status:'wait',label:'Needs you',at:2,route:[['lena','Audit complete','Oct 2'],['grace','Engineering triage','Oct 8'],['me','Your approval','now']]},
+{id:'r4',title:'Security review · beta sharing',status:'move',label:'In progress',at:1,route:[['grace','Requested','Oct 7'],['omar','Threat model','now'],['sam','Privacy check','next'],['me','Sign-off','']]},
+{id:'r5',title:'Production analytics access',status:'done',label:'Done',at:4,route:[['me','You requested','Sep 12'],['ravi','Access grant','Sep 13'],['omar','Security check','Sep 15'],['nina','Dashboard handoff','Sep 18']]},
+{id:'r6',title:'Research ops workshop',status:'done',label:'Done',at:3,route:[['jonah','Requested','Aug 20'],['zoe','Scheduled','Aug 22'],['me','Co-hosted','Sep 5']]}
+];
+const RM=Object.fromEntries(REQS.map(r=>[r.id,r]));
+const ACTIVE=REQS.filter(r=>r.status!=='done');
+
+/* shared map: positions are stable across every screen and direction */
+const DPOS={des:[180,140],eng:[520,112],leg:[622,312],fin:[400,372],ppl:[132,345]};
+const OFF=[[-48,-24],[42,-36],[50,28],[-36,40]];
+const POS={me:[330,240]};
+DEPTS.forEach(d=>P.filter(p=>p.dept===d.id).forEach((p,i)=>{POS[p.id]=[DPOS[d.id][0]+OFF[i][0],DPOS[d.id][1]+OFF[i][1]]}));
+
+/* ---------- geometry helpers ---------- */
+const f=p=>p[0].toFixed(1)+','+p[1].toFixed(1);
+function rng(s){return function(){s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function hash(str){let h=2166136261;for(const c of str){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
+function closed(p){const n=p.length;let d='M'+f(p[0]);for(let i=0;i<n;i++){const a=p[(i-1+n)%n],b=p[i],c=p[(i+1)%n],e=p[(i+2)%n];d+='C'+f([b[0]+(c[0]-a[0])/6,b[1]+(c[1]-a[1])/6])+' '+f([c[0]-(e[0]-b[0])/6,c[1]-(e[1]-b[1])/6])+' '+f(c)}return d+'Z'}
+function open(p){let d='M'+f(p[0]);for(let i=0;i<p.length-1;i++){const a=p[i-1]||p[i],b=p[i],c=p[i+1],e=p[i+2]||c;d+='C'+f([b[0]+(c[0]-a[0])/6,b[1]+(c[1]-a[1])/6])+' '+f([c[0]-(e[0]-b[0])/6,c[1]-(e[1]-b[1])/6])+' '+f(c)}return d}
+function blob(cx,cy,rx,ry,seed,j){const R=rng(seed),n=9,pts=[];for(let i=0;i<n;i++){const a=i/n*Math.PI*2,k=1+(R()*2-1)*(j||.16);pts.push([cx+Math.cos(a)*rx*k,cy+Math.sin(a)*ry*k])}return closed(pts)}
+function bend(a,b,k){const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2,dx=b[0]-a[0],dy=b[1]-a[1];return 'M'+f(a)+'Q'+f([mx-dy*k,my+dx*k])+' '+f(b)}
+function routePts(r){const pts=[];r.route.forEach(s=>{const q=POS[s[0]];const last=pts[pts.length-1];if(!last||last[0]!==q[0]||last[1]!==q[1])pts.push(q)});return pts}
+function fresh(p){if(p.days==null)return 0;return p.days<=7?1:p.days<=30?.7:p.days<=60?.45:.28}
+function initials(n){return n.split(' ').map(w=>w[0]).join('').slice(0,2)}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function pulse(path,color,dur,begin,r){if(reduce)return'';return `<circle r="${r||4}" fill="${color}" filter="url(#__glow)"><animateMotion dur="${dur}s" begin="${begin||0}s" repeatCount="indefinite" path="${path}"/></circle>`}
+let uid=0;
+
+/* ---------- direction configs ---------- */
+const DIRS={
+ delta:{ink:'#12324A',muted:'#4E6B80',rel:'#1C8FC4',flow:'#0FB5AE',signal:'#F2B33D',leaf:'#3FA34D',fd:'Nunito, sans-serif',fb:'Source Sans 3, sans-serif',
+  sw:[['#D8EEF9','Sky','surface'],['#FFFFFF','Cloud','panels'],['#12324A','Deep water','text · 12:1'],['#4E6B80','Shallows','secondary · 5.4:1'],['#1C8FC4','Stream','relationships · graphics only'],['#0FB5AE','Current','moving requests'],['#F2B33D','Sun','waiting / needs you'],['#3FA34D','Leaf','growth · new ties']]},
+ canopy:{ink:'#DDEFEA',muted:'#8FB0AA',rel:'#2F6F6A',flow:'#5EF2D6',signal:'#C38BFF',leaf:'#9BD36A',fd:'Sora, sans-serif',fb:'Manrope, sans-serif',
+  sw:[['#071318','Forest floor','surface'],['#0E2229','Understory','panels'],['#DDEFEA','Moonlight','text · 15.7:1'],['#8FB0AA','Lichen','secondary · 7:1'],['#2F6F6A','Root','relationships'],['#5EF2D6','Biolume','moving requests · 11.8:1'],['#C38BFF','Seed light','waiting / needs you'],['#9BD36A','Moss','new ties']]},
+ atlas:{ink:'#1E2B24',muted:'#5A6A5F',rel:'#7C8C73',flow:'#2B54C9',signal:'#C7362F',leaf:'#A9B79A',fd:'Newsreader, Georgia, serif',fb:'Public Sans, sans-serif',
+  sw:[['#EEF0E7','Survey paper','surface'],['#F8F9F3','Sheet','panels'],['#1E2B24','Ink','text · 12.8:1'],['#5A6A5F','Pencil','secondary · 5.4:1'],['#A9B79A','Contour','terrain & ties'],['#DCE5C9','Lowland','region tint'],['#2B54C9','Trail blue','routes · 5.7:1'],['#C7362F','Marker red','you are here · waiting']]}
+};
+const TINT={des:'#DCE5C9',eng:'#D6E2E0',leg:'#E6E0CB',fin:'#E3E6CF',ppl:'#DDE3D3'};
+
+function defs(c,id){return `<defs>
+<filter id="${id}glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<radialGradient id="${id}pool" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#C6EAF7"/><stop offset=".7" stop-color="#E4F4FA"/><stop offset="1" stop-color="#F3FAFC" stop-opacity=".6"/></radialGradient>
+<pattern id="${id}hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(40)"><line x1="0" y1="0" x2="0" y2="7" stroke="#A9B79A" stroke-width="1" opacity=".55"/></pattern>
+</defs>`}
+function fix(svg,id){return svg.split('url(#__').join('url(#'+id)}
+
+/* ---------- HOME visualizations ---------- */
+function deptStats(id){const ppl=P.filter(p=>p.dept===id);const ties=ppl.reduce((s,p)=>s+p.ties,0);const act=ACTIVE.filter(r=>PM[r.route[r.at][0]].dept===id).length;const needs=ACTIVE.some(r=>r.route[r.at][0]==='me')&&id==='des';return{ppl,ties,act,needs}}
+
+function homeDelta(c,id){
+ const src=[380,58];const xs={ppl:100,eng:240,des:380,leg:520,fin:660};const ys={ppl:318,eng:372,des:396,leg:372,fin:318};
+ let s=`<path d="M0 360 C120 330 220 350 380 338 C540 326 640 344 760 330 V460 H0Z" fill="#DDEFD9" opacity=".7"/><path d="M0 400 C160 380 300 410 420 396 C560 380 660 404 760 392 V460 H0Z" fill="#CFE7C9" opacity=".6"/>`;
+ DEPTS.forEach(d=>{const st=deptStats(d.id),x=xs[d.id],y=ys[d.id];const path=`M${src[0]},${src[1]+14}C${src[0]},${src[1]+130} ${x},${y-170} ${x},${y-34}`;
+  s+=`<path d="${path}" fill="none" stroke="${c.rel}" stroke-opacity=".38" stroke-width="${2+st.ties/3.2}" stroke-linecap="round"/>`;
+  if(st.act) s+=`<path class="flow" d="${path}" fill="none" stroke="${c.flow}" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 14"/>`;});
+ DEPTS.forEach(d=>{const st=deptStats(d.id),x=xs[d.id],y=ys[d.id];
+  s+=`<ellipse cx="${x}" cy="${y}" rx="66" ry="36" fill="url(#__pool)" stroke="#fff" stroke-width="2"/>`;
+  st.ppl.forEach((p,i)=>{s+=`<circle cx="${x-27+i*18}" cy="${y-8}" r="5.5" fill="${p.days==null?'none':'#fff'}" stroke="${c.rel}" stroke-width="1.5" ${p.days==null?'stroke-dasharray="2 2"':''} opacity="${p.days==null?1:.35+fresh(p)*.65}"/>`});
+  s+=`<text x="${x}" y="${y+12}" text-anchor="middle" font-family="${c.fd}" font-weight="800" font-size="13" fill="${c.ink}">${esc(d.name.split(' ').pop()==='Ops'?'People Ops':d.name.split(' & ')[0].replace('Platform ',''))}</text>`;
+  s+=`<text x="${x}" y="${y+26}" text-anchor="middle" font-family="${c.fb}" font-size="11" fill="${c.muted}">${st.act?st.act+' moving':'quiet'}</text>`;
+  if(st.needs) s+=`<circle class="breathe" cx="${x+52}" cy="${y-26}" r="9" fill="${c.signal}" opacity=".5"/><circle cx="${x+52}" cy="${y-26}" r="6" fill="${c.signal}"/>`;});
+ s+=`<circle class="ripple" cx="${src[0]}" cy="${src[1]}" r="16" fill="none" stroke="${c.rel}" stroke-width="1.5"/><circle class="ripple r2" cx="${src[0]}" cy="${src[1]}" r="16" fill="none" stroke="${c.rel}" stroke-width="1.5"/>`;
+ s+=`<circle cx="${src[0]}" cy="${src[1]}" r="15" fill="#fff" stroke="${c.rel}" stroke-width="3"/><text x="${src[0]}" y="${src[1]+4}" text-anchor="middle" font-family="${c.fd}" font-weight="800" font-size="11" fill="${c.ink}">You</text>`;
+ s+=`<text x="16" y="24" font-family="${c.fb}" font-size="11.5" fill="${c.muted}">Stream width = how often you work together · moving water = request in transit · sun = waiting on you</text>`;
+ return s;
+}
+
+function homeCanopy(c,id){
+ const me=[380,228];let s='';const R=rng(7);
+ for(let i=0;i<70;i++) s+=`<circle cx="${(R()*760).toFixed(0)}" cy="${(R()*460).toFixed(0)}" r="${(R()*1.2+.3).toFixed(1)}" fill="${c.muted}" opacity="${(R()*.25+.05).toFixed(2)}"/>`;
+ DEPTS.forEach((d,i)=>{const st=deptStats(d.id);const a=(-90+i*72)*Math.PI/180;const dp=[me[0]+Math.cos(a)*262,me[1]+Math.sin(a)*158];
+  const dx=dp[0]-me[0],dy=dp[1]-me[1],L=Math.hypot(dx,dy),nx=-dy/L,ny=dx/L;
+  const path=`M${f(me)}C${f([me[0]+dx*.33+nx*28,me[1]+dy*.33+ny*28])} ${f([me[0]+dx*.66-nx*22,me[1]+dy*.66-ny*22])} ${f(dp)}`;
+  s+=`<path d="${path}" fill="none" stroke="${c.rel}" stroke-width="${1+st.ties/7}" stroke-linecap="round" opacity=".9"/>`;
+  st.ppl.forEach((p,j)=>{const aa=a+(j-1.5)*.42;const pp=[dp[0]+Math.cos(aa)*46,dp[1]+Math.sin(aa)*40];
+   s+=`<path d="${bend(dp,pp,.18)}" fill="none" stroke="${c.rel}" stroke-width="1" opacity="${.3+fresh(p)*.6}"/>`;
+   const live=ACTIVE.find(r=>r.route[r.at][0]===p.id);
+   s+=`<circle cx="${f(pp).split(',')[0]}" cy="${pp[1].toFixed(1)}" r="${live?4.5:3.2}" fill="${p.days==null?'none':live?c.flow:c.muted}" stroke="${p.days==null?c.muted:'none'}" stroke-dasharray="2 2" opacity="${p.days==null?.8:live?1:.4+fresh(p)*.5}" ${live?'filter="url(#__glow)"':''}/>`;});
+  s+=`<circle cx="${dp[0].toFixed(1)}" cy="${dp[1].toFixed(1)}" r="6" fill="#0E2229" stroke="${c.rel}" stroke-width="2"/>`;
+  const lx=me[0]+Math.cos(a)*332,ly=me[1]+Math.sin(a)*206;
+  s+=`<text x="${lx.toFixed(0)}" y="${(ly+4).toFixed(0)}" text-anchor="${Math.abs(Math.cos(a))<.3?'middle':Math.cos(a)>0?'end':'start'}" font-family="${c.fd}" font-weight="600" font-size="10.5" letter-spacing="1.6" fill="${c.muted}">${esc(d.name.toUpperCase())}</text>`;
+  if(st.act){for(let k=0;k<st.act;k++) s+=pulse(path,c.flow,3.4,k*1.3,3.5)}
+ });
+ s+=`<circle class="breathe" cx="${me[0]}" cy="${me[1]}" r="20" fill="none" stroke="${c.signal}" stroke-width="2"/><circle cx="${me[0]}" cy="${me[1]}" r="20" fill="none" stroke="${c.signal}" stroke-width="1.5" opacity=".7"/>`;
+ s+=`<circle cx="${me[0]}" cy="${me[1]}" r="9" fill="${c.ink}"/><text x="${me[0]}" y="${me[1]+38}" text-anchor="middle" font-family="${c.fd}" font-size="11" font-weight="600" fill="${c.ink}">You</text>`;
+ return s;
+}
+
+function atlasGround(c,labels){
+ let s='';
+ DEPTS.forEach((d,i)=>{const [x,y]=DPOS[d.id];
+  s+=`<path d="${blob(x,y,98,78,i+3)}" fill="${TINT[d.id]}" stroke="${c.leaf}" stroke-width="1"/>`;
+  s+=`<path d="${blob(x,y,98,78,i+3)}" fill="url(#__hatch)"/>`;
+  s+=`<path d="${blob(x+4,y-2,70,54,i+11)}" fill="none" stroke="${c.leaf}" stroke-width="1"/>`;
+  s+=`<path d="${blob(x+6,y-3,40,30,i+19)}" fill="${TINT[d.id]}" stroke="${c.leaf}" stroke-width="1"/>`;
+  s+=`<text x="${x}" y="${y-84}" text-anchor="middle" font-family="${c.fd}" font-style="italic" font-size="16" fill="${c.ink}">${esc(d.name)}</text>`;
+ });
+ return s;
+}
+function homeAtlas(c,id){
+ let s=atlasGround(c);
+ P.forEach(p=>{const [x,y]=POS[p.id];s+=`<circle cx="${x}" cy="${y}" r="3" fill="${p.days==null?'#F8F9F3':c.ink}" stroke="${c.ink}" stroke-width="1" opacity="${p.days==null?1:.4+fresh(p)*.6}"/>`});
+ ACTIVE.forEach((r,i)=>{const pts=routePts(r);const d=open(pts);
+  s+=`<path class="march" d="${d}" fill="none" stroke="${c.flow}" stroke-width="2" stroke-dasharray="6 5" stroke-linecap="round"/>`;
+  const cur=POS[r.route[r.at][0]];const L='ABCD'[i];
+  s+=`<g><circle cx="${cur[0]}" cy="${cur[1]-16}" r="9" fill="${r.status==='wait'?c.signal:c.flow}"/><text x="${cur[0]}" y="${cur[1]-12}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" font-weight="500" fill="#fff">${L}</text></g>`;});
+ const me=POS.me;
+ s+=`<circle class="breathe" cx="${me[0]}" cy="${me[1]}" r="12" fill="none" stroke="${c.signal}" stroke-width="1.5"/><circle cx="${me[0]}" cy="${me[1]}" r="6" fill="${c.signal}" stroke="#F8F9F3" stroke-width="2"/>`;
+ s+=`<text x="${me[0]+12}" y="${me[1]+20}" font-family="IBM Plex Mono, monospace" font-size="9.5" letter-spacing="1" fill="${c.signal}">YOU ARE HERE</text>`;
+ s+=`<g font-family="IBM Plex Mono, monospace" font-size="9" letter-spacing=".6" fill="${c.muted}"><line x1="16" y1="440" x2="116" y2="440" stroke="${c.ink}" stroke-width="1"/><line x1="16" y1="436" x2="16" y2="444" stroke="${c.ink}"/><line x1="66" y1="437" x2="66" y2="443" stroke="${c.ink}"/><line x1="116" y1="436" x2="116" y2="444" stroke="${c.ink}"/><text x="16" y="430">DISTANCE ≈ TIME SINCE LAST WORKED TOGETHER</text></g>`;
+ return s;
+}
+
+/* ---------- UNIVERSE graph ---------- */
+function uniSvg(dir,c,st,id){
+ const q=st.q.trim().toLowerCase();
+ const hit=p=>q&&(p.name.toLowerCase().includes(q)||p.role.toLowerCase().includes(q)||p.skills.some(k=>k.toLowerCase().includes(q)));
+ const anyHit=q&&P.some(hit);
+ const r=RM[st.req];const onRoute=new Set(r.route.map(s=>s[0]));
+ let s='';
+ // ground
+ if(dir==='atlas') s+=atlasGround(c);
+ else DEPTS.forEach((d,i)=>{const [x,y]=DPOS[d.id];
+  if(dir==='delta'){s+=`<path d="${blob(x,y,92,72,i+3,.12)}" fill="url(#__pool)" stroke="#fff" stroke-width="2"/>`;
+   s+=`<text x="${x}" y="${y-80}" text-anchor="middle" font-family="${c.fd}" font-weight="800" font-size="13" fill="${c.ink}">${esc(d.name)}</text>`}
+  else{s+=`<path d="${blob(x,y,92,72,i+3,.14)}" fill="#0B1C22" stroke="${c.rel}" stroke-width="1" stroke-dasharray="1 5" stroke-linecap="round"/>`;
+   s+=`<text x="${x}" y="${y-80}" text-anchor="middle" font-family="${c.fd}" font-weight="600" font-size="10" letter-spacing="1.6" fill="${c.muted}">${esc(d.name.toUpperCase())}</text>`}});
+ // overlay
+ const me=POS.me;
+ if(st.lens==='rel'){
+  P.forEach(p=>{if(!p.ties)return;const o=(.25+fresh(p)*.75)*(anyHit&&!hit(p)?.25:1);const w=dir==='atlas'?1:1+p.ties/3.5;
+   const col=dir==='atlas'?c.ink:c.rel;
+   s+=`<path d="${bend(me,POS[p.id],.12)}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round" opacity="${(dir==='delta'?.55:dir==='atlas'?.35:.9)*o}" ${dir==='atlas'?'stroke-dasharray="1 3"':''}/>`;});
+ } else {
+  const pts=routePts(r);const d=open(pts);const done=r.status==='done';
+  if(dir==='delta'){s+=`<path d="${d}" fill="none" stroke="${c.flow}" stroke-opacity=".28" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>`;
+   s+=`<path class="${done?'':'flow'}" d="${d}" fill="none" stroke="${c.flow}" stroke-width="3" stroke-linecap="round" ${done?'':'stroke-dasharray="2 14"'}/>`}
+  else if(dir==='canopy'){s+=`<path d="${d}" fill="none" stroke="${c.flow}" stroke-width="2" opacity="${done?.35:.8}" filter="url(#__glow)"/>`;
+   if(!done){s+=pulse(d,c.flow,4.5,0,4);s+=pulse(d,c.flow,4.5,2.25,3)}}
+  else{s+=`<path class="${done?'':'march'}" d="${d}" fill="none" stroke="${c.flow}" stroke-width="2.5" stroke-dasharray="6 5" stroke-linecap="round"/>`}
+ }
+ // people
+ P.forEach(p=>{const [x,y]=POS[p.id];const dim=(anyHit&&!hit(p))||(st.lens==='req'&&!onRoute.has(p.id));const sel=st.person===p.id;
+  const op=dim?.22:(p.days==null?1:.45+fresh(p)*.55);const never=p.days==null;
+  let n='';
+  if(dir==='delta') n=`<circle cx="${x}" cy="${y}" r="9" fill="${never?'#F3FAFC':'#fff'}" stroke="${c.rel}" stroke-width="2" ${never?'stroke-dasharray="3 3"':''}/><text x="${x}" y="${y+3.5}" text-anchor="middle" font-family="${c.fd}" font-weight="800" font-size="8" fill="${c.ink}">${initials(p.name)}</text>`;
+  else if(dir==='canopy') n=`<circle cx="${x}" cy="${y}" r="5.5" fill="${never?'none':c.muted}" stroke="${never?c.muted:'none'}" stroke-dasharray="2 2"/>`;
+  else n=`<path d="M${x},${y-6}L${x+5.5},${y+4}L${x-5.5},${y+4}Z" fill="${never?'#F8F9F3':c.ink}" stroke="${c.ink}" stroke-width="1"/><text x="${x}" y="${y+16}" text-anchor="middle" font-family="${c.fb}" font-size="9.5" fill="${c.ink}">${esc(p.name.split(' ')[0])}</text>`;
+  let ring='';
+  if(hit(p)) ring+=`<circle cx="${x}" cy="${y}" r="${dir==='delta'?14:11}" fill="none" stroke="${dir==='canopy'?c.flow:dir==='atlas'?c.flow:c.rel}" stroke-width="2"/>`;
+  if(sel) ring+=`<circle cx="${x}" cy="${y}" r="${dir==='delta'?15:12}" fill="none" stroke="${c.ink}" stroke-width="1.5" stroke-dasharray="${dir==='atlas'?'2 2':'none'}"/>`;
+  s+=`<g class="node" data-id="${p.id}" opacity="${op}" tabindex="0" role="button" aria-label="${esc(p.name)}">${ring}${n}<circle cx="${x}" cy="${y}" r="14" fill="transparent"/></g>`;});
+ // steps on route
+ if(st.lens==='req'){r.route.forEach((sx,i)=>{if(sx[0]==='me'&&i>0&&i<r.route.length-1)return;const [x,y]=POS[sx[0]];const now=i===r.at;
+   if(dir==='atlas'){if(sx[0]==='me'&&i>0)return;s+=`<circle cx="${x+11}" cy="${y-11}" r="7.5" fill="${now?c.signal:c.flow}"/><text x="${x+11}" y="${y-8}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#fff">${i+1}</text>`}
+   else if(now) s+=`<circle class="breathe" cx="${x}" cy="${y}" r="13" fill="none" stroke="${c.signal}" stroke-width="2.5"/><circle cx="${x}" cy="${y}" r="13" fill="none" stroke="${c.signal}" stroke-width="2"/>`;});}
+ // me
+ if(dir==='delta') s+=`<circle class="ripple" cx="${me[0]}" cy="${me[1]}" r="14" fill="none" stroke="${c.rel}"/><circle cx="${me[0]}" cy="${me[1]}" r="14" fill="${c.ink}"/><text x="${me[0]}" y="${me[1]+4}" text-anchor="middle" font-family="${c.fd}" font-weight="800" font-size="10" fill="#fff">You</text>`;
+ else if(dir==='canopy') s+=`<circle cx="${me[0]}" cy="${me[1]}" r="9" fill="${c.ink}"/><text x="${me[0]}" y="${me[1]+24}" text-anchor="middle" font-family="${c.fd}" font-size="10" font-weight="600" fill="${c.ink}">You</text>`;
+ else s+=`<circle cx="${me[0]}" cy="${me[1]}" r="6" fill="${c.signal}" stroke="#F8F9F3" stroke-width="2"/><text x="${me[0]+10}" y="${me[1]+18}" font-family="IBM Plex Mono, monospace" font-size="9" letter-spacing="1" fill="${c.signal}">YOU ARE HERE</text>`;
+ return s;
+}
+
+/* ---------- chrome ---------- */
+const ICONS={
+ home:'<path d="M3 10.5 10 4l7 6.5M5.5 9v8h9V9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+ uni:'<circle cx="10" cy="10" r="2.6" fill="currentColor"/><ellipse cx="10" cy="10" rx="8" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.4" transform="rotate(-25 10 10)"/><circle cx="16.5" cy="6.5" r="1.4" fill="currentColor"/>',
+ garden:'<path d="M4 16c0-7 4.5-11 12-11 0 7-4.5 11-12 11zM4 16l7-7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+ agent:'<circle cx="10" cy="10" r="7.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 5.2 11.8 10 10 14.8 8.2 10z" fill="currentColor"/>',
+ ins:'<path d="M4 16v-5M10 16V5M16 16V9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'};
+function rail(on,c){const items=[['home','Home'],['uni','Living Universe'],['garden','Discovery Garden'],['agent','Wayfinder Agent'],['ins','Insights']];
+ return `<nav class="rail"><svg class="logo" viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="none" stroke="${c.rel}" stroke-width="2"/><path d="M8 22c5-1 7-9 10-9s5 8 10 9" fill="none" stroke="${c.flow}" stroke-width="2.4" stroke-linecap="round"/><circle cx="18" cy="13" r="2.6" fill="${c.ink}"/></svg>`+
+ items.map(([k,l])=>`<div class="it ${k===on?'on':''}"><svg viewBox="0 0 20 20">${ICONS[k]}</svg>${l}</div>`).join('')+`</nav>`}
+const SEARCH_ICON='<svg viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+
+function buildHome(dir){
+ const c=DIRS[dir];const id='v'+(uid++);
+ const body=dir==='delta'?homeDelta(c,id):dir==='canopy'?homeCanopy(c,id):homeAtlas(c,id);
+ const title=dir==='atlas'?'Your territory this week':dir==='canopy'?'Your network, live':'Your watershed';
+ return `<div class="app m-${dir}">${rail('home',c)}<main class="home">
+ <header><div><h4>Good morning, Maya</h4><div class="sub">Friday, October 9 · 4 requests moving through 4 departments</div></div>
+ <div class="ask panel">${ICONS_SPARK(c)}<span>Ask Wayfinder to find someone, route a request, or explain a handoff…</span></div></header>
+ <section class="viz panel"><div class="vh"><span class="ph">${title}</span><span class="ph">${dir==='atlas'?'Sheet 1 of 1 · Oct 2026':'Updated just now'}</span></div>
+ <svg viewBox="0 0 760 460" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${title}">${fix(defs(c,id),id)}${fix(body,id)}</svg></section>
+ <aside class="side"><div class="stats">
+  <div class="stat panel"><span class="n">19</span><span class="l">Collaborators</span><span class="d">+2 this month</span></div>
+  <div class="stat panel"><span class="n">5</span><span class="l">Departments</span><span class="d">Legal most active</span></div>
+  <div class="stat panel"><span class="n">4</span><span class="l">Requests moving</span><span class="d">1 near done</span></div>
+  <div class="stat panel"><span class="n" style="color:var(--a-signaltext)">1</span><span class="l">Waiting on you</span><span class="d">Accessibility audit</span></div></div>
+ <div class="feed panel"><span class="ph">Moving now</span>
+  <div class="ev"><i class="wait"></i><span><b>Grace</b> sent you the accessibility audit to approve</span><time>9:12</time></div>
+  <div class="ev"><i></i><span><b>Priya</b> handed the vendor contract to <b>Sam</b> for privacy approval</span><time>8:40</time></div>
+  <div class="ev"><i></i><span><b>Mei</b> is costing your Q1 headcount request</span><time>Thu</time></div>
+  <div class="ev"><i></i><span><b>Omar</b> started the threat model for beta sharing</span><time>Wed</time></div>
+  <div class="ev"><i class="done"></i><span>Production analytics access is complete</span><time>Sep 18</time></div></div></aside>
+ <div class="entries">
+  <div class="entry panel"><span class="ph">Living Universe</span><b>Explore your 5 departments</b><span>See who's connected to whom, and trace any request.</span><span class="go">Open map →</span></div>
+  <div class="entry panel"><span class="ph">Discovery Garden</span><b>3 people worth meeting</b><span>Ben Carter shares "Survey design" with Jonah.</span><span class="go">Browse →</span></div>
+  <div class="entry panel"><span class="ph">Wayfinder Agent</span><b>Nudge Daniel on budget?</b><span>Two of your requests reach him next week.</span><span class="go">Draft a note →</span></div></div>
+ </main></div>`}
+function ICONS_SPARK(c){return '<svg viewBox="0 0 20 20"><path d="M10 2.5 11.6 8.4 17.5 10l-5.9 1.6L10 17.5 8.4 11.6 2.5 10l5.9-1.6z" fill="currentColor"/></svg>'}
+
+function buildUni(dir,frame){
+ const c=DIRS[dir];const id='v'+(uid++);
+ const st=dir==='delta'?{lens:'rel',person:'priya',req:'r1',q:''}:dir==='canopy'?{lens:'req',person:'sam',req:'r1',q:''}:{lens:'req',person:'priya',req:'r1',q:'contract'};
+ frame.innerHTML=`<div class="app m-${dir}">${rail('uni',c)}<main class="uni">
+  <div class="ubar"><h4>Living Universe</h4>
+   <label class="search panel">${SEARCH_ICON}<input id="q-${dir}" type="search" placeholder="Search people or skills: try “privacy” or “survey”" value="${esc(st.q)}" aria-label="Search people or skills"></label>
+   <div class="lens panel" role="tablist"><button data-lens="rel" role="tab">Relationships</button><button data-lens="req" role="tab">Requests</button></div></div>
+  <section class="graph panel"><svg viewBox="0 0 760 460" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Organization map"></svg>
+   <div class="legend"></div></section>
+  <aside class="uside"><div class="prof panel"></div><div class="reqs panel"></div></aside>
+  <section class="strip panel"></section>
+ </main></div>`;
+ const svg=frame.querySelector('.graph svg'),prof=frame.querySelector('.prof'),reqs=frame.querySelector('.reqs'),strip=frame.querySelector('.strip'),leg=frame.querySelector('.legend');
+ function render(){
+  svg.innerHTML=fix(defs(c,id),id)+fix(uniSvg(dir,c,st,id),id);
+  frame.querySelectorAll('.lens button').forEach(b=>{b.classList.toggle('on',b.dataset.lens===st.lens);b.setAttribute('aria-selected',b.dataset.lens===st.lens)});
+  leg.innerHTML=st.lens==='rel'
+   ?`<span><i style="background:${dir==='atlas'?c.ink:c.rel}"></i>Tie (thicker = more shared work)</span><span>Faded = not recently</span><span>Hollow = never worked together</span>`
+   :`<span><i style="background:${c.flow}"></i>Request route</span><span><i style="background:${c.signal}"></i>Where it is now</span>`;
+  const p=PM[st.person];const q=st.q.trim().toLowerCase();
+  const shared=REQS.filter(r=>r.route.some(s=>s[0]===p.id));
+  let sig='';if(dir==='canopy'){const R=rng(hash(p.id));sig='<div class="sig" aria-label="Signature">'+Array.from({length:16},()=>`<i style="background:${R()>.5?c.flow:'#1B3A40'}"></i>`).join('')+'</div>'}
+  const lead=dir==='atlas'?`<span class="ph">No. ${String(P.indexOf(p)+1).padStart(2,'0')} · ${esc(DN[p.dept])}</span>`:`<span class="ph">${esc(DN[p.dept])}</span>`;
+  prof.innerHTML=`${lead}<div class="who"><div class="av">${initials(p.name)}</div><div><div class="nm">${esc(p.name)}</div><div class="rl">${esc(p.role)}</div></div></div>${sig}
+   <div class="chips">${p.skills.map(k=>`<span class="chip ${q&&k.toLowerCase().includes(q)?'hit':''}">${esc(k)}</span>`).join('')}</div>
+   <div class="tie">${p.ties?`Worked together on <b>${p.ties} requests</b> <em>· last ${p.days<=1?'today':p.days+' days ago'}</em>`:'<b>You haven’t worked together yet.</b> <em>Jonah can introduce you.</em>'}</div>
+   <div class="hist">${shared.slice(0,3).map(r=>`<span>${esc(r.title)} · ${r.route.find(s=>s[0]===p.id)[1]}</span>`).join('')||'<span>No shared requests</span>'}</div>`;
+  reqs.innerHTML=`<span class="ph">Your requests</span>`+REQS.map(r=>`<button class="req ${r.id===st.req?'on':''}" data-req="${r.id}"><span>${esc(r.title)}</span><span class="pill ${r.status}">${r.label}</span></button>`).join('');
+  const r=RM[st.req];
+  strip.innerHTML=`<span class="ph">${esc(r.title)} · ${r.status==='done'?'completed':'step '+(r.at+1)+' of '+r.route.length}</span><div class="steps">`+
+   r.route.map((s,i)=>`<div class="step ${i<r.at?'past':i===r.at?'now':''}"><i class="dot"></i><b>${s[0]==='me'?'You':esc(PM[s[0]].name.split(' ')[0])}</b><span>${esc(s[1])}${s[2]&&s[2]!=='now'&&s[2]!=='next'?' · '+s[2]:''}</span></div>`).join('')+`</div>`;
+ }
+ frame.addEventListener('click',e=>{
+  const n=e.target.closest('.node');if(n){st.person=n.dataset.id;render();return}
+  const b=e.target.closest('[data-lens]');if(b){st.lens=b.dataset.lens;render();return}
+  const rq=e.target.closest('[data-req]');if(rq){st.req=rq.dataset.req;st.lens='req';render()}
+ });
+ frame.addEventListener('keydown',e=>{const n=e.target.closest&&e.target.closest('.node');if(n&&(e.key==='Enter'||e.key===' ')){e.preventDefault();st.person=n.dataset.id;render()}});
+ frame.querySelector('input').addEventListener('input',e=>{st.q=e.target.value;const p=P.find(x=>{const q=st.q.trim().toLowerCase();return q&&(x.name.toLowerCase().includes(q)||x.skills.some(k=>k.toLowerCase().includes(q))||x.role.toLowerCase().includes(q))});if(p)st.person=p.id;render()});
+ render();
+}
+
+/* ---------- mount ---------- */
+document.querySelectorAll('.frame').forEach(fr=>{
+ const dir=fr.dataset.dir;
+ if(fr.dataset.mock==='home') fr.innerHTML=buildHome(dir); else buildUni(dir,fr);
+});
+function fit(){document.querySelectorAll('.frame').forEach(fr=>fr.style.setProperty('--s',fr.clientWidth/1280))}
+fit(); if(window.ResizeObserver){const ro=new ResizeObserver(fit);document.querySelectorAll('.frame').forEach(fr=>ro.observe(fr))} else window.addEventListener('resize',fit);
+
+/* palettes */
+Object.entries(DIRS).forEach(([k,c])=>{const el=document.getElementById('sw-'+k);el.innerHTML=c.sw.map(([h,n,r])=>`<div class="sw"><i style="background:${h}"></i><b>${n}</b><code>${h}</code><span class="muted">${r}</span></div>`).join('')});
+
+/* comparison */
+const CMP=[['Fit with the brief’s emotion',5,4,3],['Originality',3,2,5],['Legibility, long sessions',4,3,5],['Signal clarity: what needs me?',3,5,4],['Scales to a large org',3,4,4],['Accessibility',3,4,5],['Ease of build',4,4,3]];
+const dots=n=>'●'.repeat(n)+'<s>'+'●'.repeat(5-n)+'</s>';
+document.getElementById('cmp').innerHTML=CMP.map(r=>`<tr><td>${r[0]}</td>${r.slice(1).map(n=>`<td class="dots" aria-label="${n} of 5">${dots(n)}</td>`).join('')}</tr>`).join('');
+})();
+</script>
+
+</html>

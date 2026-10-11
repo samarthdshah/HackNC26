@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Darwin Growth</title>
+<link rel="stylesheet" href="shared/aero.css">
+<style>
+html,body{overflow:hidden;-webkit-user-select:none;user-select:none}
+/* v4 daylight: sun glow and two soft light ribbons behind the tree */
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(circle at 18% 12%,rgb(255 250 230/.75),rgb(255 250 230/0) 22%),
+    radial-gradient(120% 40% at 50% 34%,rgb(255 255 255/.18),transparent 60%)}
+body::after{content:"";position:fixed;left:-10%;right:-10%;top:26%;height:18%;pointer-events:none;z-index:0;border-radius:50%;
+  border-top:2px solid rgb(255 255 255/.35);border-bottom:1px solid rgb(255 255 255/.2);transform:rotate(-4deg);filter:blur(1px)}
+
+#stage{position:fixed;inset:0 0 96px 0;display:flex;align-items:center;justify-content:center;z-index:1}
+#tree{display:block}
+#tree.hit{cursor:pointer}
+
+#head{left:28px;top:28px;width:340px}
+#head .page-title{margin:2px 0 6px}
+#head .now{margin:14px 0 4px;font-size:30px;font-weight:300;line-height:1.1}
+#head .now b{font-weight:600}
+#head .now .g{display:inline-block;transition:transform .45s var(--spring)}
+#head .now .g.bump{transform:scale(1.12)}
+#head .from{font-size:13px;color:var(--ink-2)}
+#head .acts{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+#gens{right:28px;top:28px;width:310px}
+#gens .body{padding:12px 12px 14px}
+#gens .rows{gap:6px}
+.gen{gap:10px;padding:7px 10px}
+.gen .orb.sm{background:radial-gradient(circle at 35% 28%,#fff,#B8C8D8 45%,#7890A8);transition:background .4s}
+.gen.done .orb.sm{background:radial-gradient(circle at 35% 28%,rgb(255 255 255/.9),var(--accent-hi) 40%,var(--accent-lo))}
+.gen .nm{width:52px;font-weight:600;font-size:14px}
+.gen .fit{flex:1;height:8px;border-radius:99px;background:rgb(255 255 255/.55);box-shadow:inset 0 1px 2px rgb(0 40 100/.3);overflow:hidden}
+.gen .fit i{display:block;height:100%;width:var(--w);border-radius:inherit;transform:scaleX(0);transform-origin:left;transition:transform .8s var(--spring);
+  background:linear-gradient(180deg,rgb(255 255 255/.65),rgb(255 255 255/0) 55%),linear-gradient(90deg,var(--accent-soft),var(--accent))}
+.gen.done .fit i{transform:scaleX(1)}
+.gen .hp{width:58px;text-align:right;font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.gen .chip{min-width:30px;justify-content:center}
+.gen{opacity:.55;transition:opacity .4s,background .25s,box-shadow .3s,transform .3s var(--spring)}
+.gen.done{opacity:1}
+.gen.on{background:rgb(255 255 255/.88);box-shadow:0 0 0 2px #fff,0 0 16px rgb(255 255 255/.85)}
+#gens .foot{margin-top:10px;font-size:12px;color:var(--ink-2);line-height:1.4}
+
+#tip{position:fixed;z-index:20;pointer-events:none;transform:translate(-50%,calc(-100% - 14px))}
+#tip.off{opacity:0}
+
+#rule{width:300px;z-index:25;display:none}
+#rule.open{display:block}
+#rule .x{margin-left:auto;width:22px;height:22px;border-radius:50%;font-size:14px;line-height:22px;text-align:center;color:#fff;background:rgb(255 255 255/.2);box-shadow:inset 0 0 0 1px rgb(255 255 255/.5)}
+#rule .x:hover{background:rgb(255 255 255/.35)}
+#rule .txt{font-size:17px;font-weight:600;line-height:1.3;margin:6px 0 10px}
+#rule .meta{display:flex;gap:8px;flex-wrap:wrap}
+#rule .acts{display:flex;gap:10px;margin-top:14px}
+
+@media (max-width:700px){
+  #head{left:12px;right:12px;top:12px;width:auto}
+  #head .page-sub{display:none}
+  #head .now{font-size:22px;margin-top:8px}
+  #gens{left:12px;right:12px;top:auto;bottom:76px;width:auto}
+  #gens .bar,#gens .foot{display:none}
+  #gens .body{padding:6px}
+  .gen:not(.on){display:none}
+  #stage{inset:190px 0 140px 0}
+  #rule{left:12px!important;right:12px;width:auto;top:auto!important;bottom:150px}
+}
+</style>
+</head>
+<body data-page="darwin">
+
+<div id="stage"><canvas id="tree" aria-label="Darwin's evolution tree: each ring of branches is a generation, each orange fruit is an evolved routing rule"></canvas></div>
+
+<section id="head" class="milk float" aria-live="polite">
+  <div class="bar"><span class="orb" style="width:24px;height:24px;font-size:12px;background:radial-gradient(circle at 35% 28%,rgb(255 255 255/.85),#B48CFF 38%,#6A3FC8 75%,#3A1A8A)">↯</span>Darwin · Evolve<span class="live"><i id="liveDot"></i><span id="liveTxt">evolving</span></span></div>
+  <div class="body">
+    <div class="k">Engine · Evolve</div>
+    <h1 class="page-title">Darwin Growth</h1>
+    <p class="page-sub">Darwin replays last quarter's requests and breeds shorter routes. Every ring of branches is a generation, and every orange fruit is a rule it learned.</p>
+    <div class="now"><span class="g" id="genN">Gen 0</span> · <b id="genH">–</b> avg hops</div>
+    <div class="from" id="genFrom">Seeding from last quarter's 3,470 requests</div>
+    <div class="acts"><button class="pill" id="regrow">↻ Regrow</button><span class="chip info" id="ruleCount">0 rules</span></div>
+  </div>
+</section>
+
+<section id="gens" class="milk float">
+  <div class="bar">Generations<span class="live"><i></i>replay</span></div>
+  <div class="body">
+    <div class="rows" id="genRows"></div>
+    <p class="foot">Fitness is the share of replayed requests that resolve in two hops or fewer.</p>
+  </div>
+</section>
+
+<div id="tip" class="lbl off"><i></i><span></span></div>
+
+<section id="rule" class="milk float still" role="dialog" aria-label="Evolved rule">
+  <div class="bar"><span id="rGen">Rule</span><button class="x" id="rClose" aria-label="Close">×</button></div>
+  <div class="body">
+    <div class="k">Evolved routing rule</div>
+    <p class="txt" id="rTxt"></p>
+    <div class="meta"><span class="chip" id="rSaves"></span><span class="chip" id="rStatus"></span></div>
+    <div class="acts"><button class="pill green" id="rOk">Approve</button><button class="pill ghost" id="rNo">Reject</button></div>
+  </div>
+</section>
+
+<script src="shared/aero.js"></script>
+<script src="shared/data.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const GENS = WF.darwin, RULES = WF.rules.map(r => ({...r}));
+
+/* ============ Small helpers ============ */
+const rgb = n => [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+const css = (c, a = 1) => `rgb(${c[0]} ${c[1]} ${c[2]} / ${a})`;
+const lighten = (c, t) => mix(c, [255, 255, 255], t), darken = (c, t) => mix(c, [0, 20, 50], t);
+function mulberry(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const backOut = t => { const c = 1.70158; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
+
+/* ============ Tree: the pasted canvas tree, grown once ============ */
+class Tree {
+  constructor(canvas) {
+    this.C = canvas; this.c = canvas.getContext('2d');
+    this.W = 800; this.H = 800; this.floorY = 685;
+    this.maxGenerations = GENS.length;
+    this.hover = null; this.raf = 0;
+    this.setupCanvas();
+    addEventListener('resize', () => { this.setupCanvas(); this.draw(); });
+  }
+  setupCanvas() {
+    const S = this.S = Math.min(devicePixelRatio || 1, 2);
+    this.C.width = this.W * S; this.C.height = this.H * S;
+    const st = this.C.parentElement.getBoundingClientRect(), side = Math.max(200, Math.min(st.width, st.height));
+    this.C.style.width = this.C.style.height = side + 'px';
+    this.c.setTransform(S, 0, 0, S, 0, 0); this.c.lineCap = 'round'; this.c.lineJoin = 'round';
+  }
+  get trunk() {
+    return {angle:0, angleInc:20, distance:120, distanceFade:.2, generation:1, growthSpeed:.035, hadBranches:false, progress:0, x1:400, y1:680, x2:400, y2:560};
+  }
+  reset(seed) {
+    this.rand = mulberry(seed); this.branches = [this.trunk]; this.fruit = [];
+    this.genDone = new Array(this.maxGenerations + 1).fill(0); this.genComplete = 0;
+    this.ruleFruit = []; this.done = false; this.hover = null;
+  }
+  randomInt(min, max) { return min + Math.round(this.rand() * (max - min)); }
+  grow() {
+    const {branches, maxGenerations} = this;
+    branches.forEach(b => {   // forEach skips branches pushed this frame, as in the original
+      if (b.progress < 1) {
+        b.progress = Math.min(1, b.progress + b.growthSpeed);
+        if (b.progress === 1) {
+          if (++this.genDone[b.generation] === 2 ** (b.generation - 1)) this.onGeneration(b.generation);
+          if (b.generation === maxGenerations) this.fruit.push({progress:0, speed:.04 + this.rand() * .03, x:b.x2, y:b.y2, r:this.randomInt(3, 5), tone:this.randomInt(0, 2)});
+        }
+      } else if (!b.hadBranches && b.generation < maxGenerations) {
+        b.hadBranches = true;
+        const lean = 5, distance = b.distance * (1 - b.distanceFade), generation = b.generation + 1;
+        for (const side of [-1, 1]) {
+          const angle = b.angle + side * (b.angleInc + this.randomInt(-lean, lean));
+          branches.push({...b, angle, distance, generation, hadBranches:false, progress:0, x1:b.x2, y1:b.y2,
+            x2:b.x2 + Math.sin(angle * Math.PI / 180) * distance, y2:b.y2 - Math.cos(angle * Math.PI / 180) * distance});
+        }
+      }
+    });
+    this.fruit.forEach(f => { if (f.progress < 1) f.progress = Math.min(1, f.progress + f.speed); });
+    this.ruleFruit.forEach(f => { if (f.delay > 0) f.delay--; else if (f.rp < 1) f.rp = Math.min(1, f.rp + .05); });
+    const allFruit = this.fruit.length === 2 ** (maxGenerations - 1) && this.fruit.every(f => f.progress === 1);
+    if (allFruit && !this.ruleFruit.length) this.pickRules();
+    if (allFruit && this.ruleFruit.every(f => f.rp === 1)) { this.done = true; this.onSettled(); }
+  }
+  pickRules() {   // spread the evolved rules evenly around the canopy, ripening in generation order
+    const cx = 400, cy = 470, byAngle = [...this.fruit].sort((a, b) => Math.atan2(a.x - cx, cy - a.y) - Math.atan2(b.x - cx, cy - b.y));
+    const n = RULES.length, picks = RULES.map((_, i) => byAngle[Math.floor((i + .5) * byAngle.length / n)]);
+    const order = RULES.map((r, i) => i).sort((a, b) => RULES[a].gen - RULES[b].gen);
+    picks.forEach((f, i) => { f.rule = RULES[i]; f.rp = 0; f.delay = order.indexOf(i) * 7; });
+    this.ruleFruit = picks;
+  }
+  finishInstantly() {   // reduced motion: the finished tree, no growth
+    let guard = 0; while (!this.done && guard++ < 5000) this.grow();   // same steps as the animation, just not drawn
+  }
+  colors() {
+    const p = Aero.palette();
+    return {lo:darken(rgb(p.hub), .25), mid:rgb(p.accent), tip:rgb(p.levels[3]), fruit:[rgb(p.levels[1]), rgb(p.levels[2]), rgb(p.levels[4])], rule:rgb(p.person), ground:rgb(p.levels[3]), groundLo:rgb(p.hub)};
+  }
+  branchColor(g, k) {
+    const t = (g - 1) / (this.maxGenerations - 1);
+    return t < .5 ? mix(k.lo, k.mid, t * 2) : mix(k.mid, k.tip, (t - .5) * 2);
+  }
+  orb(x, y, r, col, a = 1) {
+    const c = this.c, g = c.createRadialGradient(x - r * .35, y - r * .4, r * .1, x, y, r * 1.05);
+    g.addColorStop(0, css(lighten(col, .75), a)); g.addColorStop(.45, css(col, a)); g.addColorStop(1, css(darken(col, .35), a));
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    c.fillStyle = `rgb(255 255 255 / ${.85 * a})`; c.beginPath(); c.ellipse(x - r * .3, y - r * .45, r * .42, r * .24, -.5, 0, Math.PI * 2); c.fill();
+  }
+  draw() {
+    const {c, W, H, floorY} = this, k = this.colors();
+    c.clearRect(0, 0, W, H);
+    // glossy island the tree grows from, with a soft reflection on the water line
+    const gx = 400, gy = floorY + 2;
+    let g = c.createLinearGradient(0, gy - 22, 0, gy + 22);
+    g.addColorStop(0, css(lighten(k.ground, .45))); g.addColorStop(.5, css(k.ground)); g.addColorStop(1, css(mix(k.ground, k.groundLo, .6)));
+    c.fillStyle = g; c.beginPath(); c.ellipse(gx, gy, 280, 20, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgb(255 255 255 / .45)'; c.beginPath(); c.ellipse(gx - 40, gy - 9, 190, 5, 0, 0, Math.PI * 2); c.fill();
+    g = c.createLinearGradient(0, gy + 18, 0, gy + 70); g.addColorStop(0, 'rgb(255 255 255 / .35)'); g.addColorStop(1, 'rgb(255 255 255 / 0)');
+    c.fillStyle = g; c.beginPath(); c.ellipse(gx, gy + 34, 360, 26, 0, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = 'rgb(255 255 255 / .55)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(60, gy + 24); c.lineTo(740, gy + 24); c.stroke();
+
+    // branches, one batch per generation: tapering width, gradient from deep trunk to fresh tips, gloss on the thick ones
+    const byGen = [];
+    for (const b of this.branches) if (b.progress > 0) (byGen[b.generation] ||= []).push(b);
+    byGen.forEach((list, gen) => {
+      if (!list) return;
+      const w = Math.max(1.3, 12 * Math.pow(.8, gen - 1)), col = this.branchColor(gen, k);
+      c.strokeStyle = css(col); c.lineWidth = w; c.beginPath();
+      for (const b of list) { c.moveTo(b.x1, b.y1); c.lineTo(b.x1 + (b.x2 - b.x1) * b.progress, b.y1 + (b.y2 - b.y1) * b.progress); }
+      c.stroke();
+      if (gen <= 6) {
+        c.strokeStyle = `rgb(255 255 255 / ${.42 - gen * .04})`; c.lineWidth = w * .3; c.beginPath();
+        const o = w * .22;
+        for (const b of list) { c.moveTo(b.x1 - o, b.y1); c.lineTo(b.x1 - o + (b.x2 - b.x1) * b.progress, b.y1 + (b.y2 - b.y1) * b.progress); }
+        c.stroke();
+      }
+    });
+
+    // decorative fruit
+    for (const f of this.fruit) if (!f.rule && f.progress > 0) this.orb(f.x, f.y, f.r * backOut(f.progress), k.fruit[f.tone], .92);
+    // rule fruit: bigger, theme "person" color, a white ring once approved, grey when rejected
+    for (const f of this.ruleFruit) {
+      if (f.rp <= 0) { this.orb(f.x, f.y, f.r, k.fruit[f.tone], .92); continue; }
+      const r = 8.5 * backOut(f.rp), col = f.rule.status === 'rejected' ? [157, 176, 195] : k.rule;
+      if (f === this.hover) { c.fillStyle = 'rgb(255 255 255 / .55)'; c.beginPath(); c.arc(f.x, f.y, r + 7, 0, Math.PI * 2); c.fill(); }
+      this.orb(f.x, f.y, r, col);
+      if (f.rule.status === 'approved') { c.strokeStyle = 'rgb(255 255 255 / .95)'; c.lineWidth = 1.6; c.beginPath(); c.arc(f.x, f.y, r + 2.2, 0, Math.PI * 2); c.stroke(); }
+    }
+  }
+  loop = () => {
+    this.grow(); this.draw();
+    if (!this.done) this.raf = requestAnimationFrame(this.loop); else this.raf = 0;
+  };
+  start(seed) {
+    cancelAnimationFrame(this.raf); this.reset(seed);
+    if (Aero.RM) { this.finishInstantly(); this.draw(); return; }
+    this.raf = requestAnimationFrame(this.loop);
+  }
+  toLogical(e) { const r = this.C.getBoundingClientRect(); return {x:(e.clientX - r.left) * this.W / r.width, y:(e.clientY - r.top) * this.H / r.height}; }
+  toClient(x, y) { const r = this.C.getBoundingClientRect(); return {x:r.left + x * r.width / this.W, y:r.top + y * r.height / this.H}; }
+  ruleAt(e) {
+    const p = this.toLogical(e); let best = null, bd = 14;
+    for (const f of this.ruleFruit) { if (f.rp < 1) continue; const d = Math.hypot(f.x - p.x, f.y - p.y); if (d < bd) { bd = d; best = f; } }
+    return best;
+  }
+}
+
+/* ============ Generations card ============ */
+$('genRows').innerHTML = GENS.map(g => `<div class="row gen" data-gen="${g.gen}"><span class="orb sm"></span><span class="nm">Gen ${g.gen}</span>
+  <span class="fit" title="Fitness ${g.fitness}"><i style="--w:${Math.round(g.fitness * 100)}%"></i></span><span class="hp">${g.avgHops.toFixed(1)} hops</span><span class="chip info">${g.rules}</span></div>`).join('');
+const rows = [...document.querySelectorAll('.gen')];
+function setGen(n) {
+  rows.forEach((r, i) => { r.classList.toggle('done', i < n); r.classList.toggle('on', i === n - 1); });
+  const g = GENS[n - 1], el = $('genN');
+  if (!g) { el.textContent = 'Gen 0'; $('genH').textContent = '–'; $('genFrom').textContent = `Seeding from last quarter's ${WF.stats.requestsRouted.toLocaleString()} requests`; $('ruleCount').textContent = '0 rules'; return; }
+  el.textContent = `Gen ${g.gen}`; $('genH').textContent = g.avgHops.toFixed(1);
+  $('genFrom').textContent = g.gen === 1 ? 'Replaying the old routes' : `down from ${GENS[0].avgHops.toFixed(1)} at Gen 1 · fitness ${g.fitness.toFixed(2)}`;
+  $('ruleCount').textContent = `${g.rules} rules`;
+  el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); setTimeout(() => el.classList.remove('bump'), 450);
+}
+function setLive(evolving) { $('liveTxt').textContent = evolving ? 'evolving' : 'settled'; $('liveDot').style.background = evolving ? '#FFC24D' : ''; $('liveDot').style.boxShadow = evolving ? '0 0 8px #FFC24D' : ''; }
+
+/* ============ Wire up ============ */
+const tree = new Tree($('tree'));
+tree.onGeneration = n => { tree.genComplete = n; setGen(n); };
+tree.onSettled = () => { setLive(false); $('ruleCount').textContent = `${GENS.at(-1).rules} rules · ${RULES.length} on the tree`; };
+let seed = 7;
+function grow() { closeRule(); hideTip(); setGen(0); setLive(true); tree.start(seed++); }
+
+const tip = $('tip');
+function hideTip() { tip.classList.add('off'); $('tree').classList.remove('hit'); }
+function statusChip(s) { return s === 'approved' ? ['chip', 'Approved'] : s === 'rejected' ? ['chip bad', 'Rejected'] : ['chip warn', 'Proposed · needs admin']; }
+$('tree').addEventListener('pointermove', e => {
+  if (!tree.done) return;
+  const f = tree.ruleAt(e);
+  if (f !== tree.hover) { tree.hover = f; tree.draw(); }
+  if (!f) return hideTip();
+  const p = tree.toClient(f.x, f.y);
+  tip.style.left = p.x + 'px'; tip.style.top = p.y + 'px';
+  tip.querySelector('span').textContent = `Gen ${f.rule.gen} · ${f.rule.text}`;
+  tip.querySelector('i').style.background = f.rule.status === 'rejected' ? '#9DB0C3' : Aero.hex(Aero.palette().person);
+  tip.classList.remove('off'); $('tree').classList.add('hit');
+});
+$('tree').addEventListener('pointerleave', () => { if (tree.hover) { tree.hover = null; tree.draw(); } hideTip(); });
+
+let open = null;
+function paintRule() {
+  const r = open.rule, [cls, txt] = statusChip(r.status);
+  $('rGen').textContent = `Rule · evolved in Gen ${r.gen}`; $('rTxt').textContent = r.text;
+  $('rSaves').textContent = `Saves ${r.saves}`; $('rStatus').className = cls; $('rStatus').textContent = txt;
+  $('rOk').disabled = r.status === 'approved'; $('rNo').disabled = r.status === 'rejected';
+  $('rOk').style.opacity = r.status === 'approved' ? .55 : 1; $('rNo').style.opacity = r.status === 'rejected' ? .55 : 1;
+}
+function openRule(f) {
+  open = f; paintRule();
+  const card = $('rule'), p = tree.toClient(f.x, f.y), w = 300, h = 230;
+  let x = p.x > innerWidth / 2 ? p.x - w - 24 : p.x + 24, y = p.y - h / 2;
+  x = Math.max(12, Math.min(innerWidth - w - 12, x)); y = Math.max(12, Math.min(innerHeight - h - 110, y));
+  card.style.left = x + 'px'; card.style.top = y + 'px'; card.classList.add('open'); hideTip();
+}
+function closeRule() { $('rule').classList.remove('open'); open = null; }
+$('tree').addEventListener('click', e => { if (!tree.done) return; const f = tree.ruleAt(e); f ? openRule(f) : closeRule(); });
+$('rClose').addEventListener('click', closeRule);
+addEventListener('keydown', e => { if (e.key === 'Escape') closeRule(); });
+$('rOk').addEventListener('click', () => {
+  open.rule.status = 'approved'; paintRule(); tree.draw();
+  Aero.toast('evo', 'Darwin evolved a better rule', open.rule.text, `Approved by admin <span class="hops">saves ${open.rule.saves}</span>`);
+});
+$('rNo').addEventListener('click', () => {
+  open.rule.status = 'rejected'; paintRule(); tree.draw();
+  Aero.toast('evo', 'Rule rejected', open.rule.text, 'Darwin will breed a different route next generation');
+});
+$('regrow').addEventListener('click', grow);
+
+Aero.onTheme(() => { if (!tree.raf) tree.draw(); });   // re-tint by redrawing; a growing tree picks it up next frame
+grow();
+})();
+</script>
+</body>
+</html>
