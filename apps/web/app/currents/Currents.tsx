@@ -241,4 +241,3 @@ function Sea() {
     <div className="sea" aria-hidden="true"><svg viewBox="0 0 1200 28" preserveAspectRatio="none"><path d="M0 14 Q75 2 150 14 T300 14 T450 14 T600 14 T750 14 T900 14 T1050 14 T1200 14" fill="none" stroke="#fff" strokeWidth="2" /></svg></div>
   );
 }
-
