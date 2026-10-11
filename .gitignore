@@ -4,3 +4,15 @@ __pycache__/
 .venv/
 dist/
 apps/agent/logs/
+
+# macOS
+.DS_Store
+
+# Local keypairs: load via SOLANA_SECRET_KEY in .env instead
+devnet-wallet.json
+*-wallet.json
+
+# Next.js
+.next/
+next-env.d.ts
+*.tsbuildinfo
