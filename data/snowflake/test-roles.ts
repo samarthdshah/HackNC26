@@ -1,9 +1,13 @@
 // Prove the POL-ACCESS-1 rules from roles.sql by querying as each tier role through the SQL API "role" field.
 // Run after snowflake:roles: npm --prefix data run snowflake:test-roles
+// As lane A's user (WAYFINDER_AGENT), with SNOWFLAKE_AGENT_PAT: npm --prefix data run snowflake:test-roles -- --agent-pat
+// Same checks and expected results, minus the ACCOUNTADMIN-only ones.
 
-import { requireEnv, runSql, type SqlResult } from "./client.ts";
+import { requireEnv, runSql, usePat, type SqlResult } from "./client.ts";
 
 requireEnv(["SNOWFLAKE_DATABASE", "SNOWFLAKE_SCHEMA"]);
+const AGENT_PAT = process.argv.includes("--agent-pat");
+if (AGENT_PAT) usePat("SNOWFLAKE_AGENT_PAT");
 const ctx = { database: process.env.SNOWFLAKE_DATABASE, schema: process.env.SNOWFLAKE_SCHEMA };
 
 const MASK = "[visible to HR only]";
@@ -24,7 +28,11 @@ const VP_QUESTION = `
   SELECT ROUND(AVG(DATEDIFF('second', created_at, resolved_at)) / 86400, 2), ROUND(AVG(hop_count), 2)
   FROM (SELECT * FROM requests WHERE task_type = 'onboarding' AND status = 'resolved' ORDER BY created_at DESC LIMIT 10)`;
 
-type Test = { name: string; role: string; sql: string; expect: string; check: (r: SqlResult) => boolean };
+// role undefined = no role in the request body (the user's default role). agentOnly: runs only under --agent-pat.
+// knownRisk: a failure is reported as KNOWN RISK (see SCHEMA.md) and does not fail the run.
+type Test = {
+  name: string; role?: string; sql: string; expect: string; check: (r: SqlResult) => boolean; agentOnly?: boolean; knownRisk?: boolean;
+};
 
 const refused = (r: SqlResult) => !r.ok && r.code === "002003";
 const firstCell = (r: SqlResult) => (r.ok ? r.rows[0]?.[0] : undefined);
@@ -115,6 +123,75 @@ const TESTS: Test[] = [
     expect: "refused",
     check: refused,
   })),
+  // Lane A reference data through PHOTON_FINANCE (inherits EMPLOYEE): every non-person table.
+  ...[
+    ["company", "1"], ["departments", "10"], ["rooms", "6"], ["vendors", "6"], ["budgets", "8"], ["policies", "11"],
+  ].map(([table, n]): Test => ({
+    name: `FINANCE reads ${table}`,
+    role: "PHOTON_FINANCE",
+    sql: `SELECT COUNT(*) FROM ${table}`,
+    expect: `${n} rows`,
+    check: (r) => firstCell(r) === n,
+  })),
+  {
+    name: "APP reads resolution_by_task_type",
+    role: "PHOTON_APP",
+    sql: `SELECT COUNT(*), SUM(request_count),
+                 MAX(IFF(task_type = 'onboarding', request_count || ' / ' || avg_hops, NULL)),
+                 COUNT_IF(task_type IN ('leave_request', 'benefits_question', 'employee_relations'))
+          FROM resolution_by_task_type`,
+    expect: "17 types, 83 requests, onboarding 14 / 6.43 hops, 3 HR types",
+    check: (r) => r.ok && r.rows[0].join(", ") === "17, 83, 14 / 6.43, 3",
+  },
+  ...[
+    ["VP", "PHOTON_VP"],
+    ["MANAGER", "PHOTON_MANAGER"],
+    ["EMPLOYEE", "PHOTON_EMPLOYEE"],
+  ].map(([who, role]): Test => ({
+    name: `${who} reads resolution_by_task_type`,
+    role,
+    sql: "SELECT COUNT(*) FROM resolution_by_task_type",
+    expect: "refused",
+    check: refused,
+  })),
+  // Each statement runs as the named tier role only: no secondary roles, so PHOTON_HR is not in an EMPLOYEE or
+  // MANAGER session (HR text stays masked). Under the agent PAT the user must be WAYFINDER_AGENT.
+  ...[
+    ["EMPLOYEE", "PHOTON_EMPLOYEE"],
+    ["MANAGER", "PHOTON_MANAGER"],
+  ].map(([who, role]): Test => ({
+    name: `${who} session: user, role, secondary roles, PHOTON_HR in session`,
+    role,
+    sql: "SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_SECONDARY_ROLES(), IS_ROLE_IN_SESSION('PHOTON_HR')",
+    expect: `${AGENT_PAT ? "WAYFINDER_AGENT" : "owner"}, ${role}, none, false`,
+    check: (r) =>
+      r.ok &&
+      (!AGENT_PAT || r.rows[0][0] === "WAYFINDER_AGENT") &&
+      r.rows[0][1] === role &&
+      JSON.parse(r.rows[0][2] ?? "{}").roles === "" &&
+      r.rows[0][3] === "false",
+  })),
+  // Wanted fail safe: with no role in the body, WAYFINDER_AGENT should not get PHOTON_APP. Known risk: the PAT's
+  // PHOTON_APP role restriction overrides DEFAULT_ROLE, so today these run as PHOTON_APP. Lane A must always send a role.
+  {
+    name: "no-role session: role, secondary roles, PHOTON_HR in session",
+    sql: "SELECT CURRENT_ROLE(), CURRENT_SECONDARY_ROLES(), IS_ROLE_IN_SESSION('PHOTON_HR')",
+    expect: "PHOTON_EMPLOYEE, none, false",
+    check: (r) => r.ok && r.rows[0][0] === "PHOTON_EMPLOYEE" && JSON.parse(r.rows[0][1] ?? "{}").roles === "" && r.rows[0][2] === "false",
+    agentOnly: true,
+    knownRisk: true,
+  },
+  { name: "no-role SELECT on requests", sql: "SELECT COUNT(*) FROM requests", expect: "refused", check: refused, agentOnly: true, knownRisk: true },
+  {
+    name: "WAYFINDER_AGENT granted roles",
+    role: "ACCOUNTADMIN",
+    sql: "SHOW GRANTS TO USER WAYFINDER_AGENT",
+    expect: "PHOTON_APP + 6 tier roles",
+    check: (r) =>
+      r.ok &&
+      r.rows.map((row) => row[3]).sort().join(",") ===
+        "PHOTON_APP,PHOTON_EMPLOYEE,PHOTON_FINANCE,PHOTON_HR,PHOTON_HR_HEAD,PHOTON_MANAGER,PHOTON_VP",
+  },
 ];
 
 function describe(r: SqlResult): string {
@@ -124,9 +201,13 @@ function describe(r: SqlResult): string {
 }
 
 const results: [string, string, string, string, boolean][] = [];
-for (const t of TESTS) {
+const risks = new Set<string>();
+// The agent PAT cannot use ACCOUNTADMIN, so admin-only checks run under the owner PAT only.
+for (const t of TESTS.filter((t) => (AGENT_PAT ? t.role !== "ACCOUNTADMIN" : !t.agentOnly))) {
   const r = await runSql(t.sql, { ...ctx, role: t.role });
-  results.push([t.name, t.role, t.expect, describe(r), t.check(r)]);
+  const pass = t.check(r);
+  if (!pass && t.knownRisk) risks.add(t.name);
+  results.push([t.name, t.role ?? "(none)", t.expect, describe(r), pass || !!t.knownRisk]);
 }
 
 // person_roles: every person must map to exactly the approved role.
@@ -141,9 +222,16 @@ else {
 }
 results.push(["person_roles matches approved mapping", "PHOTON_APP", `${expected.size} people, 0 mismatches`, pr.ok ? `${pr.rows.length} people, ${mismatches.length} mismatches` : "unreadable", mismatches.length === 0]);
 
+console.log(`PAT: ${AGENT_PAT ? "SNOWFLAKE_AGENT_PAT" : "SNOWFLAKE_PAT"}`);
 console.log("| Test | Role | Expected | Actual | Result |\n|---|---|---|---|---|");
-for (const [name, role, expect, actual, pass] of results) console.log(`| ${name} | ${role} | ${expect} | ${actual} | ${pass ? "PASS" : "FAIL"} |`);
+for (const [name, role, expect, actual, pass] of results) {
+  console.log(`| ${name} | ${role} | ${expect} | ${actual} | ${risks.has(name) ? "KNOWN RISK" : pass ? "PASS" : "FAIL"} |`);
+}
 for (const m of mismatches) console.log(`  mismatch: ${m}`);
+// Report only: what a statement with no role in the request body runs as (the user's default role).
+const bare = await runSql("SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_SECONDARY_ROLES(), IS_ROLE_IN_SESSION('PHOTON_HR')", { ...ctx, role: undefined });
+console.log(`No role in request body: ${bare.ok ? bare.rows[0].join(", ") : `refused (${bare.code}) ${bare.message.slice(0, 80)}`}`);
 const failed = results.filter((r) => !r[4]).length;
-console.log(failed ? `${failed} of ${results.length} FAILED` : `All ${results.length} passed.`);
+const passed = results.length - failed - risks.size;
+console.log(failed ? `${failed} of ${results.length} FAILED` : `${passed} of ${results.length} passed` + (risks.size ? `, ${risks.size} known risk (no-role statements run as PHOTON_APP)` : "."));
 process.exit(failed ? 1 : 0);

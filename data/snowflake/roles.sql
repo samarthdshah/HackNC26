@@ -167,12 +167,39 @@ CREATE OR REPLACE SECURE VIEW vp_new_hire_setup AS
   ORDER BY 1 DESC, 2;
 GRANT SELECT ON VIEW vp_new_hire_setup TO ROLE PHOTON_VP;
 
--- 7. Service user for lane A. No password; Lane C's owner creates its PAT in Snowsight.
+-- 7. Lane A metrics: resolution hours and hops by task type, resolved requests only. No dates and no request text
+--    (titles, resolutions, notes), so HR masking never applies. hr_rows still filters by the reader's roles: PHOTON_APP
+--    holds MANAGER, so it sees every task type, including the HR ones, as aggregates only.
+CREATE OR REPLACE SECURE VIEW resolution_by_task_type AS
+  SELECT
+    task_type,
+    COUNT(*) AS request_count,
+    ROUND(AVG(DATEDIFF('second', created_at, resolved_at)) / 3600, 1)::NUMBER(10, 1) AS avg_resolution_hours,
+    ROUND(MEDIAN(DATEDIFF('second', created_at, resolved_at)) / 3600, 1)::NUMBER(10, 1) AS median_resolution_hours,
+    ROUND(AVG(hop_count), 2)::NUMBER(10, 2) AS avg_hops
+  FROM requests
+  WHERE status = 'resolved'
+  GROUP BY task_type
+  ORDER BY task_type;
+GRANT SELECT ON VIEW resolution_by_task_type TO ROLE PHOTON_APP;
+
+-- 8. Service user for lane A. No password; Lane C's owner creates its PAT in Snowsight.
+--    Every tier role is also granted directly, so lane A can name any of them as the SQL API "role" per statement.
+--    DEFAULT_ROLE stays PHOTON_APP and DEFAULT_SECONDARY_ROLES stays ('ALL') (the values before S4b step 3).
+--    Setting PHOTON_EMPLOYEE and () was tried: the PAT's PHOTON_APP role restriction overrides the default role, so a
+--    statement with no role still ran as PHOTON_APP. Known risk; see SCHEMA.md. Lane A must always send a role.
 CREATE USER IF NOT EXISTS WAYFINDER_AGENT TYPE = SERVICE COMMENT = 'Lane A agent server (Wayfinder OS)';
 ALTER USER WAYFINDER_AGENT SET
   TYPE = SERVICE
   DEFAULT_ROLE = PHOTON_APP
+  DEFAULT_SECONDARY_ROLES = ('ALL')
   DEFAULT_WAREHOUSE = {{WAREHOUSE}}
   DEFAULT_NAMESPACE = '{{DATABASE}}.{{SCHEMA}}'
   NETWORK_POLICY = hacknc_open;
 GRANT ROLE PHOTON_APP TO USER WAYFINDER_AGENT;
+GRANT ROLE PHOTON_EMPLOYEE TO USER WAYFINDER_AGENT;
+GRANT ROLE PHOTON_MANAGER TO USER WAYFINDER_AGENT;
+GRANT ROLE PHOTON_FINANCE TO USER WAYFINDER_AGENT;
+GRANT ROLE PHOTON_HR TO USER WAYFINDER_AGENT;
+GRANT ROLE PHOTON_HR_HEAD TO USER WAYFINDER_AGENT;
+GRANT ROLE PHOTON_VP TO USER WAYFINDER_AGENT;
