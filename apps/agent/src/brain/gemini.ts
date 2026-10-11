@@ -1,19 +1,55 @@
 // Gemini wrapper: plain text, schema-checked JSON, and a function-calling loop.
 
-import { GoogleGenAI, type Content, type FunctionDeclaration } from "@google/genai";
+import { GoogleGenAI, type Content, type FunctionDeclaration, type GenerateContentResponse } from "@google/genai";
 import { z } from "zod";
 import { env, required } from "../env.ts";
 
-let client: GoogleGenAI | undefined;
+let client: { key: string; ai: GoogleGenAI } | undefined;
 
 export function gemini(): GoogleGenAI {
-  client ??= new GoogleGenAI({ apiKey: required("GEMINI_API_KEY") });
-  return client;
+  const key = required("GEMINI_API_KEY");
+  if (client?.key !== key) client = { key, ai: new GoogleGenAI({ apiKey: key }) };
+  return client.ai;
+}
+
+/** Gemini can't be used right now (no credits, bad key, or still failing after retries). */
+export class AiUnavailableError extends Error {
+  constructor(readonly reason: string) {
+    super(`AI unavailable: ${reason}`);
+  }
+}
+
+export const isAiUnavailable = (err: unknown): err is AiUnavailableError => err instanceof AiUnavailableError;
+
+const TRANSIENT = new Set([429, 500, 502, 503, 504]);
+
+/** generateContent with retries on transient errors; hard failures become AiUnavailableError. */
+async function generate(params: Parameters<GoogleGenAI["models"]["generateContent"]>[0]): Promise<GenerateContentResponse> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await gemini().models.generateContent(params);
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      const text = err instanceof Error ? err.message : String(err);
+      const credits = /credits are depleted|billing/i.test(text);
+      if (status && TRANSIENT.has(status) && !credits && attempt < 2) {
+        await new Promise((r) => setTimeout(r, 1000 * 3 ** attempt));
+        continue;
+      }
+      if (credits) throw new AiUnavailableError("Gemini prepayment credits are depleted");
+      if (status === 401 || status === 403 || /API key not valid|API_KEY_INVALID/i.test(text)) {
+        throw new AiUnavailableError("Gemini rejected the API key");
+      }
+      if (status && TRANSIENT.has(status)) throw new AiUnavailableError(`Gemini is overloaded (${status})`);
+      if (!status && /fetch failed|ENOTFOUND|ECONNRESET|ETIMEDOUT/i.test(text)) throw new AiUnavailableError("can't reach Gemini");
+      throw err;
+    }
+  }
 }
 
 /** One-shot text completion. */
 export async function ask(prompt: string, systemInstruction?: string): Promise<string> {
-  const res = await gemini().models.generateContent({
+  const res = await generate({
     model: env.gemini.model,
     contents: prompt,
     config: { systemInstruction, temperature: 0.2 },
@@ -27,7 +63,7 @@ export async function askJson<S extends z.ZodType>(
   schema: S,
   systemInstruction?: string,
 ): Promise<z.infer<S>> {
-  const res = await gemini().models.generateContent({
+  const res = await generate({
     model: env.gemini.model,
     contents: prompt,
     config: {
@@ -63,7 +99,7 @@ export async function toolLoop(
   const calls: { name: string; args: unknown }[] = [];
 
   for (let turn = 0; turn < maxTurns; turn++) {
-    const res = await gemini().models.generateContent({
+    const res = await generate({
       model: env.gemini.model,
       contents,
       config: { systemInstruction, temperature: 0.2, tools: [{ functionDeclarations: declarations }] },

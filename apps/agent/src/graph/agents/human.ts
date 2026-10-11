@@ -38,14 +38,15 @@ async function routeNode(s: S): Promise<Command> {
       goto: END,
     });
   }
-  // First hop only: Darwin's approved rules may say where this task type really belongs.
-  let prefer = s.prefer;
-  const hint = s.hops === 0 && !prefer ? await routeHint(st.task_type, s.request.severity) : undefined;
-  if (hint?.prefer) prefer = hint.prefer;
+  // Darwin (approved rules only), asked before every route. A person's explicit
+  // redirect or an escalation (s.prefer) outranks Darwin's `prefer` and `redirects`.
+  const hint = await routeHint(st.task_type, s.request.severity);
+  const prefer = s.prefer ?? hint?.prefer ?? undefined;
   let r = route({ task_type: st.task_type, requester: s.request.requester, exclude: s.exclude, prefer });
-  const skip = hint?.redirects.find((x) => x.avoid === r.entry || x.avoid === r.owner);
+  const skip = s.prefer ? undefined : hint?.redirects.find((x) => (x.avoid === r.entry || x.avoid === r.owner) && !s.exclude.includes(x.use));
   if (skip) r = route({ task_type: st.task_type, requester: s.request.requester, exclude: [...s.exclude, skip.avoid], prefer: skip.use });
-  if (hint && (hint.prefer || skip)) {
+  const applied = Boolean((hint?.prefer && !s.prefer) || skip);
+  if (hint && applied) {
     ev(s, "darwin_hint", { rule_ids: hint.rule_ids, prefer: hint.prefer, skip, reason: hint.reason });
     await tell(s, `Routing to ${nameOf(r.entry ?? r.owner ?? "")} directly (Darwin: ${hint.reason})`);
   }

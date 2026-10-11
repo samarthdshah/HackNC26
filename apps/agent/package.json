@@ -11,7 +11,8 @@
     "voice:test": "tsx scripts/voice-test.ts",
     "typecheck": "tsc --noEmit -p .",
     "sim": "tsx scripts/sim.ts",
-    "tiger:test": "tsx scripts/tiger-test.ts"
+    "tiger:test": "tsx scripts/tiger-test.ts",
+    "darwin:test": "tsx scripts/darwin-test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.28.0",

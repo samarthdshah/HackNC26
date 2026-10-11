@@ -19,6 +19,16 @@ export function required(name: string): string {
   return value;
 }
 
+/** The owner's password when TIGER_DATABASE_URL is the owner's own connection string. */
+function ownerFromUrl(raw: string): string {
+  try {
+    const u = new URL(raw);
+    return u.username === "tsdbadmin" ? decodeURIComponent(u.password) : "";
+  } catch {
+    return "";
+  }
+}
+
 export const env = {
   gemini: {
     apiKey: optional("GEMINI_API_KEY"),
@@ -78,8 +88,12 @@ export const env = {
   port: Number(optional("AGENT_PORT", "8787")),
   corsOrigin: optional("AGENT_CORS_ORIGIN", "*"),
   tiger: {
-    url: optional("TIGER_DATABASE_URL"),
-    password: optional("TIGER_PASSWORD"),
+    url: optional("TIGER_DATABASE_URL"), // host and database; the user comes from below
+    // Lane A's own login (data/tiger/SCHEMA.md). TIGER_PASSWORD keeps the URL's user instead.
+    user: optional("TIGER_AGENT_PASSWORD") ? "wayfinder_agent" : "",
+    password: optional("TIGER_AGENT_PASSWORD") || optional("TIGER_PASSWORD"),
+    // Owner login, only for scripts/tiger-test.ts (inspect and clean up test rows)
+    ownerPassword: optional("TIGER_OWNER_PASSWORD") || ownerFromUrl(optional("TIGER_DATABASE_URL")),
     // Only if your network intercepts TLS and certificate verification fails
     insecureTls: optional("TIGER_TLS_INSECURE") === "1",
   },

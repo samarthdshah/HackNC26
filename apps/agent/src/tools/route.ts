@@ -5,7 +5,7 @@
 import type { ToolIO } from "@wayfinder/shared";
 import { getDepartment, getPerson } from "../data/fixtures.ts";
 import { isTeam } from "../org/entities.ts";
-import { edgesFrom } from "../org/map.ts";
+import { allEdges, edgesFrom, isActive } from "../org/map.ts";
 
 type In = ToolIO["route"]["input"];
 type Out = ToolIO["route"]["output"];
@@ -14,6 +14,15 @@ type Out = ToolIO["route"]["output"];
 function personInTeam(team: string, taskType: string, exclude: Set<string>): string | undefined {
   const viaEdge = edgesFrom(team, taskType).find((e) => !exclude.has(e.to));
   if (viaEdge) return viaEdge.to;
+  // An incident landing on a team that has no route for this kind (e.g. a checkout
+  // incident paged to Platform) goes to whoever takes that team's incidents: the
+  // on-call (POL-INC-1/2), not the department head.
+  if (taskType.endsWith("_incident")) {
+    const onCall = allEdges()
+      .filter((e) => e.from === team && e.task_type.endsWith("_incident") && isActive(e) && !exclude.has(e.to))
+      .sort((x, y) => y.confidence - x.confidence)[0];
+    if (onCall) return onCall.to;
+  }
   const head = getDepartment(team)?.head_id;
   return head && !exclude.has(head) ? head : undefined;
 }

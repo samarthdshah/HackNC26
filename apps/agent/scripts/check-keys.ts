@@ -50,13 +50,29 @@ const checks: [string, () => Promise<string>][] = [
     },
   ],
   [
+    "Darwin",
+    async () => {
+      if (!env.darwinUrl) throw new Error("DARWIN_URL not set (optional: agent routes without hints)");
+      const get = async (p: string) => {
+        const res = await fetch(new URL(p, env.darwinUrl), { signal: AbortSignal.timeout(3000) });
+        if (!res.ok) throw new Error(`${p} ${res.status}`);
+        return res.json() as Promise<Record<string, unknown>>;
+      };
+      const health = await get("/health");
+      if (health.ok !== true) throw new Error(`/health not ok (tiger=${health.tiger})`);
+      const hint = await get("/route-hint?task_type=checkout_incident");
+      const approved = (hint.rule_ids as string[]).length > 0;
+      return `${health.requests} requests replayed · checkout rule ${approved ? "approved ✓" : "NOT approved (approvals reset on restart)"}`;
+    },
+  ],
+  [
     "Tiger Data",
     async () => {
       if (!tigerConfigured()) throw new Error("TIGER_DATABASE_URL and TIGER_PASSWORD needed");
       const ok = await tigerReady();
       await closeTiger();
       if (!ok) throw new Error("not reachable, or Lane C's tables are missing (see warning above)");
-      return "events, org_edges, org_edge_changes ready (requests and hops come from C's trigger)";
+      return `as ${env.tiger.user || "URL user"} · events, org_edges, org_edge_changes ready`;
     },
   ],
   [

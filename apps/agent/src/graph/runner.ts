@@ -13,10 +13,13 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Command, INTERRUPT, isInterrupted } from "@langchain/langgraph";
+import { AsyncLocalStorageProviderSingleton } from "@langchain/core/singletons";
 import { SqliteSaver } from "@langchain/langgraph-checkpoint-sqlite";
 import type { StepResult } from "@wayfinder/shared";
 import { env } from "../env.ts";
+import { isAiUnavailable } from "../brain/gemini.ts";
 import { emit } from "../events.ts";
+import { sendTo } from "../messenger.ts";
 import { buildApprovalAgent } from "./agents/approval.ts";
 import { buildHumanAgent } from "./agents/human.ts";
 import { buildRoomAgent } from "./agents/room.ts";
@@ -53,6 +56,10 @@ interface Thread {
   parent?: string;
   stepId?: string;
   done?: boolean;
+  /** Stopped because the AI was unavailable; continues on retryFailed() or restart. */
+  failed?: string;
+  /** First input, to start over if a retry finds no checkpoint. */
+  input?: unknown;
 }
 
 type PausedInfo = Exclude<Waiting, { kind: "agents" }> & { since: number };
@@ -63,13 +70,16 @@ interface Paused extends PausedInfo {
 }
 
 const threads = new Map<string, Thread>();
+const aiNotified = new Set<string>(); // requests already told about an AI outage
 const paused = new Map<string, Paused>();
 const queues = new Map<string, Promise<unknown>>();
 const requests = new Map<string, Request>();
 let token = 0;
 let seq = 0;
 
-const config = (threadId: string) => ({ configurable: { thread_id: threadId }, recursionLimit: 200 });
+// "sync": every step is checkpointed before the next starts, so a crash or outage
+// mid-run can always continue from where it stopped.
+const config = (threadId: string) => ({ configurable: { thread_id: threadId }, recursionLimit: 200, durability: "sync" as const });
 
 // ── registry persistence ───────────────────────────────────────────────────
 
@@ -100,11 +110,10 @@ export async function restore(): Promise<{ requests: number; waiting: number; re
   let resumed = 0;
   for (const [id, t] of threads) {
     if (t.done || paused.has(id)) continue;
-    const snap = await graphs[t.graph].getState(config(id));
-    const parked = snap.tasks.some((task) => task.interrupts.length > 0);
-    if (!parked && snap.next.length > 0) {
+    delete t.failed; // a restart is a retry
+    if ((await continuation(id)) !== "none") {
       resumed++;
-      void enqueue(id, () => run(id, null));
+      void enqueue(id, () => continueThread(id));
     }
   }
   return { requests: requests.size, waiting: paused.size, resumed };
@@ -112,9 +121,17 @@ export async function restore(): Promise<{ requests: number; waiting: number; re
 
 // ── running threads ────────────────────────────────────────────────────────
 
+/**
+ * Run outside any graph's async context. Commands like /retry and /status execute
+ * inside a supervisor node; without this, LangGraph would treat the threads they
+ * touch as subgraphs of that node (wrong checkpoint namespace, "no input writes").
+ */
+const outside = <T>(fn: () => T): T => AsyncLocalStorageProviderSingleton.getInstance().run(undefined, fn);
+
 /** Serialize runs per thread so two inputs can't resume the same thread at once. */
 function enqueue(threadId: string, job: () => Promise<void>): Promise<void> {
-  const next = (queues.get(threadId) ?? Promise.resolve()).then(job, job);
+  const detached = () => outside(job);
+  const next = (queues.get(threadId) ?? Promise.resolve()).then(detached, detached);
   queues.set(threadId, next.catch(() => {}));
   return next;
 }
@@ -128,9 +145,22 @@ async function run(threadId: string, input: unknown): Promise<void> {
   try {
     out = await graph.invoke(input, config(threadId));
   } catch (err) {
-    console.error(`[runner] ${threadId} failed`, err);
-    emit("error", "agent", { thread: threadId, message: err instanceof Error ? err.message : String(err) }, { request_id: thread.requestId });
-    if (thread.parent) finishAgent(thread, { status: "failed", summary: `Agent crashed: ${err instanceof Error ? err.message : err}` });
+    const message = err instanceof Error ? err.message : String(err);
+    emit("error", "agent", { thread: threadId, message }, { request_id: thread.requestId });
+    if (isAiUnavailable(err)) {
+      // Don't fail the step (recovery would need the AI too): park it and say so once per request.
+      console.warn(`[runner] ${threadId} parked: ${message}`);
+      const first = !aiNotified.has(thread.requestId);
+      aiNotified.add(thread.requestId);
+      thread.failed = err.reason;
+      const requester = requests.get(thread.requestId)?.requester;
+      if (first && requester) {
+        await sendTo(requester, `⏸️ I've paused your request: ${err.reason}. It's saved, and I'll carry on once that's fixed (text /retry).`, thread.requestId).catch(() => {});
+      }
+    } else {
+      console.error(`[runner] ${threadId} failed`, err);
+      if (thread.parent) finishAgent(thread, { status: "failed", summary: `Agent crashed: ${message}` });
+    }
     save();
     return;
   }
@@ -152,7 +182,7 @@ async function run(threadId: string, input: unknown): Promise<void> {
 function spawnAgent(parent: string, requestId: string, { request, step, briefing }: Launch) {
   const threadId = `${parent}/${step.id}${step.attempts ? `#${step.attempts}` : ""}`;
   if (threads.has(threadId)) return;
-  threads.set(threadId, { graph: step.kind, requestId, parent, stepId: step.id });
+  threads.set(threadId, { graph: step.kind, requestId, parent, stepId: step.id, input: { request, step, briefing } });
   requests.set(requestId, request); // now carries the orchestrator's title / task type
   emit("agent_spawned", "agent", { thread: threadId, agent: step.kind, step: step.id }, { request_id: requestId });
   void enqueue(threadId, () => run(threadId, { request, step, briefing }));
@@ -196,9 +226,38 @@ export function startRequest(requester: string, goal: string): Promise<string> {
   const id = `req_live_${Date.now().toString(36)}${(++seq).toString(36)}`;
   const request: Request = { id, requester, goal };
   requests.set(id, request);
-  threads.set(id, { graph: "orchestrator", requestId: id });
+  threads.set(id, { graph: "orchestrator", requestId: id, input: { request } });
   save();
   return enqueue(id, () => run(id, { request })).then(() => id);
+}
+
+/** Continue every thread parked by an AI outage from its last checkpoint. */
+export function retryFailed(): number {
+  const ids = [...threads].filter(([, t]) => t.failed && !t.done).map(([id]) => id);
+  for (const id of ids) {
+    delete threads.get(id)!.failed;
+    void enqueue(id, () => continueThread(id));
+  }
+  save();
+  return ids.length;
+}
+
+/** Resume from the last checkpoint, or start over from the first input if there is none. */
+async function continueThread(id: string) {
+  const t = threads.get(id)!;
+  const how = await continuation(id);
+  if (how === "resume") await run(id, null);
+  else if (how === "start") await run(id, t.input);
+}
+
+/** "resume" mid-run, "start" never checkpointed, "none" finished or parked on an interrupt. */
+async function continuation(id: string): Promise<"resume" | "start" | "none"> {
+  const t = threads.get(id)!;
+  const snap = await graphs[t.graph].getState(config(id));
+  // No checkpoint, or only LangGraph's input checkpoint (next = __start__): give it the input again.
+  if (!snap.config?.configurable?.checkpoint_id || snap.next.includes("__start__")) return t.input ? "start" : "none";
+  if (snap.tasks.some((task) => task.interrupts.length > 0)) return "none";
+  return snap.next.length > 0 ? "resume" : "none";
 }
 
 export function resume(threadId: string, payload: Resume): Promise<void> {
@@ -229,7 +288,7 @@ export async function idle(): Promise<void> {
 export const settle = (ms: number) => Promise.race([idle(), new Promise((r) => setTimeout(r, ms))]);
 
 export async function snapshot(requestId: string): Promise<OState | undefined> {
-  const snap = await graphs.orchestrator.getState(config(requestId));
+  const snap = await outside(() => graphs.orchestrator.getState(config(requestId)));
   return snap?.values as OState | undefined;
 }
 

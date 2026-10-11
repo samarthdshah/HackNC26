@@ -26,6 +26,7 @@ import { describePerson, nameOf, resolveEntity } from "../org/entities.ts";
 import { allEdges, resetMap } from "../org/map.ts";
 import { tts } from "../voice/elevenlabs.ts";
 import { resetHops } from "./hops.ts";
+import { retryFailed } from "./runner.ts";
 import { allPaused, listRequests, resetRunner, resume, settle, snapshot, startRequest, waitingOn } from "./runner.ts";
 
 const last = <T>(fallback: T) => Annotation<T>({ reducer: (_, next) => next, default: () => fallback });
@@ -43,7 +44,7 @@ type Handoff = { type: "start"; goal: string } | { type: "resume"; threadId: str
 type S = typeof SupervisorState.State;
 type Ctx = LangGraphRunnableConfig<{ space?: Space }>;
 
-const HELP = `Commands: /iam <name> · /as <name> (terminal) · /status · /briefing · /map <task_type> · /warroom · /voice <text> · /who <name> · /whoami · /reset`;
+const HELP = `Commands: /iam <name> · /as <name> (terminal) · /status · /briefing · /retry · /map <task_type> · /warroom · /voice <text> · /who <name> · /whoami · /reset`;
 
 // ── identify ───────────────────────────────────────────────────────────────
 
@@ -111,6 +112,10 @@ async function command(s: S, config: Ctx): Promise<Partial<S>> {
       const audio = await tts(arg || `Hi, this is Wayfinder for ${company.name}. Voice is working.`);
       await space.send(voice(audio, { mimeType: "audio/mpeg", name: "wayfinder.mp3" }));
       return {};
+    }
+    case "/retry": {
+      const n = retryFailed();
+      return { reply: n ? `Retrying ${n} paused step(s)…` : "Nothing is paused." };
     }
     case "/reset":
       resetRunner();

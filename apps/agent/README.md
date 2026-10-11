@@ -18,7 +18,8 @@ Agent server: Photon Spectrum, multi-agent LangGraph orchestration on Gemini, ap
 | `npm run terminal` | Terminal chat only (tuichat downloads on first run). No phone needed |
 | `npm run sim` | Scripted demo flows through the real graphs and Gemini, no Spectrum. `npm run sim -- "welcome lunch"` runs one. |
 | `npm run voice:test -- "text"` | Sends an ElevenLabs voice note to `DEMO_PHONE` over iMessage |
-| `npm run tiger:test` | One live request through C's events trigger: prints the derived request, hops and edge history, then cleans up (owner login; `-- --keep` leaves the rows for Insights) |
+| `npm run tiger:test` | One live request through C's events trigger: prints the derived request, hops and edge history, then cleans up. Needs the owner login: `TIGER_DATABASE_URL` as `tsdbadmin` with its password, or `TIGER_OWNER_PASSWORD` (`-- --keep` leaves the rows for Insights) |
+| `npm run darwin:test` | Checkout incident with Darwin's approved rule: expects "Routing to Platform Engineering directly (Darwin: …)" and the ask to Aisha |
 | HTTP | `GET /live` (SSE of shared `LiveUpdate`s) and `GET /health` on `AGENT_PORT` (8787) for the website |
 
 ## Playing the cast
@@ -29,7 +30,7 @@ Each phone or terminal is bound to one person from the fixtures:
 - In the terminal: `/as leo`, send a request, then `/as raj` to answer as Raj. Messages to people who aren't bound to a phone show up in the terminal as `→ Name: …`.
 - In a group chat: `/warroom` makes it the live status channel.
 
-Other commands: `/briefing` (voice rundown), `/status`, `/map data_access`, `/who priya`, `/whoami`, `/voice <text>`, `/reset`, `/help`.
+Other commands: `/retry` (continue requests paused by an AI outage), `/briefing` (voice rundown), `/status`, `/map data_access`, `/who priya`, `/whoami`, `/voice <text>`, `/reset`, `/help`.
 
 ## Orchestration (multi-agent, LangGraph)
 
@@ -62,7 +63,11 @@ SPECIALIST AGENTS (each its own graph + thread, briefed with every upstream resu
 - **Briefings:** each agent gets the results of everything upstream. The approval agent reprices from the RSVP headcount, the voice agent orders the right quantity, and the treasury agent pays against the approved amount.
 - **Guardrails:** the treasury agent's ceiling is fixed before the model runs, and its tools enforce it again. They refuse unapproved vendors and unsupported rails, and they're idempotent per step (`logs/payments.json`). A denial is never retried, and a failure gets at most one retry.
 - **Runner** (`src/graph/runner.ts`): spawns agents outside any graph run (from the orchestrator's interrupt payload), feeds their results back, cancels leftover agents when a request ends, and indexes every paused thread by the people it waits on.
-- **Darwin:** with `DARWIN_URL` set, the human agent's first route asks `GET /route-hint` and follows *approved* rules only (`prefer`, and `redirects` when the route lands on `avoid`), telling the requester why.
+- **Darwin** (Lane C, `services/darwin`): before every route the human agent asks `GET $DARWIN_URL/route-hint?task_type=…` and follows *approved* rules only: `prefer` replaces the first route, and `redirects` (`{avoid, use}`) apply whenever the route lands on `avoid`. A person's explicit redirect or an escalation outranks Darwin. If Darwin is down, routing is unchanged. `npm run darwin:test` checks it (real Darwin when it answers, otherwise a stand-in with the replies C verified).
+  - One-time setup: `cd services/darwin && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`. Start: `.venv/bin/python app.py` (needs `TIGER_DATABASE_URL` and `TIGER_WEB_PASSWORD`; serves `http://localhost:8100` on that machine only).
+  - Rules evolve at startup; list them with `GET /runs/latest` (no `POST /evolve` needed). Approve: `curl -X POST "http://localhost:8100/rules/entry:checkout_incident:dept_platform/approve"` (quote URLs with `>`). **Approvals reset when Darwin restarts.** `data_access` never gets a hint.
+- **Incidents:** an incident routed to a team with no route for that kind goes to the team's on-call (e.g. checkout incident → Platform → Aisha), per POL-INC-1/2.
+- **AI outages:** Gemini calls retry transient errors; with no credits or a rejected key, affected steps are parked (requester told once) and continue on `/retry` or the next start. Checkpoints are written synchronously, so nothing is lost.
 - **Hops:** `src/graph/hops.ts` emits one `hop` event when the person holding a request acts on it (`bounced`, `delegated`, `forwarded` for approvals and escalations, `handled`), numbered per request across parallel agents. C's trigger turns them into `request_hops`.
 - **Exactly-once sends:** `await_*` nodes only pause, because LangGraph re-runs a paused node on resume.
 - Threads are checkpointed to SQLite (`logs/checkpoints.sqlite`) and restored at startup. The org map, identities, payments and vendor wallets persist in `logs/` (the map also in Tiger).
@@ -86,7 +91,7 @@ With `ELEVENLABS_AGENT_ID`, `ELEVENLABS_PHONE_NUMBER_ID` and `VENDOR_PHONE` set,
 |---|---|
 | **Snowflake** `PHOTON.ORG` | Runs as the `WAYFINDER_AGENT` service user (`SNOWFLAKE_AGENT_PAT`) and names a role on every statement. At startup: directory, budgets, vendors, policies, rooms as `PHOTON_FINANCE`; `person_roles` and `resolution_by_task_type` (typical hours and hops per task type, shown in plan messages) as `PHOTON_APP`. Falls back to `data/fixtures` and says so |
 | Snowflake, per person | `new_hire_setup_metrics` (`VP_NEW_HIRE_SETUP`) and `request_history` (`requests`) run **as the asker's tier role**. Dana (PHOTON_VP) gets the numbers; Leo (PHOTON_EMPLOYEE) is refused by Snowflake, and the agent relays that without hinting at the data |
-| **Tiger Data** (contract: `data/tiger/SCHEMA.md`) | Login `wayfinder_agent`. Inserts every event; C's `events_derive` trigger turns `request_created`, `hop` and `request_resolved/_denied/_stuck` into `requests` and `request_hops`, which Insights and Darwin read. Map changes upsert `org_edges` and add an `org_edge_changes` row (previous confidence, reason, request) in one transaction. Reads and releases `bookings`. The agent adopts `org_edges` at startup; `/reset` zeroes learned edges and restores chart confidences (it can't delete; a full wipe is C's `tiger:seed`). Sims and tests set `TIGER_DISABLED=1` |
+| **Tiger Data** (contract: `data/tiger/SCHEMA.md`) | Login `wayfinder_agent` (`TIGER_AGENT_PASSWORD`; host and database from `TIGER_DATABASE_URL`). Inserts every event; C's `events_derive` trigger turns `request_created`, `hop` and `request_resolved/_denied/_stuck` into `requests` and `request_hops`, which Insights and Darwin read. Map changes upsert `org_edges` and add an `org_edge_changes` row (previous confidence, reason, request) in one transaction. Reads and releases `bookings`. The agent adopts `org_edges` at startup; `/reset` zeroes learned edges and restores chart confidences (it can't delete; a full wipe is C's `tiger:seed`). Sims and tests set `TIGER_DISABLED=1` |
 | **SQLite** `logs/checkpoints.sqlite` | LangGraph checkpoints for every thread, plus `logs/runner.json` for the runner's registry. `restore()` at startup re-arms reminders and continues interrupted runs, so a restart mid-demo loses nothing (`scripts/restart-test.ts` proves it) |
 
 HR task types (benefits, leave, employee relations) never go to the war room.

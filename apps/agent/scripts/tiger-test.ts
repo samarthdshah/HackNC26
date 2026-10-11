@@ -20,6 +20,12 @@ const tiger = await import("../src/data/tiger.ts");
 const pg = (await import("pg")).default;
 const { env } = await import("../src/env.ts");
 
+// Reading requests/hops and deleting test rows needs the owner; wayfinder_agent can do neither,
+// and leaving test rows behind would skew the team's Insights. So no owner, no test.
+if (!env.tiger.ownerPassword) {
+  console.error("Needs the owner login: put tsdbadmin's password in TIGER_DATABASE_URL or TIGER_OWNER_PASSWORD; it reads and cleans up.");
+  process.exit(1);
+}
 if (!(await tiger.tigerReady())) {
   console.error("Tiger is not ready (see warning above).");
   process.exit(1);
@@ -43,7 +49,8 @@ await tiger.tigerFlushed();
 const id = listRequests().at(-1)!.id;
 const url = new URL(env.tiger.url);
 url.searchParams.delete("sslmode");
-url.password = encodeURIComponent(env.tiger.password);
+url.username = "tsdbadmin";
+url.password = encodeURIComponent(env.tiger.ownerPassword);
 const db = new pg.Client({ connectionString: url.toString(), ssl: { rejectUnauthorized: !env.tiger.insecureTls } });
 await db.connect();
 const show = async (label: string, sql: string) => console.log(`\n${label}`, (await db.query(sql, [id])).rows);

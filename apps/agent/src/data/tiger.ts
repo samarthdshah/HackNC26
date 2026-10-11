@@ -31,6 +31,7 @@ function getPool(): pg.Pool {
   if (pool) return pool;
   const url = new URL(env.tiger.url);
   url.searchParams.delete("sslmode"); // TLS is configured below
+  if (env.tiger.user) url.username = env.tiger.user;
   // pg lets the connection string override a separate `password` option, so it goes in the URL.
   if (env.tiger.password) url.password = encodeURIComponent(env.tiger.password);
   pool = new pg.Pool({

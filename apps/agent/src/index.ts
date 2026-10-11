@@ -3,6 +3,7 @@
 
 import type { Message, Space } from "spectrum-ts";
 import { scheduleBriefings } from "./brain/briefing.ts";
+import { isAiUnavailable } from "./brain/gemini.ts";
 import { env } from "./env.ts";
 import { emit } from "./events.ts";
 import { loadOrgData } from "./data/org.ts";
@@ -62,6 +63,9 @@ for await (const [space, message] of app.messages) {
     .catch(async (err: unknown) => {
       console.error("[agent] handler failed", err);
       emit("error", "agent", { message: String(err) });
-      await message.reply("Something went wrong on my end, try again in a sec.").catch(() => {});
+      const text = isAiUnavailable(err)
+        ? `I can't think right now: ${err.reason}. Commands like /status still work; try again once that's fixed.`
+        : "Something went wrong on my end, try again in a sec.";
+      await message.reply(text).catch(() => {});
     });
 }
