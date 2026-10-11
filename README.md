@@ -59,10 +59,6 @@ Together they save 217.2 hours (7.3%), 16 hops, and 12 bounces in replay. A brut
 - Two kinds of learning that don't clash. The agent learns from single replies. Darwin learns from all past requests.
 - Limits on money. The payment agent's cap is set before the model runs, and each step can pay once.
 
-## What we learned
-
-[Team: one or two lines each]
-
 ## What's next
 
 - Ask both people before an intro.
