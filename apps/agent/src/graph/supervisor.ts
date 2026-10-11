@@ -20,13 +20,13 @@ import { sendBriefing } from "../brain/briefing.ts";
 import { ask, askJson } from "../brain/gemini.ts";
 import { company, getPerson } from "../data/fixtures.ts";
 import { emit } from "../events.ts";
-import { setWarRoom } from "../messenger.ts";
+import { sendTo, setWarRoom } from "../messenger.ts";
 import { bind, personFor, type Handle } from "../org/directory.ts";
 import { describePerson, nameOf, resolveEntity } from "../org/entities.ts";
 import { allEdges, resetMap } from "../org/map.ts";
 import { tts } from "../voice/elevenlabs.ts";
 import { resetHops } from "./hops.ts";
-import { retryFailed } from "./runner.ts";
+import { requestOf, retryFailed } from "./runner.ts";
 import { allPaused, listRequests, resetRunner, resume, settle, snapshot, startRequest, waitingOn } from "./runner.ts";
 
 const last = <T>(fallback: T) => Annotation<T>({ reducer: (_, next) => next, default: () => fallback });
@@ -49,7 +49,8 @@ const HELP = `Commands: /iam <name> · /as <name> (terminal) · /status · /brie
 // ── identify ───────────────────────────────────────────────────────────────
 
 function identify(s: S): Command {
-  const person = personFor(s.handle);
+  // The website passes the person it speaks as; it never binds a handle (that would steal a phone's persona).
+  const person = s.person ?? personFor(s.handle);
   if (s.text.startsWith("/")) return new Command({ update: { person }, goto: "command" });
   if (!person) return new Command({ goto: "unknown_sender" });
   emit("message_in", person, { text: s.text, platform: s.handle.platform });
@@ -235,13 +236,53 @@ export const supervisor = new StateGraph(SupervisorState)
   .addEdge("chat", END)
   .compile({ name: "supervisor" });
 
+/** Run a coordinator hand-off the supervisor decided on. */
+async function dispatch(person: string, h: Handoff | undefined, platform: string): Promise<void> {
+  // The coordinator texts the requester itself, so hand-offs need no direct reply.
+  if (h?.type === "start") await startRequest(person, h.goal);
+  if (h?.type === "resume") {
+    // message_in has no request; this ties the reply to the request it answers (Currents shows it).
+    emit("reply_in", person, { text: h.text, platform }, { request_id: requestOf(h.threadId) });
+    await resume(h.threadId, { type: "reply", from: person, text: h.text });
+  }
+}
+
 /** Handle one inbound text; returns the direct reply to send back, if any. */
 export async function handleInbound(handle: Handle, text: string, space?: Space): Promise<string | undefined> {
   const out = await supervisor.invoke({ handle, text }, { configurable: { space } });
-  const h = out.handoff;
-  // The coordinator texts the requester itself, so hand-offs need no direct reply.
-  if (h?.type === "start") await startRequest(out.person!, h.goal);
-  if (h?.type === "resume") await resume(h.threadId, { type: "reply", from: out.person!, text: h.text });
+  await dispatch(out.person!, out.handoff, handle.platform);
   return out.reply;
+}
+
+/**
+ * The website speaking as a person (POST /say), as if they had texted. With a request id,
+ * a reply this person owes that request resumes it directly. Hand-offs run in the background:
+ * the browser sees them as live events. Returns as soon as the route is decided.
+ */
+export async function handleAs(
+  person: string,
+  text: string,
+  opts: { requestId?: string; mirror?: boolean } = {},
+): Promise<{ route: "resume" | "start" | "reply" | "none"; request_id?: string; reply?: string }> {
+  const handle: Handle = { platform: "web", id: person };
+  const background = (h: Handoff) => void dispatch(person, h, "web").catch((err) => console.error(`[web] ${err}`));
+
+  const owed = opts.requestId && waitingOn(person).find((p) => requestOf(p.threadId) === opts.requestId);
+  if (owed) {
+    emit("message_in", person, { text, platform: "web" }, { request_id: opts.requestId });
+    background({ type: "resume", threadId: owed.threadId, text });
+    return { route: "resume", request_id: opts.requestId };
+  }
+
+  const out = await supervisor.invoke({ handle, text, person });
+  const h = out.handoff;
+  if (h) {
+    background(h);
+    return h.type === "resume" ? { route: "resume", request_id: requestOf(h.threadId) } : { route: "start" };
+  }
+  if (!out.reply) return { route: "none" };
+  emit("message_out", "agent", { to: person, text: out.reply, platform: "web" }, { request_id: opts.requestId });
+  if (opts.mirror) await sendTo(person, out.reply, opts.requestId);
+  return { route: "reply", reply: out.reply, request_id: opts.requestId };
 }
 

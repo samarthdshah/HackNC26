@@ -7,7 +7,7 @@
 // idempotent per step so a retry can never pay twice.
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { logFile } from "../../logs.ts";
 import { Annotation, Command, END, START, StateGraph } from "@langchain/langgraph";
 import type { ToolIO } from "@wayfinder/shared";
 import { z } from "zod";
@@ -32,7 +32,7 @@ const TreasuryState = Annotation.Root({
 type S = typeof TreasuryState.State;
 
 // Idempotency: one payment per request step, ever.
-const paidFile = fileURLToPath(new URL("../../../logs/payments.json", import.meta.url));
+const paidFile = logFile("payments.json");
 const paid: Record<string, Payment> = existsSync(paidFile) ? JSON.parse(readFileSync(paidFile, "utf8")) : {};
 const record = (key: string, p: Payment) => {
   paid[key] = p;

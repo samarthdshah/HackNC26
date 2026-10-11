@@ -4,7 +4,7 @@
 // When Nessie is unreachable, writes go to a local ledger and say so (simulated: true).
 
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { logFile } from "../logs.ts";
 import { budgets, company, departments } from "../data/fixtures.ts";
 import { env, required } from "../env.ts";
 
@@ -41,8 +41,8 @@ export const listAccounts = () => nessie<NessieAccount[]>("/accounts");
 
 // ── department accounts ─────────────────────────────────────────────────────
 
-const stateFile = fileURLToPath(new URL("../../logs/nessie.json", import.meta.url));
-const ledgerFile = fileURLToPath(new URL("../../logs/ledger.jsonl", import.meta.url));
+const stateFile = logFile("nessie.json");
+const ledgerFile = logFile("ledger.jsonl");
 type Ids = { customer?: string; accounts: Record<string, string> };
 let ids: Ids = existsSync(stateFile) ? JSON.parse(readFileSync(stateFile, "utf8")) : { accounts: {} };
 

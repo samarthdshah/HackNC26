@@ -3,7 +3,7 @@
 // Demo pricing: SOLANA_SOL_PER_USD converts invoice dollars into a small SOL amount.
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { logFile } from "../logs.ts";
 import {
   address,
   createClient,
@@ -44,7 +44,7 @@ export async function balanceSol(): Promise<number> {
 }
 
 // Fictional vendors get a stable devnet address each (we only keep the public key).
-const walletsFile = fileURLToPath(new URL("../../logs/vendor-wallets.json", import.meta.url));
+const walletsFile = logFile("vendor-wallets.json");
 const vendorWallets: Record<string, string> = existsSync(walletsFile) ? JSON.parse(readFileSync(walletsFile, "utf8")) : {};
 
 export async function vendorAddress(vendorId: string): Promise<Address> {

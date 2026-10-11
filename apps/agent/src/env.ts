@@ -87,6 +87,8 @@ export const env = {
   // GET /live (SSE) and /health for the website (Lane B)
   port: Number(optional("AGENT_PORT", "8787")),
   corsOrigin: optional("AGENT_CORS_ORIGIN", "*"),
+  /** Bearer token the website sends on POST /say and /intro. Unset: only localhost may call them. */
+  webToken: optional("AGENT_WEB_TOKEN", ""),
   tiger: {
     url: optional("TIGER_DATABASE_URL"), // host and database; the user comes from below
     // Lane A's own login (data/tiger/SCHEMA.md). TIGER_PASSWORD keeps the URL's user instead.
