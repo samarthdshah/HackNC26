@@ -28,7 +28,11 @@ const VP_QUESTION = `
   SELECT ROUND(AVG(DATEDIFF('second', created_at, resolved_at)) / 86400, 2), ROUND(AVG(hop_count), 2)
   FROM (SELECT * FROM requests WHERE task_type = 'onboarding' AND status = 'resolved' ORDER BY created_at DESC LIMIT 10)`;
 
-type Test = { name: string; role: string; sql: string; expect: string; check: (r: SqlResult) => boolean };
+// role undefined = no role in the request body (the user's default role). agentOnly: runs only under --agent-pat.
+// knownRisk: a failure is reported as KNOWN RISK (see SCHEMA.md) and does not fail the run.
+type Test = {
+  name: string; role?: string; sql: string; expect: string; check: (r: SqlResult) => boolean; agentOnly?: boolean; knownRisk?: boolean;
+};
 
 const refused = (r: SqlResult) => !r.ok && r.code === "002003";
 const firstCell = (r: SqlResult) => (r.ok ? r.rows[0]?.[0] : undefined);
@@ -167,6 +171,17 @@ const TESTS: Test[] = [
       JSON.parse(r.rows[0][2] ?? "{}").roles === "" &&
       r.rows[0][3] === "false",
   })),
+  // Wanted fail safe: with no role in the body, WAYFINDER_AGENT should not get PHOTON_APP. Known risk: the PAT's
+  // PHOTON_APP role restriction overrides DEFAULT_ROLE, so today these run as PHOTON_APP. Lane A must always send a role.
+  {
+    name: "no-role session: role, secondary roles, PHOTON_HR in session",
+    sql: "SELECT CURRENT_ROLE(), CURRENT_SECONDARY_ROLES(), IS_ROLE_IN_SESSION('PHOTON_HR')",
+    expect: "PHOTON_EMPLOYEE, none, false",
+    check: (r) => r.ok && r.rows[0][0] === "PHOTON_EMPLOYEE" && JSON.parse(r.rows[0][1] ?? "{}").roles === "" && r.rows[0][2] === "false",
+    agentOnly: true,
+    knownRisk: true,
+  },
+  { name: "no-role SELECT on requests", sql: "SELECT COUNT(*) FROM requests", expect: "refused", check: refused, agentOnly: true, knownRisk: true },
   {
     name: "WAYFINDER_AGENT granted roles",
     role: "ACCOUNTADMIN",
@@ -186,10 +201,13 @@ function describe(r: SqlResult): string {
 }
 
 const results: [string, string, string, string, boolean][] = [];
+const risks = new Set<string>();
 // The agent PAT cannot use ACCOUNTADMIN, so admin-only checks run under the owner PAT only.
-for (const t of TESTS.filter((t) => !(AGENT_PAT && t.role === "ACCOUNTADMIN"))) {
+for (const t of TESTS.filter((t) => (AGENT_PAT ? t.role !== "ACCOUNTADMIN" : !t.agentOnly))) {
   const r = await runSql(t.sql, { ...ctx, role: t.role });
-  results.push([t.name, t.role, t.expect, describe(r), t.check(r)]);
+  const pass = t.check(r);
+  if (!pass && t.knownRisk) risks.add(t.name);
+  results.push([t.name, t.role ?? "(none)", t.expect, describe(r), pass || !!t.knownRisk]);
 }
 
 // person_roles: every person must map to exactly the approved role.
@@ -206,11 +224,14 @@ results.push(["person_roles matches approved mapping", "PHOTON_APP", `${expected
 
 console.log(`PAT: ${AGENT_PAT ? "SNOWFLAKE_AGENT_PAT" : "SNOWFLAKE_PAT"}`);
 console.log("| Test | Role | Expected | Actual | Result |\n|---|---|---|---|---|");
-for (const [name, role, expect, actual, pass] of results) console.log(`| ${name} | ${role} | ${expect} | ${actual} | ${pass ? "PASS" : "FAIL"} |`);
+for (const [name, role, expect, actual, pass] of results) {
+  console.log(`| ${name} | ${role} | ${expect} | ${actual} | ${risks.has(name) ? "KNOWN RISK" : pass ? "PASS" : "FAIL"} |`);
+}
 for (const m of mismatches) console.log(`  mismatch: ${m}`);
 // Report only: what a statement with no role in the request body runs as (the user's default role).
 const bare = await runSql("SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_SECONDARY_ROLES(), IS_ROLE_IN_SESSION('PHOTON_HR')", { ...ctx, role: undefined });
 console.log(`No role in request body: ${bare.ok ? bare.rows[0].join(", ") : `refused (${bare.code}) ${bare.message.slice(0, 80)}`}`);
 const failed = results.filter((r) => !r[4]).length;
-console.log(failed ? `${failed} of ${results.length} FAILED` : `All ${results.length} passed.`);
+const passed = results.length - failed - risks.size;
+console.log(failed ? `${failed} of ${results.length} FAILED` : `${passed} of ${results.length} passed` + (risks.size ? `, ${risks.size} known risk (no-role statements run as PHOTON_APP)` : "."));
 process.exit(failed ? 1 : 0);

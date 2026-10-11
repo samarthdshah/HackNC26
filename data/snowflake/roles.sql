@@ -184,12 +184,15 @@ CREATE OR REPLACE SECURE VIEW resolution_by_task_type AS
 GRANT SELECT ON VIEW resolution_by_task_type TO ROLE PHOTON_APP;
 
 -- 8. Service user for lane A. No password; Lane C's owner creates its PAT in Snowsight.
---    DEFAULT_ROLE is PHOTON_APP; DEFAULT_SECONDARY_ROLES is left as is. Every tier role is also granted directly,
---    so lane A can name any of them as the SQL API "role" per statement.
+--    Every tier role is also granted directly, so lane A can name any of them as the SQL API "role" per statement.
+--    DEFAULT_ROLE stays PHOTON_APP and DEFAULT_SECONDARY_ROLES stays ('ALL') (the values before S4b step 3).
+--    Setting PHOTON_EMPLOYEE and () was tried: the PAT's PHOTON_APP role restriction overrides the default role, so a
+--    statement with no role still ran as PHOTON_APP. Known risk; see SCHEMA.md. Lane A must always send a role.
 CREATE USER IF NOT EXISTS WAYFINDER_AGENT TYPE = SERVICE COMMENT = 'Lane A agent server (Wayfinder OS)';
 ALTER USER WAYFINDER_AGENT SET
   TYPE = SERVICE
   DEFAULT_ROLE = PHOTON_APP
+  DEFAULT_SECONDARY_ROLES = ('ALL')
   DEFAULT_WAREHOUSE = {{WAREHOUSE}}
   DEFAULT_NAMESPACE = '{{DATABASE}}.{{SCHEMA}}'
   NETWORK_POLICY = hacknc_open;

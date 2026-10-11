@@ -301,7 +301,7 @@ The view returns no dates, so nothing needs `TO_VARCHAR`. Values at load:
 
 ## Access
 
-Defined in `roles.sql` and applied by `npm --prefix data run snowflake:roles` (as ACCOUNTADMIN; rerun after every `snowflake:load`). `npm --prefix data run snowflake:test-roles` checks the rules below with the owner PAT (35 checks). Add `-- --agent-pat` to send `SNOWFLAKE_AGENT_PAT` and run as WAYFINDER_AGENT (34 checks: the ACCOUNTADMIN grant check is skipped).
+Defined in `roles.sql` and applied by `npm --prefix data run snowflake:roles` (as ACCOUNTADMIN; rerun after every `snowflake:load`). `npm --prefix data run snowflake:test-roles` checks the rules below with the owner PAT (35 checks). Add `-- --agent-pat` to send `SNOWFLAKE_AGENT_PAT` and run as WAYFINDER_AGENT. That run has 36 checks: the ACCOUNTADMIN grant check is skipped, and two no-role checks are added. Today it reports 34 pass and 2 `KNOWN RISK`.
 
 Role hierarchy: `PHOTON_EMPLOYEE` → `PHOTON_MANAGER`, `PHOTON_FINANCE`, `PHOTON_HR`. `PHOTON_MANAGER` + `PHOTON_HR` → `PHOTON_HR_HEAD`. `PHOTON_MANAGER` + `PHOTON_FINANCE` → `PHOTON_VP`. All six → `PHOTON_APP` → `SYSADMIN`.
 
@@ -323,18 +323,18 @@ Policies: `hr_rows` (row access on `requests` and `request_hops` by `task_type`)
 |---|---|
 | `TYPE` | `SERVICE` (no password) |
 | Roles granted | `PHOTON_APP`, plus each tier role directly: `PHOTON_EMPLOYEE`, `PHOTON_MANAGER`, `PHOTON_FINANCE`, `PHOTON_HR`, `PHOTON_HR_HEAD`, `PHOTON_VP` |
-| `DEFAULT_ROLE` | `PHOTON_APP` |
-| `DEFAULT_SECONDARY_ROLES` | `["ALL"]` (Snowflake default; not changed) |
+| `DEFAULT_ROLE` | `PHOTON_APP`. `PHOTON_EMPLOYEE` was tried and had no effect under the PAT (see Known risk) |
+| `DEFAULT_SECONDARY_ROLES` | `('ALL')`, set explicitly in `roles.sql` (the Snowflake default). Statements that name a role have no secondary roles either way |
 | `DEFAULT_WAREHOUSE`, `DEFAULT_NAMESPACE` | `SNOWFLAKE_LEARNING_WH`, `PHOTON.ORG` |
 | Network policy | `hacknc_open` (allows `0.0.0.0/0`) on the user. None on the account |
 | Authentication policy | None on the user or the account |
 | PAT | Created by lane C, restricted to `PHOTON_APP`. Lane A stores it as `SNOWFLAKE_AGENT_PAT` |
 
-Verified with WAYFINDER_AGENT's own PAT (`snowflake:test-roles -- --agent-pat`, 34 of 34 pass, the same results as the owner PAT):
+Verified with WAYFINDER_AGENT's own PAT (`snowflake:test-roles -- --agent-pat`). All 34 named-role checks pass, with the same results as the owner PAT:
 
 - The `PHOTON_EMPLOYEE` role is refused on `requests`. `PHOTON_MANAGER` and `PHOTON_VP` see req_0078's title masked; `PHOTON_HR` sees it unmasked.
 - A statement that names a tier role runs as that role only. As `PHOTON_EMPLOYEE` and `PHOTON_MANAGER`: `CURRENT_USER()` = `WAYFINDER_AGENT`, `CURRENT_ROLE()` = the named role, `CURRENT_SECONDARY_ROLES()` empty, `IS_ROLE_IN_SESSION('PHOTON_HR')` false.
-- A statement with **no** `role` runs as `PHOTON_APP` (the default role). It has no secondary roles, but `IS_ROLE_IN_SESSION('PHOTON_HR')` is true, so HR text is unmasked and every table is readable. Never send a user's query without a role.
+- **Known risk: a statement with no `role` runs as `PHOTON_APP`.** It has no secondary roles, but `IS_ROLE_IN_SESSION('PHOTON_HR')` is true, so HR text is unmasked and every table is readable (a no-role `SELECT` on `requests` returns all 84 rows). Setting the user's `DEFAULT_ROLE = PHOTON_EMPLOYEE` and `DEFAULT_SECONDARY_ROLES = ()` did not help, because the PAT's `PHOTON_APP` role restriction overrides the default role. Both settings were reverted. The two no-role checks stay in `--agent-pat` and report `KNOWN RISK` until this is fixed. Until then, **lane A must send a `role` on every statement.**
 
 ### Lane A usage
 
@@ -343,7 +343,7 @@ Verified with WAYFINDER_AGENT's own PAT (`snowflake:test-roles -- --agent-pat`, 
   - `X-Snowflake-Authorization-Token-Type: PROGRAMMATIC_ACCESS_TOKEN`
   - `Content-Type: application/json`
   - `Accept: application/json`
-- **Name the tier role in every statement.** Look up the asking person's role once: `SELECT role_name FROM person_roles WHERE person_id = ?`, run with `"role": "PHOTON_APP"`. Then send each of that person's queries with `"role": "<role_name>"` in the request body. Snowflake then enforces the tier, the HR row filter and HR masking.
+- **Always send `role` in the request body; never omit it.** A statement without one runs as `PHOTON_APP`, with HR text unmasked (see Known risk above). Look up the asking person's role once: `SELECT role_name FROM person_roles WHERE person_id = ?`, run with `"role": "PHOTON_APP"`. Then send each of that person's queries with `"role": "<role_name>"` in the request body. Snowflake then enforces the tier, the HR row filter and HR masking.
 - **Reference data** (rooms, vendors, budgets, policies, directory): run as `PHOTON_FINANCE`, or as the person's own tier role for their own questions.
 - **Aggregates for routing:** read `resolution_by_task_type` with `"role": "PHOTON_APP"`. It has no request text, so this is safe.
 - **Wrap every `DATE` and `TIMESTAMP` column in `TO_VARCHAR(...)`.** The SQL API otherwise returns days since 1970, or epoch seconds plus an offset code.
