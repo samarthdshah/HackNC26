@@ -142,11 +142,14 @@ export function mount(root: HTMLElement, initial: WF): RootsApi {
   const envTex = pmrem.fromScene(room, 0.03).texture;
   scene.environment = envTex;
   const camera = new THREE.PerspectiveCamera(52, innerWidth / innerHeight, 0.1, 2000);
-  const HOME = innerWidth / innerHeight < 1 ? new THREE.Vector3(0, 103, 103) : new THREE.Vector3(0, 58, 53); // v7: higher camera, the ring reads taller on screen
+  const VIEW = innerWidth / innerHeight < 1 ? new THREE.Vector3(0, 103, 103) : new THREE.Vector3(0, 58, 53); // v7: higher camera, the ring reads taller on screen
+  // v8: the network turns 90° about the home line of sight (its long axis reads top to bottom), lifted clear of the water
+  const LIFT = 17, CENTER = new THREE.Vector3(0, LIFT, 0), HOME = VIEW.clone().multiplyScalar(1.38).add(CENTER); // stepped back: the turned ring is taller than it was wide
+  const TURN = new THREE.Quaternion().setFromAxisAngle(VIEW.clone().normalize(), Math.PI / 2);
   camera.position.copy(HOME);
   const controls = new OrbitControls(camera, renderer.domElement);
-  Object.assign(controls, { enableDamping: true, dampingFactor: 0.05, rotateSpeed: 0.6, minDistance: 8, maxDistance: 170, enablePan: false, autoRotate: S.auto, autoRotateSpeed: 0.25, maxPolarAngle: 1.68, minPolarAngle: 0.5 });
-  controls.target.set(0, 0, 0);
+  Object.assign(controls, { enableDamping: true, dampingFactor: 0.05, rotateSpeed: 0.6, minDistance: 8, maxDistance: 230, enablePan: false, autoRotate: S.auto, autoRotateSpeed: 0.25, maxPolarAngle: 1.68, minPolarAngle: 0.5 });
+  controls.target.copy(CENTER);
   scene.add(new THREE.HemisphereLight(0xdff4ff, 0x2a7fd0, 1.1));
   const sun = new THREE.DirectionalLight(0xfff6e0, 2.2); sun.position.copy(SUN).multiplyScalar(80); scene.add(sun);
 
@@ -295,7 +298,7 @@ export function mount(root: HTMLElement, initial: WF): RootsApi {
       for (const b of sp) { if (b <= a) continue; const dd = nodes[a].pos.distanceTo(nodes[b].pos); if (dd < bd && rand() < 0.7) { bd = dd; best = b; } }
       if (best >= 0) link(a, best, 0.3);
     }
-    nodes.forEach((n) => { if (n.kind) n.pos.y *= Y_SPREAD; n.dist = n.pos.length(); }); // v7: space nodes further apart top to bottom
+    nodes.forEach((n) => { if (n.kind) n.pos.y *= Y_SPREAD; n.dist = n.pos.length(); n.pos.applyQuaternion(TURN).add(CENTER); }); // v7 spacing, v8 turn
     const adj: number[][] = nodes.map(() => []), adjMain: number[][] = nodes.map(() => []), order = new Map<string, [number, number]>();
     pairs.forEach(([a, b]) => {
       adj[a].push(b); adj[b].push(a); order.set(a < b ? `${a}-${b}` : `${b}-${a}`, [a, b]);
@@ -382,12 +385,12 @@ export function mount(root: HTMLElement, initial: WF): RootsApi {
   }
 
   /* ============ AVATAR core: glass sphere around a green heart (v4) ============ */
-  const coreGroup = new THREE.Group(); scene.add(coreGroup);
+  const coreGroup = new THREE.Group(); coreGroup.position.copy(CENTER); scene.add(coreGroup);
   const heart = new THREE.Mesh(new THREE.SphereGeometry(1.5, 48, 32), new THREE.MeshPhysicalMaterial({ color: 0x3fd66a, emissive: 0x2fbf5a, emissiveIntensity: 0.55, roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.05 }));
   const shell = new THREE.Mesh(new THREE.SphereGeometry(2.7, 64, 48), new THREE.MeshPhysicalMaterial({ color: 0xe8fbff, roughness: 0.02, metalness: 0, clearcoat: 1, clearcoatRoughness: 0, transparent: true, opacity: 0.26, envMapIntensity: 2.2, depthWrite: false }));
   const gloss = new THREE.Mesh(new THREE.SphereGeometry(2.72, 48, 32, 0, Math.PI * 2, 0, Math.PI * 0.32), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.28, depthWrite: false }));
   gloss.rotation.set(-0.35, 0, 0.3); coreGroup.add(heart, shell, gloss);
-  const coreMirror = coreGroup.clone(); coreMirror.scale.y = -1; coreMirror.position.y = 2 * WATER_Y;
+  const coreMirror = coreGroup.clone(); coreMirror.scale.y = -1; coreMirror.position.y = 2 * WATER_Y - LIFT;
   coreMirror.traverse((o) => { const m = o as THREE.Mesh; if (m.material) { const mat = (m.material as THREE.Material).clone(); mat.transparent = true; mat.opacity = (mat.opacity ?? 1) * 0.35; m.material = mat; } });
   scene.add(coreMirror);
 
@@ -471,7 +474,9 @@ export function mount(root: HTMLElement, initial: WF): RootsApi {
     S.focus = id; S.run++; clearRoutes(); hideToast();
     const members = G.nodes.filter((n) => n.dept === id && n.kind !== 4), c = new THREE.Vector3();
     members.forEach((n) => c.add(n.pos)); c.divideScalar(members.length || 1);
-    const out = new THREE.Vector3(c.x, 0, c.z).normalize();
+    const out = new THREE.Vector3(c.x, 0, c.z);
+    if (out.length() < 6) out.set(0, 0, 1); // v8: a department near the top or bottom of the turned ring is viewed from the front
+    out.normalize();
     const side = new THREE.Vector3(-out.z, 0, out.x); // view the cluster at an angle so teams don't hide behind their department
     fly(c.clone().addScaledVector(out, 16).addScaledVector(side, 10).addScaledVector(UP, 13), c);
     controls.autoRotate = false; setDims(); refreshLabels();
@@ -482,7 +487,7 @@ export function mount(root: HTMLElement, initial: WF): RootsApi {
   }
   function unfocus() {
     if (!S.focus) return; S.focus = null; S.run++; clearRoutes();
-    fly(HOME, new THREE.Vector3()); controls.autoRotate = S.auto; setDims(); refreshLabels();
+    fly(HOME, CENTER); controls.autoRotate = S.auto; setDims(); refreshLabels();
     $("focusbar").classList.remove("on"); lastStory = performance.now() - 5000;
   }
   const onBack = () => unfocus();

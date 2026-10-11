@@ -12,6 +12,7 @@ import { useLiveStatus } from "@/lib/wf/live";
 import { useWF } from "@/lib/wf/store";
 import type { DarwinMeta } from "@/lib/wf/darwin";
 import { STYLE } from "./style";
+import Aquarium from "./egg/Aquarium";
 import { mount, sampleGenerations, type Action, type Scene } from "./scene";
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
@@ -125,6 +126,8 @@ export default function Darwin({ meta, initial }: { meta: DarwinMeta | null; ini
       </section>
 
       <div id="tip" className="lbl off"><i></i><span></span></div>
+
+      <Aquarium />
 
       <section id="rule" className="milk float still" role="dialog" aria-label={live ? "Generation" : "Evolved rule"}>
         <div className="bar"><span id="rGen">Rule</span><button className="x" id="rClose" aria-label="Close">×</button></div>
