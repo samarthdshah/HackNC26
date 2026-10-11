@@ -1,5 +1,5 @@
 // check_permission: who has to sign off before `person` spends money.
-// Encodes POL-SPEND-1 and POL-OOO-1 over the fixtures. Lane C will back this
+// Encodes POL-SPEND-1, POL-SPEND-2 (budget transfers) and POL-OOO-1 over the fixtures. Lane C will back this
 // with Snowflake roles; the signature stays the same.
 
 import type { ToolIO } from "@wayfinder/shared";
@@ -24,7 +24,7 @@ function budgetFor(departmentId: string, action: string) {
   return lines.find((b) => b.category.split(" ").some((w) => w.length > 3 && words.includes(w))) ?? lines[0];
 }
 
-export function checkPermission({ person, action, amount_usd }: In): Out {
+export function checkPermission({ person, action, amount_usd, to_department }: In): Out {
   const requester = getPerson(person);
   if (!requester) return { allowed: false, approvers: [], reason: `unknown person ${person}` };
   if (!amount_usd || amount_usd <= 0) return { allowed: true, approvers: [], reason: "No spend involved." };
@@ -35,7 +35,12 @@ export function checkPermission({ person, action, amount_usd }: In): Out {
 
   let approvers: string[];
   let reason: string;
-  if (amount_usd < 500) {
+  const target = to_department && to_department !== requester.department_id ? budgetFor(to_department, action) : undefined;
+  if (target) {
+    // POL-SPEND-2: moving money between budget lines needs both budget owners, whatever the amount.
+    approvers = [budget?.owner_id, target.owner_id].filter((x): x is string => Boolean(x));
+    reason = `Transfers between budget lines need both budget owners (POL-SPEND-2): ${budget?.category ?? "source"} and ${target.category}.`;
+  } else if (amount_usd < 500) {
     approvers = requester.manager_id ? [requester.manager_id] : [];
     reason = `Under $500, so ${requester.name.split(" ")[0]}'s manager approves (POL-SPEND-1).`;
   } else if (amount_usd < 5000) {

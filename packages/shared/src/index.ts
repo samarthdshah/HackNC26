@@ -101,7 +101,7 @@ export interface ToolIO {
     };
   };
   check_permission: {
-    input: { person: string; action: string; amount_usd?: number };
+    input: { person: string; action: string; amount_usd?: number; to_department?: string }; // to_department: a budget transfer (POL-SPEND-2)
     output: { allowed: boolean; approvers: string[]; reason: string; budget_id?: string; remaining_usd?: number };
   };
   draft: {

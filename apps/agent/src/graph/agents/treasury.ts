@@ -41,7 +41,7 @@ const record = (key: string, p: Payment) => {
 
 function guard(s: S): Command {
   const approved = fromBriefing(s.briefing, "amount_usd");
-  const selfOk = checkPermission({ person: s.request.requester, action: s.step.description, amount_usd: s.step.amount_usd }).allowed;
+  const selfOk = checkPermission({ person: s.request.requester, action: s.step.description, amount_usd: s.step.amount_usd, to_department: s.step.to_department }).allowed;
   const ceiling = approved ?? (selfOk ? (s.step.amount_usd ?? 0) : 0);
   if (ceiling <= 0) {
     return new Command({
