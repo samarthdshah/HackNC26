@@ -1,6 +1,6 @@
-// Darwin page data. Live integration (approve/reject, re-evolve) is deferred (ideas.md);
-// the page renders a captured GET /runs/latest from fallback/darwin-run.json, produced by
-// services/darwin/fixtures_run.py while Tiger is offline. Shapes follow services/darwin/schemas.py.
+// Darwin page snapshot: the fallback when the agent can't reach Darwin (the live path is agent
+// GET /darwin, see app/darwin/Darwin.tsx). A captured GET /runs/latest from fallback/darwin-run.json,
+// produced by services/darwin/fixtures_run.py. Shapes follow services/darwin/schemas.py.
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";

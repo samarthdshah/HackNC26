@@ -5,11 +5,14 @@
 //   GET  /health  liveness plus what the agent is connected to
 //   POST /say     the website speaks as a person, as if they had texted (Currents compose)
 //   POST /intro   Lagoon's Introduce: text two people an introduction
+//   GET  /darwin  Darwin's latest run as generations with the admin's decisions (data/evolution.ts)
+//   POST /darwin/generations/:gen/approve|reject   record a decision and push it to Darwin
 // Initial state comes from Tiger (B reads its views); /live only carries changes.
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { IntroRequest, IntroResponse, LiveHello, SayRequest, SayResponse } from "@wayfinder/shared";
 import { getPerson, source } from "./data/fixtures.ts";
+import { DarwinHttpError, decide, view as darwinView } from "./data/evolution.ts";
 import { tigerReady } from "./data/tiger.ts";
 import { env } from "./env.ts";
 import { BOOT_ID, emit, onLiveUpdate, since } from "./events.ts";
@@ -18,7 +21,7 @@ import { openGroup } from "./messenger.ts";
 import { allBindings } from "./org/directory.ts";
 import { nameOf } from "./org/entities.ts";
 
-const ROUTES = ["GET /live", "GET /health", "POST /say", "POST /intro"];
+const ROUTES = ["GET /live", "GET /health", "POST /say", "POST /intro", "GET /darwin", "POST /darwin/generations/:gen/(approve|reject)"];
 const MAX_BODY = 16 * 1024;
 
 class HttpError extends Error {
@@ -121,9 +124,15 @@ export function startServer(info: () => Record<string, unknown> = () => ({})) {
       }
       if (req.method === "POST" && path === "/say") { authorise(req); return json(res, 202, await say(req)); }
       if (req.method === "POST" && path === "/intro") { authorise(req); return json(res, 200, await intro(req)); }
+      if (req.method === "GET" && path === "/darwin") return json(res, 200, await darwinView());
+      const gen = req.method === "POST" && /^\/darwin\/generations\/(\d+)\/(approve|reject)$/.exec(path);
+      if (gen) {
+        authorise(req);
+        return json(res, 200, await decide(Number(gen[1]), gen[2] === "approve" ? "approved" : "rejected"));
+      }
       json(res, 404, { error: "not found", routes: ROUTES });
     } catch (err) {
-      const status = err instanceof HttpError ? err.status : 500;
+      const status = err instanceof HttpError || err instanceof DarwinHttpError ? err.status : 500;
       if (status === 500) console.error(`[http] ${req.method} ${path}: ${err}`);
       if (!res.headersSent) json(res, status, { ok: false, error: err instanceof Error ? err.message : String(err) });
     }

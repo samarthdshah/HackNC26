@@ -5,6 +5,7 @@
 //   hello   → a new boot_id means the agent restarted: refetch
 //   gap     → the agent couldn't replay what we missed: refetch
 // EventSource reconnects by itself and sends Last-Event-ID, so short drops replay exactly.
+// darwin_generation_* events also fire a window "wf:darwin" event so the Darwin page refetches its live view.
 
 import { useEffect, useSyncExternalStore } from "react";
 import type { Event, LiveHello, LiveUpdate, OrgEdge } from "@wayfinder/shared";
@@ -51,6 +52,7 @@ export function LiveBridge() {
     es.addEventListener("update", (m) => {
       const u = JSON.parse((m as MessageEvent).data) as LiveUpdate;
       announce(u, (id) => names?.[id] ?? id);
+      if (u.kind === "event" && (u.data as Event).type.startsWith("darwin_generation_")) window.dispatchEvent(new CustomEvent("wf:darwin"));
       soon();
     });
     return () => { es.close(); clearTimeout(t1); clearTimeout(t2); setStatus("connecting"); };
@@ -84,5 +86,12 @@ function announce(u: LiveUpdate, name: (id: string) => string) {
     case "request_resolved": return toast("route", "Resolved", title || "A request was resolved");
     case "intro_sent": return toast("myc", "Mycelium intro sent", esc(`${who(p.a)} ↔ ${who(p.b)}`), esc(String(p.topic ?? "")));
     case "darwin_hint": return toast("evo", "Darwin rule applied", esc(String(p.reason ?? "")), title);
+    case "darwin_generation_approved":
+    case "darwin_generation_rejected": {
+      const n = Array.isArray(p.rule_ids) ? p.rule_ids.length : 0;
+      const ok = e.type === "darwin_generation_approved";
+      return toast("evo", `Generation ${esc(String(p.gen ?? ""))} ${ok ? "approved" : "rejected"}`, `${n} ${n === 1 ? "rule" : "rules"}`,
+        ok ? "The agent now routes by its rules" : "It fell from the tree");
+    }
   }
 }

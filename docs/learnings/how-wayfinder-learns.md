@@ -1,5 +1,7 @@
 # How Wayfinder learns
 
+Updated 2026-10-11: Darwin approval is live, per generation, stored as events and pushed to Darwin.
+
 Wayfinder learns in two ways that do different jobs:
 - **Live learning** (the agent) reacts to one reply and corrects one route immediately.
 - **Darwin** reflects on the whole history, proposes tested rules, and needs an admin to approve them.
@@ -72,6 +74,10 @@ Darwin:         all history → tested, evidence-backed policy, approved   (refl
 
 ## Current state and open questions
 
-- The website's Darwin page shows a **saved snapshot** (`apps/web/lib/wf/fallback/darwin-run.json`, made by `services/darwin/fixtures_run.py`). Live approve, reject and re-evolve are deferred: see [ideas.md](../../ideas.md).
-- Darwin only reflects new live requests when it is re-run. Its approvals live in memory and reset when it restarts.
+- **An admin approves a whole generation, not single rules.** On the Darwin page each generation's best rule set is a fruit. Approve it and it glows; reject it and it falls.
+- **Decisions are events.** Each one is a `darwin_generation_approved|rejected` event (`gen`, `rule_ids`, `run_id`) written through `emit()`, so it lands in Tiger, `logs/events.jsonl` and the live stream like everything else. The latest decision per generation wins.
+- **The agent pushes them into Darwin.** A rule is approved if any approved generation carries it, and rejected if only rejected ones do (`apps/agent/src/data/evolution.ts`). Darwin still keeps approvals in memory, so the agent re-applies them whenever Darwin's run id changes (for example after a restart).
+- **That is how they reach routing:** the agent's `/route-hint` call to Darwin only returns approved rules.
+- With Darwin unreachable, the page shows the **saved snapshot** (`apps/web/lib/wf/fallback/darwin-run.json`) with the buttons disabled.
+- Darwin only reflects new live requests when it is re-run. Re-evolve from the page is still deferred: see [ideas.md](../../ideas.md).
 - Open: is "checkout orders pipeline failed" a `checkout_incident` or a `pipeline_issue`? This decides whether Darwin's checkout rule fires in the delegate scenario.

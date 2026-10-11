@@ -94,6 +94,8 @@ export const env = {
     // Lane A's own login (data/tiger/SCHEMA.md). TIGER_PASSWORD keeps the URL's user instead.
     user: optional("TIGER_AGENT_PASSWORD") ? "wayfinder_agent" : "",
     password: optional("TIGER_AGENT_PASSWORD") || optional("TIGER_PASSWORD"),
+    // The website's read-only login; the agent uses it only to read Darwin decisions back from events_public.
+    webPassword: optional("TIGER_WEB_PASSWORD"),
     // Owner login, only for scripts/tiger-test.ts (inspect and clean up test rows)
     ownerPassword: optional("TIGER_OWNER_PASSWORD") || ownerFromUrl(optional("TIGER_DATABASE_URL")),
     // Only if your network intercepts TLS and certificate verification fails

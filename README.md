@@ -98,7 +98,7 @@ Package manager: npm workspaces (`apps/*`, `packages/*`), Node 20+. Darwin is Py
 | Folder | Owner | Contents |
 |---|---|---|
 | `apps/agent/` | A | Agent server: Spectrum, Gemini tool loop, approvals, ElevenLabs, Nessie, Solana |
-| `apps/web/` | B | Next.js site: Home Tree, Roots, Currents, Insights, Lagoon, Darwin (see [web pages](#web-pages)) |
+| `apps/web/` | B | Next.js site: Home Tree, Roots, Currents, Insights, Lagoon, Darwin (see [web pages](#web-pages)). This is the website; the agent's separate `web.ts` server from the `version7` branch is not used |
 | `packages/shared/` | all | Shared TypeScript contracts: `Request`, `Hop`, `Event`, `OrgEdge`, `LiveUpdate`, agent HTTP API, and the web's `WF` view model |
 | `data/fixtures/` | C | Simulated company fixtures (JSON → Snowflake / Tiger Data) |
 | `services/darwin/` | C | Python replay + evolution API; `models.py` mirrors the shared contracts |

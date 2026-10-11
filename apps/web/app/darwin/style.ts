@@ -1,4 +1,5 @@
-// Verbatim from docs/design/v6/darwin.html <style> (shared/logo.svg → /logo.svg).
+// From docs/design/v6/darwin.html <style> (shared/logo.svg → /logo.svg), plus the live
+// approve/reject styles from CodeRockerr's version7 darwin.html.
 export const STYLE = `
 html,body{overflow:hidden;-webkit-user-select:none;user-select:none}
 /* v4 daylight: sun glow and two soft light ribbons behind the tree */
@@ -37,12 +38,22 @@ body::after{content:"";position:fixed;left:-10%;right:-10%;top:26%;height:18%;po
 .gen{opacity:.55;transition:opacity .4s,background .25s,box-shadow .3s,transform .3s var(--spring)}
 .gen.done{opacity:1}
 .gen.on{background:rgb(255 255 255/.88);box-shadow:0 0 0 2px #fff,0 0 16px rgb(255 255 255/.85)}
+/* live: every generation is a row; click one to approve or reject it (version7 mechanism) */
+#gens .rows.scroll{position:relative;max-height:min(46vh,420px);overflow-y:auto;padding:2px}
+#gens .rows.scroll .gen{cursor:pointer}
+.gen.approved .orb.sm,.gen.done.approved .orb.sm{background:radial-gradient(circle at 35% 28%,#fff,#FFD666 45%,#E0A100);box-shadow:0 0 10px rgb(255 214 102/.9)}
+.gen.rejected .orb.sm,.gen.done.rejected .orb.sm{background:radial-gradient(circle at 35% 28%,#fff,#B9C6D3 45%,#8A9BAD)}
+.gen.rejected .nm{text-decoration:line-through;opacity:.6}
 #gens .foot{margin-top:10px;font-size:12px;color:var(--ink-2);line-height:1.4}
 
 #tip{position:fixed;z-index:20;pointer-events:none;transform:translate(-50%,calc(-100% - 14px))}
 #tip.off{opacity:0}
 
 #rule{width:300px;z-index:25;display:none}
+#rule.live{width:320px}
+#rule .rl{margin:4px 0 10px;padding:0;list-style:none;display:grid;gap:5px}
+#rule .rl:empty{display:none}
+#rule .rl li{font-size:13px;line-height:1.3;padding:6px 9px;border-radius:10px;background:rgb(255 255 255/.55);box-shadow:inset 0 0 0 1px rgb(255 255 255/.7)}
 #rule.open{display:block}
 #rule .x{margin-left:auto;width:22px;height:22px;border-radius:50%;font-size:14px;line-height:22px;text-align:center;color:#fff;background:rgb(255 255 255/.2);box-shadow:inset 0 0 0 1px rgb(255 255 255/.5)}
 #rule .x:hover{background:rgb(255 255 255/.35)}
@@ -55,7 +66,13 @@ body::after{content:"";position:fixed;left:-10%;right:-10%;top:26%;height:18%;po
   #head .page-sub{display:none}
   #head .now{font-size:22px;margin-top:8px}
   #gens{left:12px;right:12px;top:auto;bottom:76px;width:auto}
-  #gens .bar,#gens .foot{display:none}
+  #gens .bar,/* live: every generation is a row; click one to approve or reject it (version7 mechanism) */
+#gens .rows.scroll{position:relative;max-height:min(46vh,420px);overflow-y:auto;padding:2px}
+#gens .rows.scroll .gen{cursor:pointer}
+.gen.approved .orb.sm,.gen.done.approved .orb.sm{background:radial-gradient(circle at 35% 28%,#fff,#FFD666 45%,#E0A100);box-shadow:0 0 10px rgb(255 214 102/.9)}
+.gen.rejected .orb.sm,.gen.done.rejected .orb.sm{background:radial-gradient(circle at 35% 28%,#fff,#B9C6D3 45%,#8A9BAD)}
+.gen.rejected .nm{text-decoration:line-through;opacity:.6}
+#gens .foot{display:none}
   #gens .body{padding:6px}
   .gen:not(.on){display:none}
   #stage{inset:190px 0 140px 0}

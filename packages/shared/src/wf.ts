@@ -112,6 +112,24 @@ export interface WfDeptStat {
 export type WfRoute = [from: string, to: string, n: number];
 
 export interface WfGeneration { gen: number; avgHops: number; fitness: number; rules: number }
+
+/** Live Darwin (agent GET /darwin): one generation's champion rule set and the admin's decision on it. */
+export type DarwinDecision = "approved" | "rejected";
+export interface DarwinGeneration {
+  gen: number; // 1-based (Darwin's generation k is gen k+1)
+  avgHops: number; // Darwin's replay of history with this generation's rules
+  fitness: number; // share of Darwin's best improvement this generation reached, 0..1
+  rules: number;
+  ruleIds: string[];
+  ruleTexts: string[];
+  status: "proposed" | DarwinDecision;
+  decidedAt: string | null;
+}
+export interface DarwinView {
+  connected: boolean; // false: Darwin unreachable or DARWIN_URL unset (the page falls back to its snapshot)
+  replayed: number;
+  generations: DarwinGeneration[];
+}
 export interface WfRule {
   id: string;
   gen: number;
