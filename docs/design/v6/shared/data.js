@@ -1,4 +1,6 @@
-/* Wayfinder v5 · one simulated company shared by every page, so the numbers agree.
+/* Wayfinder v6 design MOCK (retired for the app): the pages' data SHAPE lives on in packages/shared/src/wf.ts,
+   filled from Tiger / data/fixtures by apps/web/lib/wf. Kept so the static mockups still open.
+   One simulated company shared by every page, so the numbers agree.
    window.WF = { org, people, me, queries, matches, stats, series, routing, darwin, helpers } */
 (() => {
   'use strict';

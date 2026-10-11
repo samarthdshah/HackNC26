@@ -23,8 +23,8 @@ iMessage · Voice · Website · Terminal
 Three engines:
 
 - **Coordinate (Wayfinder):** breaks a goal into steps, sends each step to its real owner, and handles approvals, payments, and reminders.
-- **Discover (Mycelium):** matches people's needs, skills, and unused resources, then introduces them once they consent.
-- **Evolve (Darwin):** replays past workflows and evolves better routing rules, which admins approve.
+- **Discover (Mycelium):** matches people's needs, skills, and unused resources, then introduces them. (Consent-first intros are planned: see [ideas.md](ideas.md).)
+- **Evolve (Darwin):** replays past workflows and evolves better routing rules for admins to approve. (The web page shows a captured run today; live approval is in [ideas.md](ideas.md).)
 
 ## Tech stack
 
@@ -33,24 +33,27 @@ Three engines:
 | Agent server | Node/TypeScript + `spectrum-ts` |
 | Brain | Gemini with function calling |
 | Voice | ElevenLabs over Spectrum voice calls |
-| Org data | Snowflake + Cortex |
+| Org data | Snowflake (role-gated access: VP, manager, finance, HR tiers) |
 | Live data | Tiger Data (Postgres, TimescaleDB, pgvector) |
 | Money | Capital One Nessie (internal), Solana devnet (external + receipts) |
-| Website | Next.js, Tailwind (Frutiger Aero theme), React Flow, Framer Motion, Recharts |
-| Evolution | Python, NetworkX, genetic algorithm |
+| Website | Next.js 14, Frutiger Aero kit (`docs/design/v6`), three.js, d3, GSAP, Recharts |
+| Evolution | Python, FastAPI, genetic algorithm over replayed history |
 
-## Planned layout
+## Layout
 
 ```
 apps/
-  agent/      # Spectrum + Gemini tool loop + voice + money tools     (A)
-  web/        # Next.js site, Mycelium graph, dashboards               (B)
+  agent/      # Spectrum + Gemini graphs + voice + money tools, HTTP for the web  (A)
+  web/        # Next.js site: the six v6 Aero pages, live from Tiger + agent SSE   (B)
 services/
-  darwin/     # Python replay + evolution API                         (C)
+  darwin/     # Python replay + evolution API                                     (C)
 data/
-  seed/       # simulated company fixtures (JSON → Snowflake/Tiger)   (C)
+  fixtures/   # simulated company (JSON → Snowflake / Tiger)                      (C)
+  tiger/      # Tiger schema, roles, seed (SCHEMA.md is the contract)              (C)
+  snowflake/  # Snowflake load, roles, verify                                     (C)
 packages/
-  types/      # shared contracts: events, edges, tools, live updates (all)
+  shared/     # shared contracts: records, events, edges, live updates, WF view   (all)
+docs/design/  # Aero design system; v6 is the target
 ```
 
 ## Team
@@ -58,8 +61,8 @@ packages/
 | Person | Role | Owns | Tracks |
 |---|---|---|---|
 | **A** | Fullstack + AI | Agent and conversation: Spectrum, Gemini tool loop, approvals, group threads, ElevenLabs, Nessie/Solana tools | Photon, Gemini, ElevenLabs, Solana, Nessie |
-| **B** | Fullstack + AI | Website and discovery: Next.js + Aero design, live push to browser, all pages, Mycelium matching + consent, landing page | Frutiger Aero, Community, Best .Tech |
-| **C** | Data | Data and intelligence: simulated company, Snowflake + Cortex, Tiger Data + Insights queries, Darwin, demo script + Devpost | Snowflake, Tiger Data, Commit, DEV |
+| **B** | Fullstack + AI | Website and discovery: Next.js + Aero design, live push to browser, all pages, Mycelium matching, landing page | Frutiger Aero, Community, Best .Tech |
+| **C** | Data | Data and intelligence: simulated company, Snowflake roles, Tiger Data + Insights queries, Darwin, demo script + Devpost | Snowflake, Tiger Data, Commit, DEV |
 
 ## Shared contracts (agree in the first 30 minutes)
 
@@ -73,19 +76,19 @@ packages/
 | Phase | Hours | A (Agent) | B (Web) | C (Data) |
 |---|---|---|---|---|
 | 0 · Foundations | 0–2 | Spectrum + Gemini keys, voice handoff test | Next.js scaffold, Aero tokens | **JSON fixtures by hour 1**, then Snowflake + Tiger Data |
-| 1 · Coordination core | 2–8 | Tool loop, routing, redirects/delegates, approvals | Chat, Mycelium graph, live push | Event log, map storage, Insights queries |
+| 1 · Coordination core | 2–8 | Tool loop, routing, redirects/delegates, approvals | Roots, Currents, live push | Event log, map storage, Insights queries |
 | **Gate** | **8** | **Use case 1 runs end to end (must ship)** | | |
-| 2 · Full use cases | 8–14 | Nessie, Solana, ElevenLabs calls, group threads/RSVPs | Plan view, Wallet, Insights | Cortex Q&A, VP role check, seed use cases 2 & 3 |
-| 3 · Discover and Evolve | 14–19 | Incident flow, hardening | Mycelium matching + consent, Lab | Darwin replay + evolution |
+| 2 · Full use cases | 8–14 | Nessie, Solana, ElevenLabs calls, group threads/RSVPs | Currents, Insights | VP role check, seed use cases 2 & 3 |
+| 3 · Discover and Evolve | 14–19 | Incident flow, hardening | Lagoon (Mycelium matching), Darwin page | Darwin replay + evolution |
 | 4 · Polish and submit | 19–24 | Rehearse phone parts | Landing page, backup video | Demo script, Devpost, DEV post, Commit form |
 
 If a gate slips, everyone works on it together before moving to the next phase.
 
 ## Scope
 
-- **Must ship:** iMessage agent, self-learning map, approvals by text, group threads, seeded company, event log, Chat + Mycelium + Insights pages
-- **Should ship:** Nessie, Solana, ElevenLabs calls, consent intros, Plan view + Wallet, full Aero styling, simple Darwin
-- **Stretch:** Lab / Time Machine, multilingual voice, policy-doc → rules, campus mode
+- **Must ship:** iMessage agent, self-learning map, approvals by text, group threads, seeded company, event log, Roots + Currents + Insights pages
+- **Should ship:** Nessie, Solana, ElevenLabs calls, Lagoon intros, full Aero styling, simple Darwin
+- **Stretch:** consent intros and live Darwin approval ([ideas.md](ideas.md)), multilingual voice, policy-doc → rules, campus mode
 - **Out of scope:** real company systems, real money, production-grade security
 
 ## Repo layout
@@ -95,11 +98,34 @@ Package manager: npm workspaces (`apps/*`, `packages/*`), Node 20+. Darwin is Py
 | Folder | Owner | Contents |
 |---|---|---|
 | `apps/agent/` | A | Agent server: Spectrum, Gemini tool loop, approvals, ElevenLabs, Nessie, Solana |
-| `apps/web/` | B | Next.js site, Mycelium graph and matching, Insights, landing page |
-| `packages/shared/` | all | Shared TypeScript contracts: `OrgEdge`, `Event`, `LiveUpdate`, `ToolName` (draft) |
+| `apps/web/` | B | Next.js site: Home Tree, Roots, Currents, Insights, Lagoon, Darwin (see [web pages](#web-pages)) |
+| `packages/shared/` | all | Shared TypeScript contracts: `Request`, `Hop`, `Event`, `OrgEdge`, `LiveUpdate`, agent HTTP API, and the web's `WF` view model |
 | `data/fixtures/` | C | Simulated company fixtures (JSON → Snowflake / Tiger Data) |
 | `services/darwin/` | C | Python replay + evolution API; `models.py` mirrors the shared contracts |
 
-Note: `data/fixtures/` and `packages/shared/` replace `data/seed/` and `packages/types/` from the planned layout above.
 
-Setup: `npm install`, then `npm run typecheck`. Copy `.env.example` to `.env` for keys.
+Setup: `npm install`, then `npm run typecheck`. Copy `.env.example` to `.env` for keys (one value per line: a wrapped value is cut off at the line break).
+
+## Running it
+
+```bash
+npm run dev -w @wayfinder/agent          # agent on :8787 (iMessage + terminal); GET /live, POST /say, POST /intro
+npm run dev -w @wayfinder/web            # website on :3000; reads Tiger as wayfinder_web, falls back to data/fixtures
+npm run wf:check -w @wayfinder/web       # the web adapter reproduces Tiger's Insights numbers
+npm run sim -w @wayfinder/agent          # scripted scenarios; uses apps/agent/logs-sim/, never touches live state
+```
+
+## Web pages
+
+| Page | Route | Shows |
+|---|---|---|
+| Home Tree | `/` | Headline numbers from real history and live requests |
+| Roots | `/roots` | The org (departments → teams → people), your requests, cross-team handoffs |
+| Currents | `/currents?q=<id>` | One request end to end: hops, what Wayfinder learned, every message; compose as the viewer |
+| Insights | `/insights` | Hours lost to "not us", hops before vs after, where requests flow |
+| Lagoon | `/lagoon` | People who share your skills, open asks, unused rooms; Introduce texts both people |
+| Darwin | `/darwin` | Routing rules evolved from replayed history (captured run) |
+
+Add `?me=p_nina` to view as someone else and `?notour` to skip the first-visit tour.
+
+Testing over iMessage: [docs/phase3-runbook.md](docs/phase3-runbook.md). What we've learned (how Wayfinder learns, Photon quirks, setup gotchas): [docs/learnings/](docs/learnings/README.md).

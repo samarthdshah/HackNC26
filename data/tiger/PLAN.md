@@ -354,7 +354,7 @@ Script: `data/tiger/seed.ts` (`npm --prefix data run tiger:seed`). Same style as
 
 Demo rows the seed must assert (fail if missing):
 
-- `req_demo_leo`: `open`, `data_access`, requester `p_leo`, created 2026-10-10 09:20. One hop, `p_leo → dept_data_platform`, `bounced`, `redirect_to = dept_analytics_eng`.
+- `req_demo_leo` (**superseded:** not seeded in Tiger; the agent creates Leo's request live. See SCHEMA.md and `LIVE_ONLY` in seed.ts): `open`, `data_access`, requester `p_leo`, created 2026-10-10 09:20. One hop, `p_leo → dept_data_platform`, `bounced`, `redirect_to = dept_analytics_eng`.
 - Priya out: edges `p_priya → p_tom` for `data_access` and `purchase_approval`, `delegate_until = 2026-10-16T17:00-04:00`. Both appear in `org_edges_current` on the demo date. (Priya's `status`/`out_until` live in Snowflake `people`; Tiger only needs the edges.)
 - `bk_sam_commons`: `rm_commons`, 11:00 to 13:00, `partially_used`, `used_until` 12:00.
 - Six `checkout_incident` requests, all resolved: 2 direct (req_0017, req_0066) and 4 routed (req_0004, req_0029, req_0043, req_0055).
