@@ -15,6 +15,9 @@ type Pp = { p: WfPerson; score: number };
 type Topic = WfTopic & {
   key: string; i: number; ppl: Pp[]; x: number; y: number; tx: number; ty: number; vis: boolean;
   el: HTMLButtonElement; g: SVGGElement; glow: SVGPathElement; core: SVGPathElement; flow: SVGPathElement;
+  // v7 drag: drag = being dragged now, pinned = dropped by the user (layout leaves it there), dragged = swallow the click that ends a drag.
+  // None of these are on WfTopic, so update(wf)'s Object.assign keeps them.
+  drag?: boolean; pinned?: boolean; dragged?: boolean;
 };
 type Pulse = { t: Topic; pid: string; dot?: SVGCircleElement; t0: number; dur: number };
 type IntroState = "sending" | "sent" | "err";
@@ -209,7 +212,8 @@ export function mount(root: HTMLElement, initial: WF, ctx: LagoonCtx): LagoonApi
       glow: svgEl("path", { class: "glow", opacity: 0.55 }, g), core: svgEl("path", { class: "core", opacity: 0.6 }, g), flow: svgEl("path", { class: "flow", opacity: 0.9 }, g) } as Topic;
     el.addEventListener("mouseenter", () => t.g.classList.add("hot"));
     el.addEventListener("mouseleave", () => t.g.classList.remove("hot"));
-    el.addEventListener("click", () => openTopic(t));
+    el.addEventListener("click", () => { if (t.dragged) { t.dragged = false; return; } openTopic(t); });
+    el.addEventListener("pointerdown", (e) => startDrag(t, e));
     $("seeds").appendChild(el);
     return t;
   }
@@ -268,19 +272,47 @@ export function mount(root: HTMLElement, initial: WF, ctx: LagoonCtx): LagoonApi
       y = Math.min(H - 130 - r, Math.max(r + 14, y));
       if (x - r < card.right + 14 && y - r < card.bottom + 14) y = Math.min(H - 130 - r, card.bottom + 14 + r); // would sit under the title card
       if (x + r > W - 100 && y - r < 96) y = 96 + r; // keep the menu corner clear
-      t.tx = x; t.ty = y;
+      if (!t.pinned) { t.tx = x; t.ty = y; } // a bubble the user dragged stays where it was dropped
     });
     for (let it = 0; it < 40; it++) for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { // nudge overlapping bubbles apart
       const A = vis[i], B = vis[j], dx = B.tx - A.tx, dy = B.ty - A.ty, d = Math.hypot(dx, dy) || 1;
       const need = (size(A.ppl.length) + size(B.ppl.length)) / 2 + 14 - d; if (need <= 0) continue;
-      const ux = ((dx / d) * need) / 2, uy = ((dy / d) * need) / 2;
-      A.tx -= ux; A.ty -= uy; B.tx += ux; B.ty += uy;
+      const ma = A.pinned ? 0 : B.pinned ? 1 : 0.5, mb = B.pinned ? 0 : A.pinned ? 1 : 0.5; if (!ma && !mb) continue; // only unpinned bubbles get nudged
+      const ux = (dx / d) * need, uy = (dy / d) * need;
+      A.tx -= ux * ma; A.ty -= uy * ma; B.tx += ux * mb; B.ty += uy * mb;
     }
     vis.forEach((t) => {
       const r = size(t.ppl.length) / 2;
       t.tx = Math.min(stage - r - 16, Math.max(r + 16, t.tx)); t.ty = Math.min(H - 130 - r, Math.max(r + 14, t.ty));
     });
   }
+
+  /* ============ Drag (v7): mouse or touch moves a topic bubble; its tentacle follows (the loop redraws it from t.x, t.y) ============ */
+  let drag: { t: Topic; id: number; ox: number; oy: number; sx: number; sy: number } | null = null;
+  function startDrag(t: Topic, e: PointerEvent) {
+    if (mobile() || e.button > 0) return;
+    drag = { t, id: e.pointerId, ox: e.clientX - t.x, oy: e.clientY - t.y, sx: e.clientX, sy: e.clientY };
+    t.el.setPointerCapture(e.pointerId);
+  }
+  const onDragMove = (e: PointerEvent) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const t = drag.t;
+    if (!t.drag && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 5) return; // small moves still count as a click
+    t.drag = true; t.el.classList.add("dragging");
+    const r = size(t.ppl.length) / 2;
+    t.tx = Math.min(innerWidth - r, Math.max(r, e.clientX - drag.ox));
+    t.ty = Math.min(innerHeight - r, Math.max(r, e.clientY - drag.oy));
+  };
+  const onDragEnd = (e: PointerEvent) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const t = drag.t; drag = null;
+    if (!t.drag) return;
+    t.drag = false; t.pinned = true; t.dragged = true; t.el.classList.remove("dragging");
+    later(() => { t.dragged = false; }, 0); // only swallow the click that ends this drag
+  };
+  addEventListener("pointermove", onDragMove);
+  addEventListener("pointerup", onDragEnd);
+  addEventListener("pointercancel", onDragEnd);
 
   /* ============ Tentacle curves ============ */
   const jfSvg = $("jfSvg") as unknown as SVGSVGElement;
@@ -415,8 +447,8 @@ export function mount(root: HTMLElement, initial: WF, ctx: LagoonCtx): LagoonApi
     if (!mobile()) {
       for (const t of topics) {
         if (!t.vis) continue;
-        const bx = RM ? 0 : Math.cos(time * 0.4 + t.i * 1.3) * 6, by = RM ? 0 : Math.sin(time * 0.6 + t.i) * 9, d = size(t.ppl.length);
-        t.x += (t.tx + bx - t.x) * (RM ? 1 : 0.06); t.y += (t.ty + by - t.y) * (RM ? 1 : 0.06);
+        const still = RM || t.drag, bx = still ? 0 : Math.cos(time * 0.4 + t.i * 1.3) * 6, by = still ? 0 : Math.sin(time * 0.6 + t.i) * 9, d = size(t.ppl.length);
+        t.x += (t.tx + bx - t.x) * (still ? 1 : 0.06); t.y += (t.ty + by - t.y) * (still ? 1 : 0.06);
         t.el.style.transform = `translate(${(t.x - d / 2).toFixed(1)}px,${(t.y - d / 2).toFixed(1)}px)`;
         const c = curve(t, time); t.glow.setAttribute("d", c); t.core.setAttribute("d", c); t.flow.setAttribute("d", c);
         t.flow.setAttribute("stroke-dashoffset", RM ? "0" : (-time * 30 - t.i * 7).toFixed(1));
@@ -453,6 +485,7 @@ export function mount(root: HTMLElement, initial: WF, ctx: LagoonCtx): LagoonApi
       timers.forEach(clearTimeout); timers.clear();
       offTheme();
       removeEventListener("resize", onResize); removeEventListener("keydown", onKey);
+      removeEventListener("pointermove", onDragMove); removeEventListener("pointerup", onDragEnd); removeEventListener("pointercancel", onDragEnd); drag = null;
       $("dClose").removeEventListener("click", onClose); $("moreTopics").removeEventListener("click", onMore);
       dBody.removeEventListener("click", onBodyClick); dBody.removeEventListener("keydown", onBodyKey);
       gctx.revert();

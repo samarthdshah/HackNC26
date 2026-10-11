@@ -1,6 +1,7 @@
-// Verbatim page CSS from docs/design/v6/index.html (rendered in a <style> that unmounts with the page).
+// Verbatim page CSS from docs/design/v6/index.html, with the v7 hero changes (rendered in a <style> that unmounts with the page).
 export const css = `
 html,body{overflow:hidden}
+body[data-page=home]{--page:var(--accent);--page-hi:var(--accent-hi)}   /* hero title bar matches the other panels' .bar and follows the theme */
 /* Sky: theme gradient from aero.css, plus the v4 sun and Vista light ribbons */
 #sky{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
 #sky .sun{position:absolute;left:8%;top:-14%;width:60vmax;height:60vmax;border-radius:50%;
@@ -13,18 +14,18 @@ canvas#globe{position:fixed;inset:0;width:100%;height:100%;display:block;z-index
 /* Hero card on the left */
 #heroWrap{position:fixed;z-index:10;left:5vw;top:0;bottom:96px;display:flex;align-items:center;pointer-events:none}
 #hero{width:min(480px,40vw);opacity:0;pointer-events:auto}
-#hero .body{padding:24px 22px 20px}
-#hero .more .eng{padding-top:4px}
-#hero.collapsed .ctas{margin-bottom:0}
-#hero .page-title{font-size:72px;margin:4px 0 6px;color:var(--ink)}
+#hero .body{padding:16px 22px 20px}
+#hero .page-title{font-size:72px;margin:0 0 6px;padding-top:0;color:var(--ink)}
 #hero .tag{font-size:21px;font-weight:300;line-height:1.3;margin-bottom:10px}
 #hero .tag b{font-weight:600;color:var(--accent-lo)}
 #hero .page-sub{margin-bottom:16px}
 #hero .ctas{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
-#hero .eng{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-#hero .eng .milk{padding:12px 12px 13px;border-radius:14px}
-#hero .eng .orb{width:28px;height:28px;font-size:13px;margin-bottom:8px}
-#hero .eng h3{font-size:15px;font-weight:600;line-height:1.1;margin-bottom:3px}
+#hero .eng{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding-top:4px}
+#hero .eng .milk{border-radius:22px;box-shadow:inset 0 0 14px rgb(255 255 255/.85),inset 0 -6px 14px rgb(160 210 245/.35),0 8px 20px rgb(0 40 100/.18)}
+#hero .eng .milk:hover{box-shadow:inset 0 0 16px rgb(255 255 255/.95),inset 0 -6px 14px rgb(160 210 245/.4),0 12px 26px rgb(0 40 100/.22)}
+#hero .eng .milk::before{content:"";position:absolute;left:0;right:0;top:0;height:50%;pointer-events:none;border-radius:22px 22px 50% 50% / 22px 22px 18px 18px;
+  background:linear-gradient(180deg,rgb(255 255 255/.85),rgb(255 255 255/.15))}   /* glossy upper half */
+#hero .eng .in{position:relative;padding:10px 12px 13px}
 #hero .eng p{font-size:12px;line-height:1.35;color:var(--ink-2)}
 #hero .reveal{opacity:0}
 
@@ -50,7 +51,6 @@ canvas#globe{position:fixed;inset:0;width:100%;height:100%;display:block;z-index
   #hero .page-title{font-size:46px}
   #hero .tag{font-size:17px}
   #hero .page-sub{display:none}
-  #hero .ctas{margin-bottom:0}
   .pin .v{font-size:16px} .pin .l{font-size:11px}
   .pin.m-hide{display:none}
   #skip{bottom:auto;top:16px;right:72px}

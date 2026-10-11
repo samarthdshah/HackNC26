@@ -1,5 +1,5 @@
 "use client";
-// Home Tree: port of docs/design/v6/index.html. The globe scene mounts once (app/home/scene.ts);
+// Home Tree: port of docs/design/v6/index.html (v7 hero). The globe scene mounts once (app/home/scene.ts);
 // the stat pins are React so live refreshes update their numbers in place.
 
 import Link from "next/link";
@@ -69,6 +69,7 @@ export default function Home() {
 
       <div id="heroWrap">
         <section id="hero" className="milk still title-card">
+          <div className="bar"><span className="logo-orb" />Home Tree</div>
           <div className="body">
             <h1 className="page-title reveal" data-tour="1|Wayfinder|An AI coordinator you text. Tell it a goal and it finds the people, resources and approvals to make it happen.">Wayfinder</h1>
             <p className="tag reveal"><b>Discover.</b> <b>Connect.</b> <b>Coordinate.</b> <b>Evolve.</b></p>
@@ -77,11 +78,11 @@ export default function Home() {
               <Link className="pill" href="/roots">Explore the Roots</Link>
               <Link className="pill ghost" href="/insights">See the Insights</Link>
             </div>
-            <div className="more"><div><div className="eng" data-tour="4|Three engines|Coordinate routes each step to its real owner. Discover introduces people with overlapping work. Evolve learns shorter routes over time.">
-              <article className="milk reveal"><span className="orb">W</span><h3>Coordinate</h3><p>Breaks a goal into steps and sends each to its real owner.</p></article>
-              <article className="milk reveal"><span className="orb pink">✦</span><h3>Discover</h3><p>Mycelium matches needs and skills, then introduces people.</p></article>
-              <article className="milk reveal"><span className="orb amber">↯</span><h3>Evolve</h3><p>Darwin replays past requests and evolves shorter routes.</p></article>
-            </div></div></div>
+            <div className="eng" data-tour="4|Three engines|Coordinate routes each step to its real owner. Discover introduces people with overlapping work. Evolve learns shorter routes over time.">
+              <article className="milk reveal"><h3 className="band green">Coordinate</h3><div className="in"><p>Breaks a goal into steps and sends each to its real owner.</p></div></article>
+              <article className="milk reveal"><h3 className="band pink">Discover</h3><div className="in"><p>Mycelium matches needs and skills, then introduces people.</p></div></article>
+              <article className="milk reveal"><h3 className="band amber">Evolve</h3><div className="in"><p>Darwin replays past requests and evolves shorter routes.</p></div></article>
+            </div>
           </div>
         </section>
       </div>

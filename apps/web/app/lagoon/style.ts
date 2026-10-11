@@ -34,6 +34,8 @@ html,body{overflow:hidden}
 #seeds{position:fixed;inset:0;z-index:8;pointer-events:none}
 .seed{position:absolute;left:0;top:0;width:var(--d);height:var(--d);pointer-events:auto;will-change:transform;transition:opacity .5s var(--ease);border-radius:50%}
 .seed.hidden{opacity:0;pointer-events:none}
+.seed{cursor:grab;touch-action:none}
+.seed.dragging{cursor:grabbing;z-index:1}
 .seed .bub{position:absolute;inset:0;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:16%;text-align:center;
   background:radial-gradient(circle at 50% 32%,rgb(255 255 255/.82),rgb(255 255 255/.5) 55%,color-mix(in srgb,var(--c) 34%,rgb(255 255 255/.3)) 100%);
   border:1.5px solid rgb(255 255 255/.92);backdrop-filter:blur(8px) saturate(1.2);-webkit-backdrop-filter:blur(8px) saturate(1.2);
@@ -89,6 +91,7 @@ html,body{overflow:hidden}
   .seed .bub::before{left:8%;width:30%;height:40%;top:4%}
   .seed .tp{flex:1}
   .seed.hidden{display:none}
+  .seed{cursor:pointer;touch-action:auto}
   #drawer{left:12px;right:12px;top:auto;bottom:76px;width:auto;max-height:62vh;translate:0 calc(100% + 100px)}
 }
 `;

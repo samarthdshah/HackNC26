@@ -28,6 +28,7 @@ type Graph = {
 type Label = { i: number; n: Node; o: CSS2DObject; d: HTMLDivElement; base: boolean; temp: boolean; dim: boolean };
 type Route = { dots: THREE.Mesh[]; mat: THREE.MeshBasicMaterial };
 
+const Y_SPREAD = 1.35; // v7: vertical spacing between nodes (stays above the water at WATER_Y)
 const WATER_Y = -23, SUN = new THREE.Vector3(-0.55, 0.32, -0.77).normalize(), UP = new THREE.Vector3(0, 1, 0);
 const ROUTE_COLOR = 0x1f9a3a; // Wayfinder green: flat, unlit dots
 
@@ -141,7 +142,7 @@ export function mount(root: HTMLElement, initial: WF): RootsApi {
   const envTex = pmrem.fromScene(room, 0.03).texture;
   scene.environment = envTex;
   const camera = new THREE.PerspectiveCamera(52, innerWidth / innerHeight, 0.1, 2000);
-  const HOME = innerWidth / innerHeight < 1 ? new THREE.Vector3(0, 70, 128) : new THREE.Vector3(0, 40, 68);
+  const HOME = innerWidth / innerHeight < 1 ? new THREE.Vector3(0, 103, 103) : new THREE.Vector3(0, 58, 53); // v7: higher camera, the ring reads taller on screen
   camera.position.copy(HOME);
   const controls = new OrbitControls(camera, renderer.domElement);
   Object.assign(controls, { enableDamping: true, dampingFactor: 0.05, rotateSpeed: 0.6, minDistance: 8, maxDistance: 170, enablePan: false, autoRotate: S.auto, autoRotateSpeed: 0.25, maxPolarAngle: 1.68, minPolarAngle: 0.5 });
@@ -294,7 +295,7 @@ export function mount(root: HTMLElement, initial: WF): RootsApi {
       for (const b of sp) { if (b <= a) continue; const dd = nodes[a].pos.distanceTo(nodes[b].pos); if (dd < bd && rand() < 0.7) { bd = dd; best = b; } }
       if (best >= 0) link(a, best, 0.3);
     }
-    nodes.forEach((n) => (n.dist = n.pos.length()));
+    nodes.forEach((n) => { if (n.kind) n.pos.y *= Y_SPREAD; n.dist = n.pos.length(); }); // v7: space nodes further apart top to bottom
     const adj: number[][] = nodes.map(() => []), adjMain: number[][] = nodes.map(() => []), order = new Map<string, [number, number]>();
     pairs.forEach(([a, b]) => {
       adj[a].push(b); adj[b].push(a); order.set(a < b ? `${a}-${b}` : `${b}-${a}`, [a, b]);

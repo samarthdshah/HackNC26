@@ -61,6 +61,5 @@ canvas#scene.pointing{cursor:pointer}
   #legend{bottom:72px;gap:10px;padding:5px 12px;font-size:11px}
   #legend .opt{display:none}
   #focusbar{top:auto;bottom:150px}
-  body.has-dock #toast{bottom:112px}
 }
 `;

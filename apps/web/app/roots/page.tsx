@@ -12,7 +12,7 @@ import { duration } from "@/lib/wf/format";
 import { css } from "./style";
 import type { RootsApi } from "./scene";
 
-type Filter = "active" | "done" | "all";
+type Filter = "active" | "done"; // v7: Active / Past only
 
 // Plain-language status: who has it now, and how long it has been open.
 function status(q: WfQuery, h: WFHelpers, now: number) {
@@ -55,9 +55,8 @@ export default function RootsPage() {
 
   const mine = wf?.queries ?? [];
   const nActive = mine.filter((q) => q.status === "active").length;
-  // "All" shows every live request Wayfinder is routing, not just the viewer's.
-  const list = !wf ? [] : filter === "all" ? wf.allQueries : mine.filter((q) => q.status === filter);
-  const empty = !wf ? "Loading…" : !mine.length && !wf.allQueries.length ? "Nothing yet. Text Wayfinder to start." : "Nothing here yet.";
+  const list = mine.filter((q) => q.status === filter);
+  const empty = !wf ? "Loading…" : !mine.length ? "Nothing yet. Text Wayfinder to start." : "Nothing here yet.";
   const play = (id: string) => api.current?.playQuery(id);
 
   return (
@@ -80,8 +79,8 @@ export default function RootsPage() {
           </div>
           <div className="seg" role="group" aria-label="Filter queries"
             data-tour="2|Active and past|Switch between requests still in flight and ones already resolved.">
-            {(["active", "done", "all"] as const).map((f) => (
-              <button key={f} data-f={f} aria-pressed={filter === f} onClick={() => setFilter(f)}>{f === "active" ? "Active" : f === "done" ? "Past" : "All"}</button>
+            {(["active", "done"] as const).map((f) => (
+              <button key={f} data-f={f} aria-pressed={filter === f} onClick={() => setFilter(f)}>{f === "active" ? "Active" : "Past"}</button>
             ))}
           </div>
           <div className="rows" id="qlist">

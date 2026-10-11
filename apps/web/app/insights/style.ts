@@ -1,6 +1,7 @@
 // Verbatim page CSS from docs/design/v6/insights.html (rendered in a <style> that unmounts with the page).
 export const css = `
 html,body{overflow-x:hidden}
+body[data-page=insights]{--page:var(--accent);--page-hi:var(--accent-hi)}   /* v7: title bar matches the other panels instead of dock amber */
 canvas#bubbles{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
 main{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:30px 28px 140px}
 
