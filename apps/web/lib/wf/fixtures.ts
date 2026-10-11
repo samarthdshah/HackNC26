@@ -35,7 +35,7 @@ export function loadFixtures(): RawData {
   const actors: Actor[] = [
     ...departments.map((d) => ({ id: d.id, kind: "department" as const, name: d.name, department_id: d.id })),
     ...people.map((p) => ({ id: p.id, kind: "person" as const, name: p.name, department_id: p.department_id })),
-    { id: "agent", kind: "agent", name: "Wayfinder", department_id: null },
+    { id: "agent", kind: "agent", name: "AVATAR", department_id: null },
   ];
 
   const requests: Request[] = [];

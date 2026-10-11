@@ -52,7 +52,7 @@ export default function Home() {
         </svg>
         <div className="haze" />
       </div>
-      <canvas id="globe" aria-label="Wayfinder globe: a sphere of glass cubes showing what Wayfinder has done" />
+      <canvas id="globe" aria-label="AVATAR globe: a sphere of glass cubes showing what AVATAR has done" />
       <svg id="leaders" aria-hidden="true" />
       <div id="pins" aria-live="polite">
         {pins.map((p, k) => (
@@ -65,16 +65,16 @@ export default function Home() {
           </div>
         ))}
       </div>
-      <div id="globeSpot" aria-hidden="true" data-tour="2|The globe|Every cube stands for work Wayfinder routes. The pins show the real numbers: hours lost to bounces, people helped, hops per request." />
+      <div id="globeSpot" aria-hidden="true" data-tour="2|The globe|Every cube stands for work AVATAR routes. The pins show the real numbers: hours lost to bounces, people helped, hops per request." />
 
       <div id="heroWrap">
         <section id="hero" className="milk still title-card">
           <div className="bar"><span className="logo-orb" />Home Tree</div>
           <div className="body">
-            <h1 className="page-title reveal" data-tour="1|Wayfinder|An AI coordinator you text. Tell it a goal and it finds the people, resources and approvals to make it happen.">Wayfinder</h1>
+            <h1 className="page-title reveal" data-tour="1|AVATAR|An AI coordinator you text. Tell it a goal and it finds the people, resources and approvals to make it happen.">AVATAR</h1>
             <p className="tag reveal"><b>Discover.</b> <b>Connect.</b> <b>Coordinate.</b> <b>Evolve.</b></p>
             <p className="page-sub reveal">Tell it a goal. It finds the people who can make it happen.</p>
-            <div className="ctas reveal" data-tour="3|Start here|Roots shows your organisation as a living network. Insights shows where time goes and what Wayfinder hands back.">
+            <div className="ctas reveal" data-tour="3|Start here|Roots shows your organisation as a living network. Insights shows where time goes and what AVATAR hands back.">
               <Link className="pill" href="/roots">Explore the Roots</Link>
               <Link className="pill ghost" href="/insights">See the Insights</Link>
             </div>

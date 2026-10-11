@@ -10,7 +10,7 @@ export interface WFHelpers {
   dept: (id: string) => WfDept | undefined;
   /** v6 fell back to the first query; null here so pages can show an empty state. */
   query: (id?: string | null) => WfQuery | null;
-  /** "Wayfinder" for wf/agent, a first name for people, the department name for teams. */
+  /** "AVATAR" for wf/agent, a first name for people, the department name for teams. */
   nameOf: (id: string) => string;
 }
 
@@ -33,7 +33,7 @@ export function makeHelpers(wf: WF | null): WFHelpers {
     person: (id) => people.get(id),
     dept: (id) => depts.get(id),
     query: (id) => (id ? queries.get(id) ?? null : wf?.queries[0] ?? null),
-    nameOf: (id) => (id === "wf" || id === "agent" ? "Wayfinder" : people.get(id)?.first ?? wf?.actorNames[id] ?? id),
+    nameOf: (id) => (id === "wf" || id === "agent" ? "AVATAR" : people.get(id)?.first ?? wf?.actorNames[id] ?? id),
   };
 }
 

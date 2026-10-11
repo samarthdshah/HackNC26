@@ -56,7 +56,7 @@ export default function Currents() {
     return () => clearInterval(t);
   }, [q?.status, q?.id]);
 
-  useEffect(() => { if (q) document.title = `Wayfinder Currents · ${q.title}`; }, [q?.title]);
+  useEffect(() => { if (q) document.title = `AVATAR Currents · ${q.title}`; }, [q?.title]);
   useEffect(() => { setSendErr(null); setTyping(false); }, [q?.id]);
 
   // mini-map: redraw on every snapshot
@@ -122,20 +122,20 @@ export default function Currents() {
       setTyping(false);
       if (res.reply) {
         push({ id: `opt-r-${Date.now()}`, t: clock(new Date().toISOString(), tz), from: "wf", kind: "msg", text: res.reply, fresh: true });
-        toast("msg", "New message", "Wayfinder replied", res.reply.replace(/[<&]/g, (c) => (c === "<" ? "&lt;" : "&amp;")));
+        toast("msg", "New message", "AVATAR replied", res.reply.replace(/[<&]/g, (c) => (c === "<" ? "&lt;" : "&amp;")));
         setTimeout(hideToast, 4200);
       }
       await refresh(); // the effect below swaps optimistic rows for the agent's real events
     } catch {
       setTyping(false);
-      setSendErr("Wayfinder isn't reachable right now, so this message wasn't delivered.");
+      setSendErr("AVATAR isn't reachable right now, so this message wasn't delivered.");
       toast("msg", "Agent not reachable", "Your message wasn't delivered", "Try again once the agent is running.");
     }
   };
 
   /* ---------- states without a query ---------- */
   if (!wf || !q) {
-    const msg = error ? `Couldn't load data: ${error}` : !wf ? "Loading…" : "No requests yet. Text Wayfinder to start one.";
+    const msg = error ? `Couldn't load data: ${error}` : !wf ? "Loading…" : "No requests yet. Text AVATAR to start one.";
     return (
       <>
         <style dangerouslySetInnerHTML={{ __html: STYLE }} />
@@ -160,7 +160,7 @@ export default function Currents() {
   const live = wf.allQueries.filter((x) => !wf.queries.some((y) => y.id === x.id));
   const active = wf.queries.filter((x) => x.status === "active").length;
   const ownerId = q.hops.at(-1)?.who;
-  const owner = ownerId ? helpers.nameOf(ownerId) : "Wayfinder";
+  const owner = ownerId ? helpers.nameOf(ownerId) : "AVATAR";
   const dot = (x: WfQuery) => (x.rawStatus === "denied" || x.rawStatus === "stuck" ? "#F0715A" : x.status === "done" ? "#2E9E3A" : "#F2A114");
   const nameOf = (id: string) => (id === me ? "You" : helpers.nameOf(id));
   const orbOf = (id: string) => (id === "wf" || id === "agent" ? "" : id === me ? "accent" : ORBS[hash(id) % 4]);
@@ -203,14 +203,14 @@ export default function Currents() {
           </div>
         </section>
 
-        <section className="flow milk still" aria-label="Path of the query" data-tour="4|The path|Each numbered stop is a hop. The dashed arc at the end is the shortcut Wayfinder learned for next time.">
+        <section className="flow milk still" aria-label="Path of the query" data-tour="4|The path|Each numbered stop is a hop. The dashed arc at the end is the shortcut AVATAR learned for next time.">
           <div className="bar">Path<span className="chip info" id="hopChip" style={{ textShadow: "none" }}>{n} {n === 1 ? "hop" : "hops"}</span><button className="pill ghost" id="replay" onClick={() => setReplay((r) => r + 1)}>↻ Replay</button></div>
           <div className="stage"><svg id="flow" ref={flowRef} viewBox="0 0 1000 380" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Left to right flow of hops"></svg></div>
           <div className="legend" aria-hidden="true"><span><i style={{ background: "var(--accent)" }}></i>You</span><span><i style={{ background: "#F0715A" }}></i>Redirected</span><span><i style={{ background: "#F2A114" }}></i>Delegated</span><span><i style={{ background: "#1FA889" }}></i>Passed on</span><span><i style={{ background: "#2E9E3A" }}></i>Approved / answered</span><span><i style={{ background: "#2A8CE8" }}></i>Waiting</span></div>
           <div className="ticker" aria-live="polite"><svg className="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" /></svg><span className="msg" id="tick" ref={tickRef}></span><span className="chip">just now</span></div>
         </section>
 
-        <aside className="tx milk still" aria-label="Transactions" data-tour="5|Transactions|Every message, approval and payment on this request. Type below to message Wayfinder about it.">
+        <aside className="tx milk still" aria-label="Transactions" data-tour="5|Transactions|Every message, approval and payment on this request. Type below to message AVATAR about it.">
           <div className="bar">Transactions<span className="live"><i></i><span id="activeCount">{active} active {active === 1 ? "chat" : "chats"}</span></span></div>
           <div className="chats" id="chatsRow"><span className={`orb sm ${q.status === "done" ? "" : "amber"}`}></span><span>{q.status === "done" ? "Closed" : "Open"} thread with <b style={{ color: "var(--ink)" }}>{owner}</b> · {rows.length} messages</span></div>
           <div className="list" id="txList" ref={listRef} aria-live="polite">
@@ -227,7 +227,7 @@ export default function Currents() {
             {sendErr && <div className="msgi sys new" role="alert"><span className="orb grey">!</span><div><div className="tx-t">{sendErr}</div></div></div>}
           </div>
           <form className="compose" id="compose" autoComplete="off" onSubmit={send}>
-            <input id="msgIn" type="text" placeholder="Message Wayfinder about this query…" aria-label="Message" value={text} onChange={(e) => setText(e.target.value)} />
+            <input id="msgIn" type="text" placeholder="Message AVATAR about this query…" aria-label="Message" value={text} onChange={(e) => setText(e.target.value)} />
             <button className="pill" type="submit">Send</button>
           </form>
         </aside>

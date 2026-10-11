@@ -44,7 +44,7 @@ export default function Dock() {
   const page = activePage(path);
   useEffect(() => { if (ref.current) wireCandy(ref.current); }, []);
   return (
-    <nav id="dock" ref={ref} aria-label="Wayfinder pages" data-tour="90|Pages|Jump between the six views of Wayfinder from this dock.">
+    <nav id="dock" ref={ref} aria-label="AVATAR pages" data-tour="90|Pages|Jump between the six views of AVATAR from this dock.">
       {PAGES.map((p) => (
         <Link key={p.id} className="ctl" href={p.href} aria-current={p.id === page ? "page" : undefined}>
           <span className="sq glass">

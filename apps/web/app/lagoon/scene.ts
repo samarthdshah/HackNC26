@@ -397,7 +397,7 @@ export function mount(root: HTMLElement, initial: WF, ctx: LagoonCtx): LagoonApi
     if (disposed) { introState.set(k, ok ? "sent" : "err"); return; }
     if (!ok) {
       introState.set(k, "err"); swapBtn(t, x.p.id);
-      toast("msg", "Intro not sent", "Wayfinder’s agent isn’t reachable", `Nothing was sent to ${esc(x.p.first)}. Try again in a moment. <span class="hops">${esc(detail)}</span>`);
+      toast("msg", "Intro not sent", "AVATAR’s agent isn’t reachable", `Nothing was sent to ${esc(x.p.first)}. Try again in a moment. <span class="hops">${esc(detail)}</span>`);
       return;
     }
     introState.set(k, "sent");

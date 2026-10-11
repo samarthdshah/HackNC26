@@ -40,7 +40,7 @@ export function buildWF(raw: RawData, opts: BuildOptions = {}): WF {
   const meId = opts.me ?? "p_leo";
 
   // ---------- names ----------
-  const names: Record<string, string> = { agent: "Wayfinder", wf: "Wayfinder", ...raw.extraNames };
+  const names: Record<string, string> = { agent: "AVATAR", wf: "AVATAR", ...raw.extraNames };
   for (const a of raw.actors) names[a.id] = a.name;
   for (const p of raw.people) names[p.id] = p.name;
   for (const d of raw.departments) names[d.id] = d.name;

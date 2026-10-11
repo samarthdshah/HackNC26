@@ -90,7 +90,7 @@ export default function Darwin({ meta, initial }: { meta: DarwinMeta | null; ini
       <style dangerouslySetInnerHTML={{ __html: STYLE }} />
       <div id="stage"><canvas id="tree" aria-label={live ? "Darwin's evolution tree: each ring of branches is a generation, each orange fruit is that generation's best rule set" : "Darwin's evolution tree: each ring of branches is a generation, each orange fruit is an evolved routing rule"}></canvas></div>
 
-      <section id="head" className="milk float title-card" aria-live="polite" data-tour="1|Darwin Growth|Darwin replays past requests and keeps the routes that need fewer hops. It is Wayfinder improving itself.">
+      <section id="head" className="milk float title-card" aria-live="polite" data-tour="1|Darwin Growth|Darwin replays past requests and keeps the routes that need fewer hops. It is AVATAR improving itself.">
         <div className="bar"><span className="logo-orb"></span>Evolve<span className="live"><i id="liveDot"></i><span id="liveTxt">{has ? "evolving" : "idle"}</span></span></div>
         <div className="body">
           <h1 className="page-title">Darwin Growth</h1>

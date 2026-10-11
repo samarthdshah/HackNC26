@@ -29,7 +29,7 @@ function kpis(wf: WF): Kpi[] {
     { k: "Requests routed", to: S.requestsRouted, f: fmt, spark: ser.map((d) => d.requests), chip: `${fmt(last?.requests ?? 0)} this wk` },
     after != null
       ? { k: "Median resolve", to: after / 60000, f: mins, chip: `was ${S.medianBefore}` }
-      : { k: "Median resolve", to: S.medianBeforeMs / 60000, f: mins, chip: "before Wayfinder" },
+      : { k: "Median resolve", to: S.medianBeforeMs / 60000, f: mins, chip: "before AVATAR" },
     { k: "Intros made", to: S.introsMade, f: fmt, chip: "Mycelium", cls: "info" },
     { k: "Text approvals", to: S.approvalsByText, f: fmt, chip: "no portals" },
     S.avgHopsAfter != null
@@ -153,8 +153,8 @@ export default function Insights() {
       <main>
         <header className="top">
           <div>
-            <h1 className="page-title" data-tour="1|Insights|Where time goes across the org, and what Wayfinder hands back, over the last 12 weeks.">Insights</h1>
-            <p className="page-sub">Where time goes{wf ? ` at ${wf.company.name}` : ""}, and what Wayfinder hands back, over the last 12 weeks.</p>
+            <h1 className="page-title" data-tour="1|Insights|Where time goes across the org, and what AVATAR hands back, over the last 12 weeks.">Insights</h1>
+            <p className="page-sub">Where time goes{wf ? ` at ${wf.company.name}` : ""}, and what AVATAR hands back, over the last 12 weeks.</p>
           </div>
           <div className="when">
             <span className="chip info">Last 12 weeks</span>
@@ -254,10 +254,10 @@ export default function Insights() {
             </div>
           </section>
 
-          <section className="milk still card" aria-labelledby="brH" data-tour="4|Fewer hops|How many people a request bounced through before Wayfinder. The “after” bars fill in as live requests resolve.">
-            <div className="bar" id="brH">Hops before vs after Wayfinder<span className="sub">avg per request</span></div>
+          <section className="milk still card" aria-labelledby="brH" data-tour="4|Fewer hops|How many people a request bounced through before AVATAR. The “after” bars fill in as live requests resolve.">
+            <div className="bar" id="brH">Hops before vs after AVATAR<span className="sub">avg per request</span></div>
             <div className="body">
-              <div className="legend" id="brLegend">{c ? <><span>{sw("#9DB0C3")}Before</span><span>{sw(`linear-gradient(${c.hi},${c.lo})`)}With Wayfinder · live</span></> : null}</div>
+              <div className="legend" id="brLegend">{c ? <><span>{sw("#9DB0C3")}Before</span><span>{sw(`linear-gradient(${c.hi},${c.lo})`)}With AVATAR · live</span></> : null}</div>
               <div className="chart" id="bars">
                 {c && wf ? (
                   <ResponsiveContainer width="100%" height="100%">
@@ -270,7 +270,7 @@ export default function Insights() {
                       <XAxis dataKey="name" {...axis(c)} interval={0} tick={{ fill: c.ink2, fontSize: 11 }} /><YAxis {...axis(c)} />
                       <Tooltip content={<Tip />} cursor={{ fill: "rgba(255,255,255,.35)" }} />
                       <Bar dataKey="before" name="Before" fill="url(#gBefore)" radius={[6, 6, 0, 0]} isAnimationActive={!RM} animationDuration={1100} />
-                      <Bar dataKey="after" name="With Wayfinder" fill="url(#gAfter)" radius={[6, 6, 0, 0]} isAnimationActive={!RM} animationDuration={1100} animationBegin={250} />
+                      <Bar dataKey="after" name="With AVATAR" fill="url(#gAfter)" radius={[6, 6, 0, 0]} isAnimationActive={!RM} animationDuration={1100} animationBegin={250} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : null}

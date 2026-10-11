@@ -374,7 +374,7 @@ export function mount(root: HTMLElement, ctx: DarwinCtx): Scene {
     setButton(ok, false, "Darwin isn't connected: this is a snapshot");
     setButton(no, false, "Darwin isn't connected: this is a snapshot");
     $("rNote").textContent = r.status === "frozen"
-      ? "Wayfinder learns this one live from replies, so Darwin never proposes it."
+      ? "AVATAR learns this one live from replies, so Darwin never proposes it."
       : "Darwin isn't connected, so this is a snapshot of its latest run. Start Darwin and the agent to approve generations.";
   }
   function openRule(f: Fruit) {

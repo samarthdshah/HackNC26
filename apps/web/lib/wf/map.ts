@@ -41,7 +41,7 @@ export function txOf(e: Event, name: (id: string) => string, me: string): { from
     case "approval_requested": return { from: "wf", kind: "pending", text: `Asked ${first(p.approver)} to approve ${money(p.amount_usd)} by text.`.replace(" approve  by", " approve by") };
     case "reminder_sent": return { from: "wf", kind: "pending", text: `Reminded ${Array.isArray(p.to) ? p.to.map(first).join(", ") : first(p.to)}.` };
     case "escalated": return { from: "wf", kind: "pending", text: `No reply from ${first(p.from)}, escalated to ${first(p.to)}.` };
-    case "request_stuck": return { from: "wf", kind: "pending", text: "Stuck: Wayfinder needs a hand to finish this." };
+    case "request_stuck": return { from: "wf", kind: "pending", text: "Stuck: AVATAR needs a hand to finish this." };
     case "approved": return { from: String(p.approver ?? e.actor), kind: "approve", text: `Approved ${money(p.amount_usd)}`.trim() + "." };
     case "request_resolved": return { from: "wf", kind: "approve", text: "Resolved." };
     case "denied": return { from: String(p.approver ?? p.by ?? e.actor), kind: "deny", text: `Declined${p.note ? `: ${p.note}` : "."}` };

@@ -19,12 +19,12 @@ header.top .when{display:flex;gap:10px;align-items:center}
 
 /* KPI tiles */
 .kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
-.tile{padding:12px 14px 10px;border-radius:12px;background:rgb(255 255 255/.5);border:1px solid rgb(255 255 255/.8);box-shadow:inset 0 1px 0 #fff,0 2px 8px rgb(0 40 100/.08);display:grid;gap:4px}
+.tile{min-width:0;overflow:hidden;padding:12px 14px 10px;border-radius:12px;background:rgb(255 255 255/.5);border:1px solid rgb(255 255 255/.8);box-shadow:inset 0 1px 0 #fff,0 2px 8px rgb(0 40 100/.08);display:grid;gap:4px}
 .tile .num{font-size:30px;font-weight:300;line-height:1.05;letter-spacing:-.01em;white-space:nowrap}
 .tile .num small{font-size:15px;color:var(--ink-2);font-weight:400}
-.tile .foot{display:flex;align-items:center;justify-content:space-between;gap:6px}
-.tile .chip{white-space:nowrap;font-size:11px;padding:2px 7px}
-.spark{flex:1 1 auto;min-width:40px;max-width:84px;height:26px;overflow:visible}
+.tile .foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 6px;min-width:0}   /* the sparkline drops under the chip when the card is narrow */
+.tile .chip{white-space:nowrap;font-size:11px;padding:2px 7px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.spark{flex:1 0 56px;min-width:0;max-width:84px;height:26px;overflow:visible}
 .spark .ln{fill:none;stroke:var(--accent);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .spark .ar{fill:var(--accent-soft);opacity:.22}
 .spark .end{fill:#fff;stroke:var(--accent);stroke-width:1.5}

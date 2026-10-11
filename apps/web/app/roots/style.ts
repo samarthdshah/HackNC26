@@ -49,8 +49,8 @@ canvas#scene.pointing{cursor:pointer}
 .lw .lbl.person{transform:translateY(-14px)}
 .lw .lbl.off{transform:translateY(-8px) scale(.9)}
 .lw .lbl.dim{opacity:.32}
-.lw .lbl.core{font-size:15px;color:#fff;text-shadow:0 1px 2px rgb(0 60 0/.5);transform:translateY(-44px);
-  background:linear-gradient(180deg,rgb(255 255 255/.5),rgb(255 255 255/.1) 49%,transparent 50%),linear-gradient(180deg,#5BD86B,#1F8F37);border-color:rgb(255 255 255/.7)}
+.lw .lbl.core{font-size:15px;color:#fff;text-shadow:0 1px 2px rgb(0 50 60/.5);transform:translateY(-44px);
+  background:linear-gradient(180deg,rgb(255 255 255/.5),rgb(255 255 255/.1) 49%,transparent 50%),linear-gradient(180deg,#42CDD7,#1B9DA7);border-color:rgb(255 255 255/.7)}   /* teal of the Roots dock icon (.sq.teal, hsl 184 72% 38%) */
 .lw .lbl.me{box-shadow:0 0 0 2px #5BD86B,0 3px 10px rgb(0 40 100/.22)}
 
 @media (max-width:700px){
