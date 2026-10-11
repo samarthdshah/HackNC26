@@ -8,6 +8,7 @@ export async function forward(path: "/say" | "/intro", req: Request) {
   try {
     const res = await fetch(`${base}${path}`, {
       method: "POST",
+      cache: "no-store",
       headers: {
         "Content-Type": "application/json",
         ...(process.env.AGENT_WEB_TOKEN ? { Authorization: `Bearer ${process.env.AGENT_WEB_TOKEN}` } : {}),
