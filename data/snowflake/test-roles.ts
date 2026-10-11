@@ -1,9 +1,13 @@
 // Prove the POL-ACCESS-1 rules from roles.sql by querying as each tier role through the SQL API "role" field.
 // Run after snowflake:roles: npm --prefix data run snowflake:test-roles
+// As lane A's user (WAYFINDER_AGENT), with SNOWFLAKE_AGENT_PAT: npm --prefix data run snowflake:test-roles -- --agent-pat
+// Same checks and expected results, minus the ACCOUNTADMIN-only ones.
 
-import { requireEnv, runSql, type SqlResult } from "./client.ts";
+import { requireEnv, runSql, usePat, type SqlResult } from "./client.ts";
 
 requireEnv(["SNOWFLAKE_DATABASE", "SNOWFLAKE_SCHEMA"]);
+const AGENT_PAT = process.argv.includes("--agent-pat");
+if (AGENT_PAT) usePat("SNOWFLAKE_AGENT_PAT");
 const ctx = { database: process.env.SNOWFLAKE_DATABASE, schema: process.env.SNOWFLAKE_SCHEMA };
 
 const MASK = "[visible to HR only]";
@@ -146,6 +150,23 @@ const TESTS: Test[] = [
     expect: "refused",
     check: refused,
   })),
+  // Each statement runs as the named tier role only: no secondary roles, so PHOTON_HR is not in an EMPLOYEE or
+  // MANAGER session (HR text stays masked). Under the agent PAT the user must be WAYFINDER_AGENT.
+  ...[
+    ["EMPLOYEE", "PHOTON_EMPLOYEE"],
+    ["MANAGER", "PHOTON_MANAGER"],
+  ].map(([who, role]): Test => ({
+    name: `${who} session: user, role, secondary roles, PHOTON_HR in session`,
+    role,
+    sql: "SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_SECONDARY_ROLES(), IS_ROLE_IN_SESSION('PHOTON_HR')",
+    expect: `${AGENT_PAT ? "WAYFINDER_AGENT" : "owner"}, ${role}, none, false`,
+    check: (r) =>
+      r.ok &&
+      (!AGENT_PAT || r.rows[0][0] === "WAYFINDER_AGENT") &&
+      r.rows[0][1] === role &&
+      JSON.parse(r.rows[0][2] ?? "{}").roles === "" &&
+      r.rows[0][3] === "false",
+  })),
   {
     name: "WAYFINDER_AGENT granted roles",
     role: "ACCOUNTADMIN",
@@ -165,7 +186,8 @@ function describe(r: SqlResult): string {
 }
 
 const results: [string, string, string, string, boolean][] = [];
-for (const t of TESTS) {
+// The agent PAT cannot use ACCOUNTADMIN, so admin-only checks run under the owner PAT only.
+for (const t of TESTS.filter((t) => !(AGENT_PAT && t.role === "ACCOUNTADMIN"))) {
   const r = await runSql(t.sql, { ...ctx, role: t.role });
   results.push([t.name, t.role, t.expect, describe(r), t.check(r)]);
 }
@@ -182,9 +204,13 @@ else {
 }
 results.push(["person_roles matches approved mapping", "PHOTON_APP", `${expected.size} people, 0 mismatches`, pr.ok ? `${pr.rows.length} people, ${mismatches.length} mismatches` : "unreadable", mismatches.length === 0]);
 
+console.log(`PAT: ${AGENT_PAT ? "SNOWFLAKE_AGENT_PAT" : "SNOWFLAKE_PAT"}`);
 console.log("| Test | Role | Expected | Actual | Result |\n|---|---|---|---|---|");
 for (const [name, role, expect, actual, pass] of results) console.log(`| ${name} | ${role} | ${expect} | ${actual} | ${pass ? "PASS" : "FAIL"} |`);
 for (const m of mismatches) console.log(`  mismatch: ${m}`);
+// Report only: what a statement with no role in the request body runs as (the user's default role).
+const bare = await runSql("SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_SECONDARY_ROLES(), IS_ROLE_IN_SESSION('PHOTON_HR')", { ...ctx, role: undefined });
+console.log(`No role in request body: ${bare.ok ? bare.rows[0].join(", ") : `refused (${bare.code}) ${bare.message.slice(0, 80)}`}`);
 const failed = results.filter((r) => !r[4]).length;
 console.log(failed ? `${failed} of ${results.length} FAILED` : `All ${results.length} passed.`);
 process.exit(failed ? 1 : 0);
