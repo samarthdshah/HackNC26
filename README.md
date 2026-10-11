@@ -34,13 +34,13 @@ You text Avatar in iMessage. It breaks your request into steps and sends each st
 
 ### What Darwin found
 
-Darwin replayed 83 resolved requests and proposed 3 rules:
+Darwin replays closed requests: 83 requests with 255 hops. The data holds 84 requests and 256 hops because Leo's demo request is still open, with 1 hop so far. Darwin proposed 3 rules:
 
 1. Page Platform Engineering first for checkout incidents.
 2. Send dashboard requests to Analytics Engineering first.
 3. For onboarding, skip People Ops and go to Workplace.
 
-Together they save 217.2 hours (7.3%), 16 hops, and 12 bounces in replay. A brute-force check of all 28 possible rule sets picked the same 3. The data backs rule 1. Checkout incidents paged to Platform first took 43 minutes on average. Those routed through other teams took 233.
+Together they save 217.2 hours (7.3%), 16 hops, and 12 bounces in replay. A brute-force check of all 28 possible rule sets picked the same 3. The data backs rule 1. In the recorded history, the 2 checkout incidents paged to Platform first took 43 minutes on average to close. The 4 routed through other teams took 233 minutes. In Darwin's replay of all 6 incidents, rule 1 cuts the average time to close from 169.2 minutes to 71.7.
 
 ## Challenges we ran into
 
