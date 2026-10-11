@@ -44,7 +44,7 @@ export const env = {
   },
   nessie: {
     apiKey: optional("NESSIE_API_KEY"),
-    baseUrl: optional("NESSIE_BASE_URL", "http://api.nessieisreal.com"),
+    baseUrl: optional("NESSIE_BASE_URL", "https://api.nessieisreal.com"),
   },
   solana: {
     rpcUrl: optional("SOLANA_RPC_URL", "https://api.devnet.solana.com"),

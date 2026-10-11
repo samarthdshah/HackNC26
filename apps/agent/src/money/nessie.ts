@@ -81,11 +81,21 @@ function offline(kind: string, entry: Record<string, unknown>, err: unknown) {
 export async function transferBetweenBudgets(fromDept: string, toDept: string, amountUsd: number, description: string) {
   try {
     const [from, to] = [await accountFor(fromDept), await accountFor(toDept)];
+    // This Nessie's transfers are one-sided (no payee field), so the money moves as
+    // a transfer out of the source account plus a deposit into the destination.
+    const day = new Date().toISOString().slice(0, 10);
     const res = await post<{ objectCreated: { _id: string } }>(`/accounts/${from}/transfers`, {
-      medium: "balance",
-      payee_id: to,
+      transaction_date: day,
+      status: "completed",
       amount: amountUsd,
-      description: description.slice(0, 120),
+      description: `To ${toDept}: ${description}`.slice(0, 120),
+    });
+    await post(`/accounts/${to}/deposits`, {
+      medium: "balance",
+      transaction_date: day,
+      status: "completed",
+      amount: amountUsd,
+      description: `From ${fromDept}: ${description}`.slice(0, 120),
     });
     return { tx_id: res.objectCreated._id, rail: "nessie transfer", simulated: false as const };
   } catch (err) {
