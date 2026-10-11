@@ -52,7 +52,7 @@ export type LiveUpdate =
 // such as check_permission against these without waiting on the agent).
 
 /** Which specialist agent runs a step. */
-export type StepKind = "action" | "approval" | "payment" | "call" | "rsvp";
+export type StepKind = "action" | "approval" | "payment" | "call" | "rsvp" | "room";
 
 export interface PlanStep {
   id: string;

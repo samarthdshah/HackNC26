@@ -12,7 +12,7 @@ const bool = (v: string | null) => v === "true";
 export async function loadOrgData(): Promise<{ source: "snowflake" | "fixtures"; detail: string }> {
   if (!snowflakeConfigured()) return { source: "fixtures", detail: "Snowflake not configured" };
   try {
-    const [companyRows, peopleRows, deptRows, budgetRows, vendorRows, policyRows, roomRows, roleRows] = await Promise.all([
+    const [companyRows, peopleRows, deptRows, budgetRows, vendorRows, policyRows, roomRows, roleRows, typicalRows] = await Promise.all([
       rows(`select name, domain, timezone, to_varchar(demo_date) from company`),
       rows(`select id, name, email, department_id, role, manager_id, status, to_varchar(out_until), delegate_id,
                    access_role, skills from people order by id`),
@@ -23,6 +23,11 @@ export async function loadOrgData(): Promise<{ source: "snowflake" | "fixtures";
       rows(`select id, title, text from policies order by id`),
       rows(`select id, name, floor, capacity, features from rooms order by id`),
       rows(`select * from person_roles`, env.snowflake.appRole),
+      // Aggregate-only view for lane A; C grants it to PHOTON_APP only.
+      rows(
+        `select task_type, request_count, avg_resolution_hours, median_resolution_hours, avg_hops from resolution_by_task_type`,
+        env.snowflake.appRole,
+      ).catch(() => [] as Row[]),
     ]);
     const [c] = companyRows;
     setOrgData({
@@ -46,8 +51,14 @@ export async function loadOrgData(): Promise<{ source: "snowflake" | "fixtures";
       policies: policyRows.map((r): Policy => ({ id: r[0]!, title: r[1]!, text: r[2]! })),
       rooms: roomRows.map((r): Room => ({ id: r[0]!, name: r[1]!, floor: num(r[2]), capacity: num(r[3]), features: arr(r[4]) })),
       personRoles: Object.fromEntries(roleRows.map((r) => [r[0]!, r[1]!])),
+      typical: Object.fromEntries(
+        typicalRows.map((r) => [r[0]!, { requests: num(r[1]), avg_hours: num(r[2]), median_hours: num(r[3]), avg_hops: num(r[4]) }]),
+      ),
     });
-    return { source: "snowflake", detail: `${peopleRows.length} people, ${deptRows.length} departments, ${roleRows.length} role mappings` };
+    return {
+      source: "snowflake",
+      detail: `${peopleRows.length} people, ${deptRows.length} departments, ${roleRows.length} role mappings, ${typicalRows.length} task-type baselines, as ${env.snowflake.patOwner}`,
+    };
   } catch (err) {
     console.warn(`[org] Snowflake load failed, using fixtures: ${err instanceof Error ? err.message : err}`);
     return { source: "fixtures", detail: `Snowflake failed: ${err instanceof Error ? err.message : err}` };

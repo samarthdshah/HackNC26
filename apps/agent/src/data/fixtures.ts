@@ -87,6 +87,14 @@ export let rooms = load<Room[]>("rooms.json");
 export const edges = load<OrgEdge[]>("edges.json");
 /** Person id -> Snowflake tier role (PHOTON.ORG.PERSON_ROLES). Empty until loaded. */
 export let personRoles: Record<string, string> = {};
+/** Resolved-request history per task type (Snowflake resolution_by_task_type). */
+export interface Typical {
+  requests: number;
+  avg_hours: number;
+  median_hours: number;
+  avg_hops: number;
+}
+export let typical: Record<string, Typical> = {};
 export let source: "fixtures" | "snowflake" = "fixtures";
 
 export interface OrgData {
@@ -98,10 +106,11 @@ export interface OrgData {
   policies: Policy[];
   rooms: Room[];
   personRoles: Record<string, string>;
+  typical: Record<string, Typical>;
 }
 
 export function setOrgData(data: OrgData) {
-  ({ company, people, departments, budgets, vendors, policies, rooms, personRoles } = data);
+  ({ company, people, departments, budgets, vendors, policies, rooms, personRoles, typical } = data);
   source = "snowflake";
 }
 

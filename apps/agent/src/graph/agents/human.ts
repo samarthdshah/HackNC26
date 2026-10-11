@@ -14,6 +14,8 @@ import { learnDelegate, learnRedirect, reinforce } from "../../org/map.ts";
 import { draft } from "../../tools/draft.ts";
 import { route } from "../../tools/route.ts";
 import { agentBase, last, type Assignment, type Resume, type Waiting } from "../state.ts";
+import { routeHint } from "../../data/darwin.ts";
+import { recordHop } from "../hops.ts";
 import { ev, tell } from "./common.ts";
 
 const MAX_HOPS = 4;
@@ -36,7 +38,17 @@ async function routeNode(s: S): Promise<Command> {
       goto: END,
     });
   }
-  const r = route({ task_type: st.task_type, requester: s.request.requester, exclude: s.exclude, prefer: s.prefer });
+  // First hop only: Darwin's approved rules may say where this task type really belongs.
+  let prefer = s.prefer;
+  const hint = s.hops === 0 && !prefer ? await routeHint(st.task_type, s.request.severity) : undefined;
+  if (hint?.prefer) prefer = hint.prefer;
+  let r = route({ task_type: st.task_type, requester: s.request.requester, exclude: s.exclude, prefer });
+  const skip = hint?.redirects.find((x) => x.avoid === r.entry || x.avoid === r.owner);
+  if (skip) r = route({ task_type: st.task_type, requester: s.request.requester, exclude: [...s.exclude, skip.avoid], prefer: skip.use });
+  if (hint && (hint.prefer || skip)) {
+    ev(s, "darwin_hint", { rule_ids: hint.rule_ids, prefer: hint.prefer, skip, reason: hint.reason });
+    await tell(s, `Routing to ${nameOf(r.entry ?? r.owner ?? "")} directly (Darwin: ${hint.reason})`);
+  }
   if (!r.owner) {
     return new Command({ update: { result: { status: "failed", summary: `No owner found for ${st.task_type}` } }, goto: END });
   }
@@ -94,6 +106,7 @@ async function onReply(s: S): Promise<Command> {
     if (a.reminders >= env.maxReminders) {
       const boss = getPerson(a.owner)?.manager_id;
       ev(s, "escalated", { from: a.owner, to: boss });
+      recordHop(s.request.id, s.request.requester, a.owner, "forwarded", { note: "no reply, escalated" });
       await tell(s, `${firstName(a.owner)} hasn't replied. Escalating${boss ? ` to ${nameOf(boss)}` : ""}.`);
       return new Command({ update: { prefer: boss, exclude: [...s.exclude, a.owner] }, goto: "route" });
     }
@@ -114,8 +127,9 @@ async function onReply(s: S): Promise<Command> {
 
   switch (verdict.kind) {
     case "done":
-      reinforce(a.chain, st.task_type);
+      reinforce(a.chain, st.task_type, s.request.id);
       ev(s, "step_done", { by, chain: a.chain });
+      recordHop(s.request.id, s.request.requester, a.owner, "handled", { note: msg.text });
       if (a.delegated_from) {
         await sendTo(a.delegated_from, `FYI: ${firstName(by)} handled "${st.description}" while you're out.`, s.request.id);
       }
@@ -138,10 +152,12 @@ async function onReply(s: S): Promise<Command> {
       if (verdict.kind === "delegate" && !isTeam(target)) {
         learnDelegate(a.owner, target, st.task_type, verdict.until, s.request.id);
         ev(s, "delegated", { from: a.owner, to: target, task_type: st.task_type, until: verdict.until });
+        recordHop(s.request.id, s.request.requester, a.owner, "delegated", { redirect_to: target, note: msg.text });
         await tell(s, `${firstName(a.owner)} handed it to ${nameOf(target)}.`);
       } else {
         const { demoted, learned } = learnRedirect("agent", entry, target, st.task_type, s.request.id);
         ev(s, "redirected", { from: entry, to: target, by, task_type: st.task_type, demoted, learned });
+        recordHop(s.request.id, s.request.requester, a.owner, "bounced", { redirect_to: target, note: msg.text });
         await tell(s, `${firstName(by)} says it's not ${nameOf(entry)}, it's ${nameOf(target)}. Rerouting, and I'll remember that.`);
         await postWarRoom(`🧠 Learned: ${st.task_type} → ${nameOf(target)} (not ${nameOf(entry)})`, s.request.id, isSensitive(st.task_type));
       }
@@ -158,6 +174,7 @@ async function onReply(s: S): Promise<Command> {
 
     case "deny":
       ev(s, "denied", { by, note: verdict.note });
+      recordHop(s.request.id, s.request.requester, a.owner, "handled", { note: `declined: ${msg.text}` });
       return new Command({
         update: { verdict, result: { status: "denied", owner: by, summary: `${firstName(by)} declined: ${msg.text}` } },
         goto: END,

@@ -17,12 +17,19 @@ requireEnv(["SNOWFLAKE_ACCOUNT", "SNOWFLAKE_PAT", "SNOWFLAKE_ROLE", "SNOWFLAKE_W
 
 const account = process.env.SNOWFLAKE_ACCOUNT!.toLowerCase().replace(/_/g, "-");
 const base = `https://${account}.snowflakecomputing.com`;
-const headers = {
-  Authorization: `Bearer ${process.env.SNOWFLAKE_PAT}`,
+let patEnv = "SNOWFLAKE_PAT";
+const headers = () => ({
+  Authorization: `Bearer ${process.env[patEnv]}`,
   "X-Snowflake-Authorization-Token-Type": "PROGRAMMATIC_ACCESS_TOKEN",
   "Content-Type": "application/json",
   Accept: "application/json",
-};
+});
+
+// Send a different PAT, e.g. SNOWFLAKE_AGENT_PAT to run as lane A's WAYFINDER_AGENT. Default: SNOWFLAKE_PAT.
+export function usePat(envName: string): void {
+  requireEnv([envName]);
+  patEnv = envName;
+}
 
 export function short(text: string): string {
   return text.replace(/\s+/g, " ").slice(0, 300);
@@ -34,6 +41,7 @@ export type SqlResult =
 
 export type SqlOptions = {
   bindings?: Record<string, { type: string; value: string }>;
+  role?: string; // Overrides SNOWFLAKE_ROLE for this statement. Pass undefined to send no role (user's default).
   database?: string;
   schema?: string;
 };
@@ -54,7 +62,7 @@ export async function runSql(statement: string, opts: SqlOptions = {}): Promise<
   let result = await parse(
     await fetch(`${base}/api/v2/statements`, {
       method: "POST",
-      headers,
+      headers: headers(),
       body: JSON.stringify({
         statement,
         timeout: 60,
@@ -67,7 +75,7 @@ export async function runSql(statement: string, opts: SqlOptions = {}): Promise<
   // Long statements return 202 with a handle; poll until done.
   while ("pending" in result) {
     await new Promise((r) => setTimeout(r, 1000));
-    result = await parse(await fetch(`${base}/api/v2/statements/${result.pending}`, { headers }));
+    result = await parse(await fetch(`${base}/api/v2/statements/${result.pending}`, { headers: headers() }));
   }
   return result;
 }

@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Event, LiveUpdate, OrgEdge } from "@wayfinder/shared";
-import { writeEdge, writeEvent } from "./data/tiger.ts";
+import { writeEdge, writeEvent, type EdgeChange } from "./data/tiger.ts";
 
 const logDir = fileURLToPath(new URL("../logs/", import.meta.url));
 mkdirSync(logDir, { recursive: true });
@@ -38,9 +38,9 @@ export function emit(
 }
 
 /** An org map edge was created or changed. */
-export function emitEdge(edge: OrgEdge, learnedFrom?: string) {
+export function emitEdge(edge: OrgEdge, change: EdgeChange) {
   const ts = new Date().toISOString();
-  appendFileSync(logDir + "edges.jsonl", JSON.stringify({ ts, ...edge }) + "\n");
-  writeEdge(edge, learnedFrom);
+  appendFileSync(logDir + "edges.jsonl", JSON.stringify({ ts, ...edge, ...change }) + "\n");
+  writeEdge(edge, change);
   publish({ kind: "edge", ts, data: edge });
 }

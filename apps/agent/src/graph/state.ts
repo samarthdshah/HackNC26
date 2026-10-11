@@ -13,6 +13,7 @@ export interface Request {
   title?: string;
   task_type?: string;
   amount_usd?: number;
+  severity?: "sev1" | "sev2";
 }
 
 export interface Step extends PlanStep {

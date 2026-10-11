@@ -1,6 +1,8 @@
 // Live check of the Tiger integration: runs Leo's warehouse-access request with
-// Tiger enabled, prints exactly what landed in Lane C's tables, then deletes the
-// rows this run wrote (pass --keep to leave them for the Insights page).
+// Tiger enabled, prints what Lane C's events trigger derived (requests, hops) and
+// the edge history, then deletes this run's rows (pass --keep to leave them for
+// the Insights page). Verifying and cleaning up need the owner login; as
+// wayfinder_agent the run still happens but can't be inspected from here.
 //   npm run tiger:test -w @wayfinder/agent [-- --keep]
 
 export {};
@@ -45,19 +47,26 @@ url.password = encodeURIComponent(env.tiger.password);
 const db = new pg.Client({ connectionString: url.toString(), ssl: { rejectUnauthorized: !env.tiger.insecureTls } });
 await db.connect();
 const show = async (label: string, sql: string) => console.log(`\n${label}`, (await db.query(sql, [id])).rows);
-await show("requests:", `select id, task_type, title, requester_id, status, resolved_by, origin, hr_sensitive from requests where id = $1`);
-await show("request_hops:", `select seq, from_id, to_id, outcome, redirect_to, note from request_hops where request_id = $1 order by seq`);
-await show("learned edges:", `select from_id, to_id, task_type, confidence, source, learned_from from org_edges where learned_from = $1`);
+await show("requests (from trigger):", `select id, task_type, title, requester_id, status, resolved_by, origin, hr_sensitive from requests where id = $1`);
+await show("request_hops (from hop events):", `select seq, from_id, to_id, outcome, redirect_to, to_char(at, 'HH24:MI:SS') at from request_hops where request_id = $1 order by seq`);
+await show("org_edge_changes:", `select from_id, to_id, task_type, previous_confidence prev, confidence, source, reason from org_edge_changes where request_id = $1 order by id`);
 await show("events:", `select type, count(*)::int from events where request_id = $1 group by 1 order by 1`);
-await show("insights_hours_saved (agent_routing):", `select basis_count, hours from insights_hours_saved where metric = 'agent_routing' and $1::text is not null`);
+await show("insights_hours_saved:", `select metric, basis_count, hours from insights_hours_saved where $1::text is not null`);
 
 if (!keep) {
-  await db.query(`delete from request_hops where request_id = $1`, [id]);
-  await db.query(`delete from requests where id = $1`, [id]);
-  await db.query(`delete from events where request_id = $1`, [id]);
-  resetMap(); // drops learned edges in Tiger and restores chart confidences
-  await tiger.tigerFlushed();
-  console.log(`\nCleaned up ${id} and restored the chart map.`);
+  try {
+    resetMap(); // puts demoted chart edges back and zeroes learned ones (with "reset" change rows)
+    await tiger.tigerFlushed();
+    await db.query(`delete from request_hops where request_id = $1`, [id]);
+    await db.query(`delete from requests where id = $1`, [id]);
+    await db.query(`delete from events where request_id = $1`, [id]);
+    await db.query(`delete from org_edge_changes where request_id = $1`, [id]);
+    await db.query(`delete from org_edges where source = 'learned' and learned_from = $1`, [id]);
+    await db.query(`delete from org_edge_changes where reason = 'reset' and request_id is null and changed_at > now() - interval '5 minutes'`);
+    console.log(`\nCleaned up ${id} and restored the chart map.`);
+  } catch (err) {
+    console.log(`\nCould not clean up (${(err as Error).message}); ask lane C to run tiger:seed, or rerun with the owner login.`);
+  }
 }
 await db.end();
 await tiger.closeTiger();

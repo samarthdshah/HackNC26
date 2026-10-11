@@ -15,7 +15,7 @@ import { Command, END, START, StateGraph, interrupt } from "@langchain/langgraph
 import type { StepResult } from "@wayfinder/shared";
 import { z } from "zod";
 import { ask, askJson } from "../brain/gemini.ts";
-import { getPerson } from "../data/fixtures.ts";
+import { getPerson, typical } from "../data/fixtures.ts";
 import { emit } from "../events.ts";
 import { postWarRoom, sendTo } from "../messenger.ts";
 import { firstName, isSensitive, nameOf } from "../org/entities.ts";
@@ -30,8 +30,10 @@ const AGENT_LABEL: Record<Step["kind"], string> = {
   payment: "💸",
   call: "📞",
   rsvp: "🙋",
+  room: "🏢",
 };
 
+const formatHours = (h: number) => (h < 1.5 ? `${Math.round(h * 60)} min` : h < 36 ? `~${Math.round(h)} h` : `~${Math.round(h / 24)} days`);
 const tell = (s: OState, text: string) => sendTo(s.request.requester, text, s.request.id);
 const ev = (s: OState, type: string, payload: Record<string, unknown> = {}) =>
   emit(type, "agent", { title: s.request.title, ...payload }, { request_id: s.request.id });
@@ -43,6 +45,10 @@ const Understanding = z.object({
   title: z.string().describe("3-7 word title"),
   task_type: z.string().describe("Closest allowed task type, or 'other'"),
   amount_usd: z.number().optional().describe("Money involved, if stated or implied by quantity and price"),
+  severity: z
+    .enum(["sev1", "sev2"])
+    .optional()
+    .describe("Incidents only (POL-INC-1): sev1 = customers cannot pay, sev2 = checkout degraded"),
   question: z
     .string()
     .optional()
@@ -59,9 +65,9 @@ async function understand(s: OState): Promise<Command> {
     Understanding,
     "You triage workplace requests. Act first: owners can ask follow-ups themselves. Leave question empty unless truly blocked.",
   );
-  const request = { ...s.request, title: u.title, task_type: u.task_type, amount_usd: u.amount_usd };
+  const request = { ...s.request, title: u.title, task_type: u.task_type, amount_usd: u.amount_usd, severity: u.severity };
   if (u.question) return new Command({ update: { request, log: [`asked: ${u.question}`] }, goto: "clarify" });
-  emit("request_created", s.request.requester, { goal: s.request.goal, title: u.title, task_type: u.task_type, amount_usd: u.amount_usd }, { request_id: s.request.id });
+  emit("request_created", s.request.requester, { goal: s.request.goal, title: u.title, task_type: u.task_type, amount_usd: u.amount_usd, ...(u.severity && { severity: u.severity }) }, { request_id: s.request.id });
   return new Command({ update: { request }, goto: "planner" });
 }
 
@@ -113,7 +119,14 @@ async function critic(s: OState): Promise<Command> {
 async function announce(s: OState): Promise<OUpdate> {
   ev(s, "plan_created", { steps: s.steps, revisions: s.planRounds - 1 });
   const lines = s.steps.map((x) => `${AGENT_LABEL[x.kind]} ${x.description}${x.depends_on.length ? ` (after ${x.depends_on.join(", ")})` : ""}`);
-  await tell(s, s.steps.length === 1 ? `On it: ${s.steps[0].description}` : `On it. Plan:\n${lines.map((l, i) => `${i + 1}. ${l}`).join("\n")}`);
+  const t = typical[s.request.task_type ?? ""];
+  const usually = t && t.requests >= 2 ? ` (these usually take ${formatHours(t.median_hours)} and ${Math.round(t.avg_hops)} handoffs; I'll keep it moving)` : "";
+  await tell(
+    s,
+    s.steps.length === 1
+      ? `On it: ${s.steps[0].description}${usually}`
+      : `On it. Plan:\n${lines.map((l, i) => `${i + 1}. ${l}`).join("\n")}${usually ? `\n${usually.trim().slice(1, -1)}` : ""}`,
+  );
   await postWarRoom(`📋 ${s.request.title} (${nameOf(s.request.requester)}): ${s.steps.length} steps`, s.request.id, isSensitive(s.request.task_type));
   return {};
 }

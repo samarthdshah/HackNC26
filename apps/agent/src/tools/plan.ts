@@ -5,7 +5,7 @@
 import type { PlanStep, ToolIO } from "@wayfinder/shared";
 import { z } from "zod";
 import { askJson } from "../brain/gemini.ts";
-import { departments, getPerson, policies, vendors } from "../data/fixtures.ts";
+import { departments, getPerson, policies, rooms, vendors } from "../data/fixtures.ts";
 import { describePerson } from "../org/entities.ts";
 import { taskTypes } from "../org/map.ts";
 
@@ -14,10 +14,11 @@ type In = ToolIO["plan"]["input"];
 const StepSchema = z.object({
   id: z.string().describe("s1, s2, ..."),
   kind: z
-    .enum(["action", "approval", "payment", "call", "rsvp"])
+    .enum(["action", "approval", "payment", "call", "rsvp", "room"])
     .describe(
       "action: a person must do it. approval: spend sign-off. payment: money moves (vendor or between budgets). " +
-        "call: phone a vendor to place or confirm an order. rsvp: collect yes/no from a group for a headcount.",
+        "call: phone a vendor to place or confirm an order. rsvp: collect yes/no from a group for a headcount. " +
+          "room: make sure a room is free for a time (frees unused booked time); Workplace still books it.",
     ),
   task_type: z.string(),
   description: z.string().describe("One imperative sentence naming who it is for"),
@@ -44,6 +45,8 @@ fewest steps, each run by one specialist, as a dependency graph (steps without d
   priced from the vendor list. If the amount depends on a headcount, depend on the rsvp step and estimate.
 - Vendor orders: a call step to place the order, then a payment step (pay vendor) after approval.
 - Fixes and favours from other teams: one action step.
+- Meetings or events needing a room: a room step (after any rsvp, so it knows the headcount), then an action
+  step for Workplace to book it (task_type room_booking), depending on the room step. Food needs The Commons.
 - Moving budget between departments: approval then payment with to_department.
 - Set vendor_id on every approval, call and payment step that involves a vendor.
 - Never add steps the agent does itself (lookups, telling the requester).
@@ -65,6 +68,7 @@ function grounding(input: In): string {
     input.task_type && `Likely task type: ${input.task_type}`,
     input.amount_usd && `Stated amount: $${input.amount_usd}`,
     `Allowed task_type values: ${taskTypes().join(", ")}`,
+    `Rooms: ${rooms.map((r) => `${r.id} ${r.name} (${r.capacity} seats; ${r.features.join(", ")})`).join("; ")}`,
     `Departments: ${departments.map((d) => `${d.id} (${d.name})`).join(", ")}`,
     `Vendors:\n${vendors.map((v) => `${v.id} ${v.name} [${v.approved ? "approved" : "NOT approved"}] ${v.category}: ${v.pricing} Pays by ${v.payment_methods.join("/")}`).join("\n")}`,
     `Policy handbook:\n${policies.map((p) => `[${p.id}] ${p.title}: ${p.text}`).join("\n")}`,

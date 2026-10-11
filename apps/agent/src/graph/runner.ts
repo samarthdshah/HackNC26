@@ -19,6 +19,7 @@ import { env } from "../env.ts";
 import { emit } from "../events.ts";
 import { buildApprovalAgent } from "./agents/approval.ts";
 import { buildHumanAgent } from "./agents/human.ts";
+import { buildRoomAgent } from "./agents/room.ts";
 import { buildRsvpAgent } from "./agents/rsvp.ts";
 import { buildTreasuryAgent } from "./agents/treasury.ts";
 import { buildVoiceAgent } from "./agents/voice.ts";
@@ -40,6 +41,7 @@ function compileAll() {
     payment: buildTreasuryAgent().compile({ ...opts, name: "treasury_agent" }),
     call: buildVoiceAgent().compile({ ...opts, name: "voice_agent" }),
     rsvp: buildRsvpAgent().compile({ ...opts, name: "rsvp_agent" }),
+    room: buildRoomAgent().compile({ ...opts, name: "room_agent" }),
   };
 }
 

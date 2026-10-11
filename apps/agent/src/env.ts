@@ -62,7 +62,9 @@ export const env = {
   briefingAt: optional("BRIEFING_AT"), // "08:30" local time, empty = off
   snowflake: {
     account: optional("SNOWFLAKE_ACCOUNT"),
-    pat: optional("SNOWFLAKE_PAT"),
+    // WAYFINDER_AGENT's own PAT (lane C) when set; the owner PAT is only a fallback.
+    pat: optional("SNOWFLAKE_AGENT_PAT") || optional("SNOWFLAKE_PAT"),
+    patOwner: optional("SNOWFLAKE_AGENT_PAT") ? "WAYFINDER_AGENT" : "owner PAT",
     warehouse: optional("SNOWFLAKE_WAREHOUSE"),
     database: optional("SNOWFLAKE_DATABASE", "PHOTON"),
     schema: optional("SNOWFLAKE_SCHEMA", "ORG"),
@@ -71,6 +73,10 @@ export const env = {
     // Service role allowed to read PERSON_ROLES and switch into tier roles.
     appRole: optional("SNOWFLAKE_APP_ROLE", "PHOTON_APP"),
   },
+  darwinUrl: optional("DARWIN_URL"),
+  // GET /live (SSE) and /health for the website (Lane B)
+  port: Number(optional("AGENT_PORT", "8787")),
+  corsOrigin: optional("AGENT_CORS_ORIGIN", "*"),
   tiger: {
     url: optional("TIGER_DATABASE_URL"),
     password: optional("TIGER_PASSWORD"),

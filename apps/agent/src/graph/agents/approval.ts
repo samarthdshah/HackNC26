@@ -17,6 +17,7 @@ import { learnDelegate } from "../../org/map.ts";
 import { draft } from "../../tools/draft.ts";
 import { checkPermission } from "../../tools/permission.ts";
 import { agentBase, last, type Approval, type Resume, type Waiting } from "../state.ts";
+import { recordHop } from "../hops.ts";
 import { ev, fromBriefing, tell, vendorFor } from "./common.ts";
 
 const ApprovalState = Annotation.Root({
@@ -90,6 +91,7 @@ async function onAnswer(s: S): Promise<Command> {
     if (a.reminders >= env.maxReminders) {
       const boss = getPerson(approver)?.manager_id ?? approver;
       ev(s, "escalated", { from: approver, to: boss });
+      recordHop(s.request.id, s.request.requester, approver, "forwarded", { note: "no reply to approval, escalated" });
       await tell(s, `${firstName(approver)} hasn't answered, so I'm escalating to ${nameOf(boss)}.`);
       const approvers = a.approvers.map((x, i) => (i === a.index ? boss : x));
       return new Command({ update: { approval: { ...a, approvers, reminders: 0 } }, goto: "ask_approver" });
@@ -103,6 +105,7 @@ async function onAnswer(s: S): Promise<Command> {
   const verdict = await classifyReply(msg.text, a.ask ?? "", true);
   if (verdict.kind === "done" || verdict.kind === "accept") {
     ev(s, "approved", { approver, amount_usd: a.amount_usd });
+    recordHop(s.request.id, s.request.requester, approver, "forwarded", { note: `approved $${a.amount_usd}` });
     if (a.index + 1 < a.approvers.length) {
       await tell(s, `${firstName(approver)} approved. Now asking ${nameOf(a.approvers[a.index + 1])}.`);
       return new Command({ update: { verdict, approval: { ...a, index: a.index + 1, reminders: 0 } }, goto: "ask_approver" });
@@ -123,6 +126,7 @@ async function onAnswer(s: S): Promise<Command> {
   }
   if (verdict.kind === "deny") {
     ev(s, "denied", { approver, note: verdict.note });
+    recordHop(s.request.id, s.request.requester, approver, "handled", { note: `denied $${a.amount_usd}` });
     return new Command({
       update: { verdict, result: { status: "denied", owner: approver, summary: `${firstName(approver)} denied: ${msg.text}` } },
       goto: END,
@@ -132,6 +136,7 @@ async function onAnswer(s: S): Promise<Command> {
   if (delegate && !isTeam(delegate)) {
     learnDelegate(approver, delegate, "purchase_approval", verdict.until, s.request.id);
     ev(s, "delegated", { from: approver, to: delegate, until: verdict.until });
+    recordHop(s.request.id, s.request.requester, approver, "delegated", { redirect_to: delegate, note: msg.text });
     const approvers = a.approvers.map((x, i) => (i === a.index ? delegate : x));
     return new Command({ update: { verdict, approval: { ...a, approvers, reminders: 0 } }, goto: "ask_approver" });
   }

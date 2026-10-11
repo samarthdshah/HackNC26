@@ -56,7 +56,7 @@ const checks: [string, () => Promise<string>][] = [
       const ok = await tigerReady();
       await closeTiger();
       if (!ok) throw new Error("not reachable, or Lane C's tables are missing (see warning above)");
-      return "events, org_edges, requests, request_hops ready";
+      return "events, org_edges, org_edge_changes ready (requests and hops come from C's trigger)";
     },
   ],
   [

@@ -12,6 +12,7 @@ const { nameOf } = await import("../src/org/entities.ts");
 const { allEdges, resetMap } = await import("../src/org/map.ts");
 const { idle, resetRunner } = await import("../src/graph/runner.ts");
 const { loadOrgData } = await import("../src/data/org.ts");
+const { env } = await import("../src/env.ts");
 
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
 initMessenger({ sink: (to, text) => console.log(`   📨 → ${nameOf(to)}: ${text}`) });
@@ -20,7 +21,7 @@ console.log(dim(`org data: ${org.source} (${org.detail})`));
 resetMap();
 resetRunner();
 
-const cast = ["leo", "raj", "tom", "priya", "sam", "nina", "maya", "victor", "dana", "ken", "jess", "elena", "teresa", "andre"];
+const cast = ["leo", "raj", "tom", "priya", "sam", "nina", "maya", "victor", "dana", "ken", "jess", "elena", "teresa", "andre", "luis"];
 for (const name of cast) bind(`p_${name}`, { platform: "sim", id: name });
 
 async function say(who: string, text: string) {
@@ -61,12 +62,16 @@ const scenarios: Record<string, [string, string][]> = {
     ["victor", "I need to request two weeks of parental leave starting next month"],
     ["andre", "done, approved and logged in the leave system"],
   ],
+  "Room: free Sam's unused Commons time (POL-ROOM-1)": [
+    ["nina", "I need The Commons today 12:00 to 1pm for a catered team lunch, about 12 of us"],
+    ["luis", "done, booked the Commons 12-1 for Nina"],
+  ],
   "Delegate: owner hands it to a teammate": [
     ["sam", "the checkout orders pipeline failed overnight, dashboards are empty"],
     ["elena", "I'm heads down on a migration today, Raj can cover this one"],
     ["raj", "fixed, backfill is running"],
   ],
-  // Run with REMINDER_MS=4000 MAX_REMINDERS=1 so the timers fire quickly.
+  // Uses 4 s timers and one nudge (set below) so the escalation fits in the run.
   "Reminders: nudge, then escalate": [
     ["victor", "can you get me a $120 USB-C dock from Northwind for my desk?"],
     ["wait", "5000"],
@@ -79,6 +84,8 @@ const only = process.argv[2];
 for (const [title, lines] of Object.entries(scenarios)) {
   if (only && !title.toLowerCase().includes(only.toLowerCase())) continue;
   console.log(`\n━━ ${title} ━━`);
+  const fast = title.startsWith("Reminders");
+  Object.assign(env, fast ? { reminderMs: 4000, maxReminders: 1 } : { reminderMs: 600000, maxReminders: 2 });
   for (const [who, text] of lines) await say(who, text);
 }
 

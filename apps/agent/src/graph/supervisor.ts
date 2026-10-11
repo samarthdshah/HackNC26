@@ -25,6 +25,7 @@ import { bind, personFor, type Handle } from "../org/directory.ts";
 import { describePerson, nameOf, resolveEntity } from "../org/entities.ts";
 import { allEdges, resetMap } from "../org/map.ts";
 import { tts } from "../voice/elevenlabs.ts";
+import { resetHops } from "./hops.ts";
 import { allPaused, listRequests, resetRunner, resume, settle, snapshot, startRequest, waitingOn } from "./runner.ts";
 
 const last = <T>(fallback: T) => Annotation<T>({ reducer: (_, next) => next, default: () => fallback });
@@ -114,6 +115,7 @@ async function command(s: S, config: Ctx): Promise<Partial<S>> {
     case "/reset":
       resetRunner();
       resetMap();
+      resetHops();
       return { reply: "Reset: requests cleared, org map back to the chart. Identities kept." };
     default:
       return { reply: HELP };

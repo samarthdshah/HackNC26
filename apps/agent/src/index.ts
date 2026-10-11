@@ -6,11 +6,13 @@ import { scheduleBriefings } from "./brain/briefing.ts";
 import { env } from "./env.ts";
 import { emit } from "./events.ts";
 import { loadOrgData } from "./data/org.ts";
-import { restore } from "./graph/runner.ts";
+import { closeTiger } from "./data/tiger.ts";
+import { allPaused, restore } from "./graph/runner.ts";
 import { handleInbound } from "./graph/supervisor.ts";
 import { initMessenger, rememberSpace } from "./messenger.ts";
 import { allBindings } from "./org/directory.ts";
 import { syncMapFromTiger } from "./org/map.ts";
+import { startServer } from "./server.ts";
 import { startSpectrum } from "./spectrum/app.ts";
 
 const seen = new Set<string>();
@@ -35,6 +37,8 @@ console.log(`[agent] org map from ${await syncMapFromTiger()}`);
 const restored = await restore();
 if (restored.requests) console.log(`[agent] restored ${restored.requests} requests, ${restored.waiting} waiting on people, ${restored.resumed} resumed`);
 
+startServer(() => ({ surfaces: env.surfaces, paused: allPaused().length }));
+
 const { app, imessageEnabled } = await startSpectrum();
 initMessenger({ app, imessageEnabled });
 console.log(
@@ -47,7 +51,8 @@ if (env.briefingAt) {
 }
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.on(signal, () => void app.stop().finally(() => process.exit(0)));
+  // Flush queued Tiger writes before exiting.
+  process.on(signal, () => void Promise.allSettled([app.stop(), closeTiger()]).finally(() => process.exit(0)));
 }
 
 for await (const [space, message] of app.messages) {
