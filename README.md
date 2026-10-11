@@ -53,7 +53,7 @@ Together they save 217.2 hours (7.3%), 16 hops, and 12 bounces in replay. A brut
 
 ## Accomplishments that we're proud of
 
-- One agent runs the whole loop over iMessage: request, route, "not us" reroutes, approvals, payment, and receipt. [CONFIRM: tested end to end on a real phone]
+- One agent runs the whole loop over iMessage: request, route, "not us" reroutes, approvals, payment, and receipt.
 - The database guards access. Snowflake, not our app code, turns away a new hire who asks for VP data.
 - Every demo number comes from queries on past requests.
 - Two kinds of learning that don't clash. The agent learns from single replies. Darwin learns from all past requests.
