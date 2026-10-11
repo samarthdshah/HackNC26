@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Wayfinder Roots</title>
 <link rel="stylesheet" href="shared/aero.css">
+<link rel="icon" type="image/png" sizes="32x32" href="shared/avatar-favicon-32.png">
 <style>
 html,body{overflow:hidden}
 *{-webkit-user-select:none;user-select:none}
@@ -67,7 +68,6 @@ canvas#scene.pointing{cursor:pointer}
   #legend{bottom:72px;gap:10px;padding:5px 12px;font-size:11px}
   #legend .opt{display:none}
   #focusbar{top:auto;bottom:150px}
-  body.has-dock #toast{bottom:112px}
 }
 </style>
 </head>
@@ -85,7 +85,7 @@ canvas#scene.pointing{cursor:pointer}
     <div class="who"><span class="orb" id="meOrb">L</span><div><div class="t" id="meName"></div><div class="s" id="meDept"></div></div><span class="chip warn" id="activeChip"></span></div>
     <div class="seg" role="group" aria-label="Filter queries"
       data-tour="2|Active and past|Switch between requests still in flight and ones already resolved.">
-      <button data-f="active" aria-pressed="true">Active</button><button data-f="done" aria-pressed="false">Past</button><button data-f="all" aria-pressed="false">All</button>
+      <button data-f="active" aria-pressed="true">Active</button><button data-f="done" aria-pressed="false">Past</button>
     </div>
     <div class="rows" id="qlist"></div>
     <div class="more"><div><p class="page-sub" style="font-size:12px">Each row says who has it now and how long it has been open. Open one to see every hop in Currents.</p></div></div>
@@ -146,7 +146,7 @@ Object.assign(labelRenderer.domElement.style, {position:'fixed', inset:'0', poin
 const scene = new THREE.Scene();
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(renderer), .03).texture;
 const camera = new THREE.PerspectiveCamera(52, innerWidth / innerHeight, .1, 2000);
-const HOME = innerWidth / innerHeight < 1 ? new THREE.Vector3(0, 70, 128) : new THREE.Vector3(0, 40, 68);
+const HOME = innerWidth / innerHeight < 1 ? new THREE.Vector3(0, 103, 103) : new THREE.Vector3(0, 58, 53);   // higher camera: the ring reads taller on screen
 camera.position.copy(HOME);
 const controls = new OrbitControls(camera, renderer.domElement);
 Object.assign(controls, {enableDamping:true, dampingFactor:.05, rotateSpeed:.6, minDistance:8, maxDistance:170, enablePan:false, autoRotate:S.auto, autoRotateSpeed:.25, maxPolarAngle:1.68, minPolarAngle:.5});
@@ -267,6 +267,7 @@ bubbles.frustumCulled = false; bubbles.renderOrder = -4; scene.add(bubbles);
 // kind: 0 core, 1 department, 2 team (sub-department), 3 person, 4 spore (tiny drifting filler that makes it read as mycelium)
 function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const ME = WF.me.id;
+const Y_SPREAD = 1.35;   // vertical spacing between nodes (stays above the water at WATER_Y)
 function buildOrg(d) {
   const rand = rng(7), nodes = [], pairs = [], seen = new Set();
   const add = (kind, pos, size, extra = {}) => { nodes.push({kind, pos, size, ...extra}); return nodes.length - 1; };
@@ -307,7 +308,7 @@ function buildOrg(d) {
   for (const a of sp) { let best = -1, bd = 3.2;
     for (const b of sp) { if (b <= a) continue; const dd = nodes[a].pos.distanceTo(nodes[b].pos); if (dd < bd && rand() < .7) { bd = dd; best = b; } }
     if (best >= 0) link(a, best, .3); }
-  nodes.forEach(n => n.dist = n.pos.length());
+  nodes.forEach(n => { if (n.kind) n.pos.y *= Y_SPREAD; n.dist = n.pos.length(); });   // space nodes further apart top to bottom
   const adj = nodes.map(() => []), adjMain = nodes.map(() => []), order = new Map();
   pairs.forEach(([a, b]) => { adj[a].push(b); adj[b].push(a); order.set(a < b ? `${a}-${b}` : `${b}-${a}`, [a, b]);
     if (nodes[a].kind !== 4 && nodes[b].kind !== 4) { adjMain[a].push(b); adjMain[b].push(a); } });

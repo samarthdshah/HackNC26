@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Wayfinder Lagoon</title>
 <link rel="stylesheet" href="shared/aero.css">
+<link rel="icon" type="image/png" sizes="32x32" href="shared/avatar-favicon-32.png">
 <style>
 html,body{overflow:hidden}
 /* ============ Ocean backdrop: Aero aqua, retinted per theme ============ */
@@ -40,6 +41,8 @@ html,body{overflow:hidden}
 #seeds{position:fixed;inset:0;z-index:8;pointer-events:none}
 .seed{position:absolute;left:0;top:0;width:var(--d);height:var(--d);pointer-events:auto;will-change:transform;transition:opacity .5s var(--ease);border-radius:50%}
 .seed.hidden{opacity:0;pointer-events:none}
+.seed{cursor:grab;touch-action:none}
+.seed.dragging{cursor:grabbing;z-index:1}
 .seed .bub{position:absolute;inset:0;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:16%;text-align:center;
   background:radial-gradient(circle at 50% 32%,rgb(255 255 255/.82),rgb(255 255 255/.5) 55%,color-mix(in srgb,var(--c) 34%,rgb(255 255 255/.3)) 100%);
   border:1.5px solid rgb(255 255 255/.92);backdrop-filter:blur(8px) saturate(1.2);-webkit-backdrop-filter:blur(8px) saturate(1.2);
@@ -95,6 +98,7 @@ html,body{overflow:hidden}
   .seed .bub::before{left:8%;width:30%;height:40%;top:4%}
   .seed .tp{flex:1}
   .seed.hidden{display:none}
+  .seed{cursor:pointer;touch-action:auto}
   #drawer{left:12px;right:12px;top:auto;bottom:76px;width:auto;max-height:62vh;translate:0 calc(100% + 100px)}
 }
 </style>
@@ -398,7 +402,8 @@ topics.forEach(t => {
   t.flow = svgEl('path', {class:'flow', 'stroke-width':w * 1.2, opacity:.9}, t.g);
   t.el.addEventListener('mouseenter', () => t.g.classList.add('hot'));
   t.el.addEventListener('mouseleave', () => t.g.classList.remove('hot'));
-  t.el.addEventListener('click', () => openTopic(t));
+  t.el.addEventListener('click', () => { if (t.dragged) { t.dragged = false; return; } openTopic(t); });
+  t.el.addEventListener('pointerdown', e => startDrag(t, e));
 });
 
 /* ============ Which topics float: top five after the filter; the rest go behind "+N more" ============ */
@@ -437,13 +442,14 @@ function layout() {
     y = Math.min(H - 130 - r, Math.max(r + 14, y));
     if (x - r < card.right + 14 && y - r < card.bottom + 14) y = Math.min(H - 130 - r, card.bottom + 14 + r);   // would sit under the title card
     if (x + r > W - 100 && y - r < 96) y = 96 + r;                                                             // keep the menu corner clear
-    t.tx = x; t.ty = y;
+    if (!t.pinned) { t.tx = x; t.ty = y; }   // a bubble the user dragged stays where it was dropped
   });
   for (let it = 0; it < 40; it++) for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {   // nudge overlapping bubbles apart
     const A = vis[i], B = vis[j], dx = B.tx - A.tx, dy = B.ty - A.ty, d = Math.hypot(dx, dy) || 1;
     const need = (size(A.ppl.length) + size(B.ppl.length)) / 2 + 14 - d; if (need <= 0) continue;
-    const ux = dx / d * need / 2, uy = dy / d * need / 2;
-    A.tx -= ux; A.ty -= uy; B.tx += ux; B.ty += uy;
+    const ma = A.pinned ? 0 : B.pinned ? 1 : .5, mb = B.pinned ? 0 : A.pinned ? 1 : .5; if (!ma && !mb) continue;   // only unpinned bubbles get nudged
+    const ux = dx / d * need, uy = dy / d * need;
+    A.tx -= ux * ma; A.ty -= uy * ma; B.tx += ux * mb; B.ty += uy * mb;
   }
   vis.forEach(t => { const r = size(t.ppl.length) / 2;
     t.tx = Math.min(stage - r - 16, Math.max(r + 16, t.tx)); t.ty = Math.min(H - 130 - r, Math.max(r + 14, t.ty)); });
@@ -529,6 +535,31 @@ function landPulse(pl) {
     .add(() => t.g.classList.remove('hot'), '+=1.2');
 }
 
+/* ============ Drag: mouse or touch moves a topic bubble; its tentacle follows (the loop redraws it from t.x, t.y) ============ */
+let drag = null;
+function startDrag(t, e) {
+  if (mobile() || e.button > 0) return;
+  drag = {t, id:e.pointerId, ox:e.clientX - t.x, oy:e.clientY - t.y, sx:e.clientX, sy:e.clientY};
+  t.el.setPointerCapture(e.pointerId);
+}
+addEventListener('pointermove', e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const t = drag.t;
+  if (!t.drag && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 5) return;   // small moves still count as a click
+  t.drag = true; t.el.classList.add('dragging');
+  const r = size(t.ppl.length) / 2;
+  t.tx = Math.min(innerWidth - r, Math.max(r, e.clientX - drag.ox));
+  t.ty = Math.min(innerHeight - r, Math.max(r, e.clientY - drag.oy));
+});
+function endDrag(e) {
+  if (!drag || e.pointerId !== drag.id) return;
+  const t = drag.t; drag = null;
+  if (!t.drag) return;
+  t.drag = false; t.pinned = true; t.dragged = true; t.el.classList.remove('dragging');
+  setTimeout(() => { t.dragged = false; });   // only swallow the click that ends this drag
+}
+addEventListener('pointerup', endDrag); addEventListener('pointercancel', endDrag);
+
 /* ============ Loop ============ */
 const clock = new THREE.Clock(); let time = 0;
 function frame() {
@@ -538,8 +569,8 @@ function frame() {
   if (!mobile()) {
     for (const t of topics) {
       if (!t.vis) continue;
-      const bx = RM ? 0 : Math.cos(time * .4 + t.i * 1.3) * 6, by = RM ? 0 : Math.sin(time * .6 + t.i) * 9, d = size(t.ppl.length);
-      t.x += (t.tx + bx - t.x) * (RM ? 1 : .06); t.y += (t.ty + by - t.y) * (RM ? 1 : .06);
+      const still = RM || t.drag, bx = still ? 0 : Math.cos(time * .4 + t.i * 1.3) * 6, by = still ? 0 : Math.sin(time * .6 + t.i) * 9, d = size(t.ppl.length);
+      t.x += (t.tx + bx - t.x) * (still ? 1 : .06); t.y += (t.ty + by - t.y) * (still ? 1 : .06);
       t.el.style.transform = `translate(${(t.x - d / 2).toFixed(1)}px,${(t.y - d / 2).toFixed(1)}px)`;
       const c = curve(t, time); t.glow.setAttribute('d', c); t.core.setAttribute('d', c); t.flow.setAttribute('d', c);
       t.flow.setAttribute('stroke-dashoffset', RM ? 0 : (-time * 30 - t.i * 7).toFixed(1));

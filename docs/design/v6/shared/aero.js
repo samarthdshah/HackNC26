@@ -11,14 +11,27 @@
     {name:'Eco Leaf', levels:[0x2e9d4a, 0x57c84d, 0x8fdc5a, 0x30c9a0, 0xc6ef7a, 0xe2fbb0], hub:0x1d7a3a, person:0x2fb5f5, match:0xffb84d, accent:0x2e9d4a, sky:[0x0b6b6a, 0x3fb59a, 0xdff7d8]},
     {name:'Sunset Glass', levels:[0xff7a59, 0xffa94d, 0xffd166, 0xff6fa8, 0xffc2d6, 0xfff0c2], hub:0xd9405e, person:0x2fb5f5, match:0xb48cff, accent:0xff7a59, sky:[0x5a2a8a, 0xe0607a, 0xffe3c8]},
   ];
-  const ICONS = {   // white line icons for the candy squares; .p1 bobs on hover
-    home:`<g class="icon__part p1" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-7"/><circle cx="12" cy="9" r="5.5"/><path d="M8 20h8"/></g>`,
-    roots:`<g class="icon__part p1" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="2.4" fill="#fff"/><path d="M12 7.5v4M12 11.5 6 17M12 11.5l6 5.5M12 11.5V19"/><circle cx="6" cy="18" r="1.8"/><circle cx="18" cy="18" r="1.8"/><circle cx="12" cy="20" r="1.4"/></g>`,
-    currents:`<g class="icon__part p1" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="4.5" cy="12" r="2"/><circle cx="12" cy="7" r="2"/><circle cx="19.5" cy="12" r="2"/><path d="M6.3 11 10.2 8M13.8 8l3.9 3"/></g>`,
-    glow:`<g class="icon__part p1" fill="#fff"><rect x="4" y="12" width="3.4" height="8" rx="1.2"/><rect x="10.3" y="7" width="3.4" height="13" rx="1.2"/><rect x="16.6" y="3.5" width="3.4" height="16.5" rx="1.2"/></g>`,
-    lagoon:`<g class="icon__part p1" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M5 11a7 6 0 0 1 14 0z" fill="#fff" fill-opacity=".9"/><path d="M8 11c0 3-1 5 0 8M12 11v9M16 11c0 3 1 5 0 8"/></g>`,
-    darwin:`<g class="icon__part p1" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V11M12 14 7 9M12 12l5-5"/><circle cx="6.5" cy="8.5" r="2" fill="#fff"/><circle cx="17.5" cy="6.5" r="2" fill="#fff"/><circle cx="12" cy="9" r="1.6" fill="#fff"/></g>`,
+  const ICONS = {   // simple white glyphs (24-unit box, currentColor) for the Win7 glass dock icons; .p1 bobs on hover
+    home:`<g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11.5 12 4l8.5 7.5"/><path d="M6.5 9.8V20h11V9.8"/><path d="M10.2 20v-5.2h3.6V20"/></g>`,
+    roots:`<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="2.4" fill="currentColor"/><path d="M12 7.5v4M12 11.5 6 17M12 11.5l6 5.5M12 11.5V19"/><circle cx="6" cy="18" r="1.8"/><circle cx="18" cy="18" r="1.8"/><circle cx="12" cy="20" r="1.4"/></g>`,
+    currents:`<g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="4.5" cy="12" r="2.2"/><circle cx="12" cy="7" r="2.2"/><circle cx="19.5" cy="12" r="2.2"/><path d="M6.3 11 10.2 8M13.8 8l3.9 3"/><path d="M4 18.5c2.7-2 5.3-2 8 0s5.3 2 8 0"/></g>`,
+    glow:`<g fill="currentColor"><rect x="4" y="12" width="3.6" height="8" rx="1.2"/><rect x="10.2" y="7" width="3.6" height="13" rx="1.2"/><rect x="16.4" y="3.5" width="3.6" height="16.5" rx="1.2"/></g>`,
+    lagoon:`<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 11a7 6 0 0 1 14 0z" fill="currentColor"/><path d="M8 11c0 3-1 5 0 8M12 11v9M16 11c0 3 1 5 0 8"/></g>`,
+    darwin:`<g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V11M12 14 7 9M12 12l5-5"/><circle cx="6.5" cy="8.5" r="2" fill="currentColor"/><circle cx="17.5" cy="6.5" r="2" fill="currentColor"/><circle cx="12" cy="9" r="1.6" fill="currentColor"/></g>`,
   };
+  const GLASS = {home:[119, 51], roots:[184, 72], currents:[210, 80], glow:[37, 96], lagoon:[326, 70], darwin:[262, 55]};   // hue, saturation (the old candy colours)
+  function glassIcon(id) {   // Windows 7 glass icon: rounded tinted base, inner highlight, white glyph, gloss on the top half
+    const [h, s] = GLASS[id], c = l => `hsl(${h} ${s}% ${l}%)`;
+    return `<defs><linearGradient id="gb-${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c(66)}"/><stop offset=".55" stop-color="${c(44)}"/><stop offset="1" stop-color="${c(28)}"/></linearGradient>
+      <radialGradient id="gr-${id}" cx=".5" cy="1" r=".65"><stop offset="0" stop-color="${c(82)}" stop-opacity=".75"/><stop offset="1" stop-color="${c(82)}" stop-opacity="0"/></radialGradient>
+      <linearGradient id="gg-${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity=".18"/></linearGradient></defs>
+      <rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="url(#gb-${id})" stroke="${c(20)}" stroke-opacity=".75"/>
+      <rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="url(#gr-${id})"/>
+      <rect x="2.6" y="2.6" width="34.8" height="34.8" rx="8" fill="none" stroke="#fff" stroke-opacity=".5"/>
+      <g transform="translate(8 9)" color="rgb(0 30 60 / .35)"><g class="icon__part p1">${ICONS[id]}</g></g>
+      <g transform="translate(8 8)" color="#fff"><g class="icon__part p1">${ICONS[id]}</g></g>
+      <path d="M2.6 10.6Q2.6 2.6 10.6 2.6H29.4Q37.4 2.6 37.4 10.6V19.4Q20 22.4 2.6 19.4Z" fill="url(#gg-${id})"/>`;
+  }
   const PAGES = [
     {id:'home', href:'index.html', label:'Home Tree', sq:'green'},
     {id:'roots', href:'roots.html', label:'Roots', sq:'teal'},
@@ -49,7 +62,7 @@
     if (!page || document.body.dataset.dock === 'off') return;
     const nav = document.createElement('nav'); nav.id = 'dock'; nav.setAttribute('aria-label', 'Wayfinder pages');
     nav.dataset.tour = '90|Pages|Jump between the six views of Wayfinder from this dock.';
-    nav.innerHTML = PAGES.map(p => `<a class="ctl" href="${p.href}"${p.id === page ? ' aria-current="page"' : ''}><span class="sq ${p.sq}"><svg class="i-bob" viewBox="0 0 24 24" aria-hidden="true">${ICONS[p.id]}</svg></span><span class="lb">${p.label}</span></a>`).join('');
+    nav.innerHTML = PAGES.map(p => `<a class="ctl" href="${p.href}"${p.id === page ? ' aria-current="page"' : ''}><span class="sq glass"><svg class="i-bob" viewBox="0 0 40 40" aria-hidden="true">${glassIcon(p.id)}</svg></span><span class="lb">${p.label}</span></a>`).join('');
     document.body.appendChild(nav); document.body.classList.add('has-dock');
   }
   function wireCandy(scope = document) {   // replay the icon animation on hover/focus, as in v4
@@ -59,23 +72,23 @@
       end?.addEventListener('animationend', () => sq.classList.remove('anim')); });
   }
 
-  function ensureToast() {
-    let el = document.getElementById('toast'); if (el) return el;
-    el = document.createElement('div'); el.id = 'toast'; el.setAttribute('role', 'status');
-    el.innerHTML = `<div class="in"><span class="orb" id="tOrb">W</span><div><div class="k" id="tK"></div><div class="m" id="tM"></div><div class="s" id="tS"></div></div></div>`;
+  function ensureToast() {   // the stack lives top right, just left of the menu button
+    let el = document.getElementById('toasts'); if (el) return el;
+    el = document.createElement('div'); el.id = 'toasts'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'polite');
     document.body.appendChild(el); return el;
   }
-  // kind: 'route' (green W), 'myc' (iridescent ✦), 'evo' (↯), 'msg' (chat bubble)
+  // kind: 'route' (green W), 'myc' (iridescent ✦), 'evo' (↯), 'msg' (chat bubble). New toasts stack below older ones.
   function toast(kind, k, m, s = '') {
-    const el = ensureToast(); el.classList.toggle('myc', kind === 'myc');
-    el.querySelector('#tK').textContent = k; el.querySelector('#tM').innerHTML = m; el.querySelector('#tS').innerHTML = s;
-    const o = el.querySelector('#tOrb'), route = !['myc', 'evo', 'msg'].includes(kind);
-    o.className = route ? 'logo-orb' : 'orb'; o.textContent = route ? '' : kind === 'myc' ? '✦' : kind === 'evo' ? '↯' : '✉';
-    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
-    clearTimeout(toastT); toastT = setTimeout(hideToast, 6500);   // never parks on top of content
+    const box = ensureToast(), el = document.createElement('div'), route = !['myc', 'evo', 'msg'].includes(kind);
+    el.className = 'toast' + (kind === 'myc' ? ' myc' : '');
+    el.innerHTML = `<div class="in"><span class="${route ? 'logo-orb' : 'orb'}">${route ? '' : kind === 'myc' ? '✦' : kind === 'evo' ? '↯' : '✉'}</span><div><div class="k"></div><div class="m"></div><div class="s"></div></div></div>`;
+    el.querySelector('.k').textContent = k; el.querySelector('.m').innerHTML = m; el.querySelector('.s').innerHTML = s;
+    box.appendChild(el); void el.offsetWidth; el.classList.add('show');   // slides in from the right
+    while (box.children.length > 4) box.firstElementChild.remove();      // keep the stack short
+    el.hideT = setTimeout(() => dismiss(el), 6500);                       // never parks on top of content
   }
-  let toastT;
-  function hideToast() { document.getElementById('toast')?.classList.remove('show'); }
+  function dismiss(el) { clearTimeout(el.hideT); el.classList.remove('show'); setTimeout(() => el.remove(), 600); }
+  function hideToast() { document.querySelectorAll('#toasts .toast.show').forEach(dismiss); }
 
 
   /* ---------- Hamburger radial menu (top right): Tour · Card · 3 themes ---------- */
@@ -97,7 +110,7 @@
       <ul>${items.map((h, i) => `<li style="--i:${i}">${h}</li>`).join('')}</ul>`;
     document.body.appendChild(m);
     const tg = m.querySelector('.toggle');
-    const set = on => { m.classList.toggle('active', on); tg.setAttribute('aria-expanded', on); tg.setAttribute('aria-label', on ? 'Close menu' : 'Open menu'); };
+    const set = on => { m.classList.toggle('active', on); document.body.classList.toggle('menu-open', on); tg.setAttribute('aria-expanded', on); tg.setAttribute('aria-label', on ? 'Close menu' : 'Open menu'); };
     tg.addEventListener('click', e => { e.stopPropagation(); set(!m.classList.contains('active')); });
     m.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (!b) return;
       if (b.dataset.act === 'tour') { set(false); tour(); }
@@ -170,7 +183,7 @@
     setTimeout(tour, +(document.body.dataset.tourDelay || 1400));
   }
   function favicon() { if (document.querySelector('link[rel=icon]')) return;
-    const l = document.createElement('link'); l.rel = 'icon'; l.type = 'image/svg+xml'; l.href = 'shared/logo.svg'; document.head.appendChild(l); }
+    const l = document.createElement('link'); l.rel = 'icon'; l.type = 'image/png'; l.sizes = '32x32'; l.href = 'shared/avatar-favicon-32.png'; document.head.appendChild(l); }
 
   function css(name) { return getComputedStyle(root).getPropertyValue(name).trim(); }
 
