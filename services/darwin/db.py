@@ -1,10 +1,16 @@
 # Read-only access to Tiger Data as wayfinder_web. Darwin never connects as any
 # other login and never writes: the login has no write grants, and every session
 # is opened with default_transaction_read_only = on.
+#
+# Without TIGER_DATABASE_URL / TIGER_WEB_PASSWORD (e.g. offline testing), load()
+# falls back to the same history from data/fixtures (the seed Tiger is built from).
 
 import os
 from pathlib import Path
 from urllib.parse import urlsplit
+
+import json
+from datetime import datetime
 
 import certifi
 import psycopg
@@ -16,6 +22,15 @@ ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env", override=False)
 
 LOGIN = "wayfinder_web"
+FIXTURES = ROOT / "data" / "fixtures"
+
+
+def tiger_configured() -> bool:
+    return bool(os.environ.get("TIGER_DATABASE_URL", "").strip() and os.environ.get("TIGER_WEB_PASSWORD", "").strip())
+
+
+def source() -> str:
+    return "tiger" if tiger_configured() else "fixtures"
 
 
 def connect() -> psycopg.Connection:
@@ -47,6 +62,8 @@ def connect() -> psycopg.Connection:
 
 def load(origin: str = "all") -> Data:
     """Resolved requests with their hops, actors, and the agent's live top routes."""
+    if not tiger_configured():
+        return load_fixtures(origin)
     with connect() as conn:
         reqs = conn.execute(
             """select id, task_type, severity, created_at, resolved_at, origin
@@ -106,3 +123,26 @@ def snapshot() -> dict:
         ).fetchone()[0]
     names = ["requests_public", "request_hops_public", "events_public", "org_edges", "org_edge_changes", "actors", "bookings"]
     return {"counts": dict(zip(names, counts)), "org_edges_md5": digest, "tuple_writes": int(writes)}
+
+
+def load_fixtures(origin: str = "all") -> Data:
+    """The seed history from data/fixtures: what Tiger holds before any live request."""
+    read = lambda name: json.loads((FIXTURES / name).read_text())
+    when = datetime.fromisoformat
+    requests = [
+        Request(r["id"], r["task_type"], r.get("severity"), when(r["created_at"]), when(r["resolved_at"]), "seed",
+                [Hop(h["seq"], h["from"], h["to"], when(h["at"]), h["outcome"], h.get("redirect_to")) for h in r["hops"]])
+        for r in read("requests.json")
+        if r["status"] == "resolved" and r.get("hops") and r.get("resolved_at")
+    ]
+    if origin not in ("all", "seed"):
+        requests = []
+    actors = {"agent": Actor("agent", "agent", "Wayfinder", None)}
+    for d in read("departments.json"):
+        actors[d["id"]] = Actor(d["id"], "department", d["name"], d["id"])
+    for p in read("people.json"):
+        actors[p["id"]] = Actor(p["id"], "person", p["name"], p["department_id"])
+    top_routes: dict[str, str] = {}
+    for e in sorted((e for e in read("edges.json") if e["from"] == "agent"), key=lambda e: (e["task_type"], -e["confidence"], e["to"])):
+        top_routes.setdefault(e["task_type"], e["to"])
+    return Data(requests=sorted(requests, key=lambda r: (r.created_at, r.id)), actors=actors, top_routes=top_routes, origin=origin)

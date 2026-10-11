@@ -49,13 +49,19 @@ body::after{content:"";position:fixed;left:-10%;right:-10%;top:26%;height:18%;po
 #tip{position:fixed;z-index:20;pointer-events:none;transform:translate(-50%,calc(-100% - 14px))}
 #tip.off{opacity:0}
 
-#rule{width:300px;z-index:25;display:none}
+#rule{width:320px;z-index:25;display:none}
 #rule.open{display:block}
 #rule .x{margin-left:auto;width:22px;height:22px;border-radius:50%;font-size:14px;line-height:22px;text-align:center;color:#fff;background:rgb(255 255 255/.2);box-shadow:inset 0 0 0 1px rgb(255 255 255/.5)}
 #rule .x:hover{background:rgb(255 255 255/.35)}
 #rule .txt{font-size:17px;font-weight:600;line-height:1.3;margin:6px 0 10px}
 #rule .meta{display:flex;gap:8px;flex-wrap:wrap}
 #rule .acts{display:flex;gap:10px;margin-top:14px}
+#rule .rl{margin:4px 0 10px;padding:0;list-style:none;display:grid;gap:5px}
+#rule .rl li{font-size:13px;line-height:1.3;padding:6px 9px;border-radius:10px;background:rgb(255 255 255/.55);box-shadow:inset 0 0 0 1px rgb(255 255 255/.7)}
+.gen{cursor:pointer}
+.gen.approved .orb.sm{background:radial-gradient(circle at 35% 28%,#fff,#FFD666 45%,#E0A100);box-shadow:0 0 10px rgb(255 214 102/.9)}
+.gen.rejected .orb.sm{background:radial-gradient(circle at 35% 28%,#fff,#B9C6D3 45%,#8A9BAD)}
+.gen.rejected .nm{text-decoration:line-through;opacity:.6}
 
 @media (max-width:700px){
   #head{left:12px;right:12px;top:12px;width:auto}
@@ -72,7 +78,7 @@ body::after{content:"";position:fixed;left:-10%;right:-10%;top:26%;height:18%;po
 </head>
 <body data-page="darwin">
 
-<div id="stage"><canvas id="tree" aria-label="Darwin's evolution tree: each ring of branches is a generation, each orange fruit is an evolved routing rule"></canvas></div>
+<div id="stage"><canvas id="tree" aria-label="Darwin's evolution tree: each ring of branches is a generation, each orange fruit is that generation's best rule set"></canvas></div>
 
 <section id="head" class="milk float title-card" aria-live="polite" data-tour="1|Darwin Growth|Darwin replays past requests and keeps the routes that need fewer hops. It is Wayfinder improving itself.">
   <div class="bar"><span class="logo-orb"></span>Evolve<span class="live"><i id="liveDot"></i><span id="liveTxt">evolving</span></span></div>
@@ -80,28 +86,29 @@ body::after{content:"";position:fixed;left:-10%;right:-10%;top:26%;height:18%;po
     <h1 class="page-title">Darwin Growth</h1>
     <div class="now"><span class="g" id="genN">Gen 0</span> · <b id="genH">–</b> avg hops</div>
     <div class="more"><div>
-      <p class="page-sub">Darwin replays last quarter's requests and breeds shorter routes. Every ring of branches is a generation, and every orange fruit is a rule it learned.</p>
+      <p class="page-sub">Darwin replays past requests and breeds shorter routes. Every ring of branches is a generation, and every orange fruit is that generation's best rule set. Approve a fruit and the agent routes by it; reject it and it falls.</p>
       <div class="from" id="genFrom">Seeding from last quarter's 3,470 requests</div>
     </div></div>
     <div class="acts"><button class="pill" id="regrow">↻ Regrow</button><span class="chip info" id="ruleCount">0 rules</span></div>
   </div>
 </section>
 
-<section id="gens" class="milk float" data-tour="3|Generations|Each generation replays the same requests. Average hops fall from 6.1 to 1.4.">
+<section id="gens" class="milk float" data-tour="3|Generations|Each generation replays the same past requests with its best rules. Average hops fall as better rules survive.">
   <div class="bar">Generations<span class="live"><i></i>replay</span></div>
   <div class="body">
     <div class="rows" id="genRows"></div>
-    <p class="foot">Fitness is the share of replayed requests that resolve in two hops or fewer.</p>
+    <p class="foot">Fitness is how much of Darwin's best improvement (hours, hops and "not us" bounces on replay) each generation reached. Click a row or its fruit to approve or reject that generation.</p>
   </div>
 </section>
 
 <div id="tip" class="lbl off"><i></i><span></span></div>
 
-<section id="rule" class="milk float still" role="dialog" aria-label="Evolved rule">
+<section id="rule" class="milk float still" role="dialog" aria-label="Generation">
   <div class="bar"><span id="rGen">Rule</span><button class="x" id="rClose" aria-label="Close">×</button></div>
   <div class="body">
-    <div class="k">Evolved routing rule</div>
+    <div class="k">Best rule set this generation</div>
     <p class="txt" id="rTxt"></p>
+    <ul class="rl" id="rList"></ul>
     <div class="meta"><span class="chip" id="rSaves"></span><span class="chip" id="rStatus"></span></div>
     <div class="acts"><button class="pill green" id="rOk">Approve</button><button class="pill ghost" id="rNo">Reject</button></div>
   </div>
@@ -113,7 +120,25 @@ body::after{content:"";position:fixed;left:-10%;right:-10%;top:26%;height:18%;po
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
-const GENS = WF.darwin, RULES = WF.rules.map(r => ({...r}));
+const GENS = WF.darwin;
+// Each generation is a fruit. Its status (proposed / approved / rejected) comes from the database
+// through the web server; the sample data.js has none, so those start proposed.
+const FRUIT = GENS.map(g => ({...g, status: g.status ?? 'proposed', ruleTexts: g.ruleTexts ?? []}));
+// Live only when served by the agent's web server (npm run web): it supplies WF.connection and the
+// /api/darwin endpoints. Opened as a file or from another server, the page shows sample data.
+const LIVE_URL = 'http://localhost:3000/darwin.html', LIVE = Boolean(WF.connection?.darwin);
+if (!LIVE) addEventListener('DOMContentLoaded', () => {
+  const b = document.createElement('a'); b.href = LIVE_URL;
+  b.textContent = 'Sample data · Approve / Reject won\'t reach Darwin. Open the live page: ' + LIVE_URL;
+  b.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:10000;background:#fff7e0;color:#6b4a00;padding:8px 14px;border-radius:12px;font:12px system-ui;text-decoration:none;box-shadow:0 2px 10px rgb(0 0 0/.15)';
+  document.body.append(b);
+});
+if (!GENS.length) {   // Darwin isn't running: say so instead of drawing an empty tree
+  $('genN').textContent = 'Darwin offline'; $('genH').textContent = '–';
+  $('genFrom').textContent = 'Start it with: cd services/darwin && .venv/bin/python app.py, then reload.';
+  $('liveTxt').textContent = 'offline'; $('genRows').innerHTML = '<p class="foot">No generations yet.</p>';
+  return;
+}
 
 /* ============ Small helpers ============ */
 const rgb = n => [(n >> 16) & 255, (n >> 8) & 255, n & 255];
@@ -149,6 +174,35 @@ class Tree {
     this.ruleFruit = []; this.done = false; this.hover = null;
   }
   randomInt(min, max) { return min + Math.round(this.rand() * (max - min)); }
+  /* ---- rule fruit states: approved fruit glow, rejected fruit fall to the island ---- */
+  groundY(x, r) { const dx = Math.min(1, Math.abs(x - 400) / 280); return this.floorY + 2 - 20 * Math.sqrt(1 - dx * dx) + 3 - r; }
+  restOnGround(f) { f.x = Math.max(150, Math.min(650, f.ox)); f.y = this.groundY(f.x, 8.5); f.fall = {landed:true, grey:1}; }
+  drop(f) {   // gravity from the branch to the island, a small bounce, then rest
+    const tx = Math.max(150, Math.min(650, f.ox)), landY = this.groundY(tx, 8.5), frames = Math.sqrt(2 * Math.max(20, landY - f.y) / .45);
+    f.rise = null; f.fall = {vx:(tx - f.x) / frames, vy:-1.6, landY, landed:false, grey:0, bounces:0, spin:0};
+  }
+  lift(f) { f.fall = null; f.rise = {fromX:f.x, fromY:f.y, t:0}; f.pulse = 0; }
+  glow(f) { f.pulse = 0; }
+  animating() { return this.ruleFruit.some(f => (f.fall && !f.fall.landed) || f.rise || (f.pulse !== undefined && f.pulse < 1)); }
+  stepFruit() {
+    for (const f of this.ruleFruit) {
+      const fl = f.fall;
+      if (fl && !fl.landed) {
+        fl.vy += .45; f.x += fl.vx; f.y += fl.vy; fl.spin += fl.vx * .08; fl.grey = Math.min(1, fl.grey + .04);
+        if (f.y >= fl.landY) {
+          f.y = fl.landY;
+          if (Math.abs(fl.vy) > 2.2 && fl.bounces < 2) { fl.vy = -fl.vy * .32; fl.vx *= .5; fl.bounces++; }
+          else { fl.landed = true; fl.grey = 1; }
+        }
+      }
+      if (f.rise) {
+        const r = f.rise; r.t = Math.min(1, r.t + .035); const e = backOut(r.t);
+        f.x = r.fromX + (f.ox - r.fromX) * e; f.y = r.fromY + (f.oy - r.fromY) * e;
+        if (r.t === 1) { f.x = f.ox; f.y = f.oy; f.rise = null; }
+      }
+      if (f.pulse !== undefined && f.pulse < 1) f.pulse = Math.min(1, f.pulse + .022);
+    }
+  }
   grow() {
     const {branches, maxGenerations} = this;
     branches.forEach(b => {   // forEach skips branches pushed this frame, as in the original
@@ -176,9 +230,13 @@ class Tree {
   }
   pickRules() {   // spread the evolved rules evenly around the canopy, ripening in generation order
     const cx = 400, cy = 470, byAngle = [...this.fruit].sort((a, b) => Math.atan2(a.x - cx, cy - a.y) - Math.atan2(b.x - cx, cy - b.y));
-    const n = RULES.length, picks = RULES.map((_, i) => byAngle[Math.floor((i + .5) * byAngle.length / n)]);
-    const order = RULES.map((r, i) => i).sort((a, b) => RULES[a].gen - RULES[b].gen);
-    picks.forEach((f, i) => { f.rule = RULES[i]; f.rp = 0; f.delay = order.indexOf(i) * 7; });
+    // Gen 1 on the far left to the last generation on the far right, ripening in that order.
+    const n = FRUIT.length, picks = FRUIT.map((_, i) => byAngle[Math.floor((i + .5) * byAngle.length / n)]);
+    const order = FRUIT.map((g, i) => i).sort((a, b) => FRUIT[a].gen - FRUIT[b].gen);
+    picks.forEach((f, i) => {
+      f.item = FRUIT[i]; f.rp = 0; f.delay = order.indexOf(i) * 7; f.ox = f.x; f.oy = f.y;
+      if (f.item.status === 'rejected') this.restOnGround(f);   // already rejected: it lies on the island
+    });
     this.ruleFruit = picks;
   }
   finishInstantly() {   // reduced motion: the finished tree, no growth
@@ -229,21 +287,44 @@ class Tree {
     });
 
     // decorative fruit
-    for (const f of this.fruit) if (!f.rule && f.progress > 0) this.orb(f.x, f.y, f.r * backOut(f.progress), k.fruit[f.tone], .92);
-    // rule fruit: bigger, theme "person" color, a white ring once approved, grey when rejected
+    for (const f of this.fruit) if (!f.item && f.progress > 0) this.orb(f.x, f.y, f.r * backOut(f.progress), k.fruit[f.tone], .92);
+    // rule fruit: bigger, theme "person" color. Approved: bright, with a halo (pulses when approved).
+    // Rejected: greys as it falls and lies on the island.
+    const grey = [157, 176, 195], gold = [255, 214, 102];
     for (const f of this.ruleFruit) {
-      if (f.rp <= 0) { this.orb(f.x, f.y, f.r, k.fruit[f.tone], .92); continue; }
-      const r = 8.5 * backOut(f.rp), col = f.rule.status === 'rejected' ? [157, 176, 195] : k.rule;
+      if (f.rp <= 0 && !f.fall) { this.orb(f.x, f.y, f.r, k.fruit[f.tone], .92); continue; }
+      const approved = f.item.status === 'approved' && !f.fall, p = f.pulse ?? 1;
+      const grow = approved ? 1.4 + .4 * Math.sin(Math.min(1, p) * Math.PI) : 1;
+      const r = 8.5 * (f.fall ? 1 : backOut(Math.max(f.rp, 0))) * grow;
+      const col = f.fall ? mix(k.rule, grey, f.fall.grey) : approved ? lighten(mix(k.rule, gold, .65), .28) : k.rule;
+      if (approved) {   // soft sunlit halo; a ring ripples outward right after approval
+        const h = c.createRadialGradient(f.x, f.y, r * .5, f.x, f.y, r * 4.6);
+        h.addColorStop(0, 'rgb(255 253 235 / 1)'); h.addColorStop(.3, 'rgb(255 228 130 / .75)'); h.addColorStop(.65, 'rgb(255 214 102 / .28)'); h.addColorStop(1, 'rgb(255 214 102 / 0)');
+        c.fillStyle = h; c.beginPath(); c.arc(f.x, f.y, r * 4.6, 0, Math.PI * 2); c.fill();
+        c.strokeStyle = 'rgb(255 255 240 / .9)'; c.lineWidth = 1.4; c.beginPath();   // four sparkle rays
+        for (let i = 0; i < 4; i++) { const a = Math.PI / 4 + i * Math.PI / 2, r0 = r + 4, r1 = r + 9 + 4 * Math.sin(Math.min(1, p) * Math.PI);
+          c.moveTo(f.x + Math.cos(a) * r0, f.y + Math.sin(a) * r0); c.lineTo(f.x + Math.cos(a) * r1, f.y + Math.sin(a) * r1); }
+        c.stroke();
+        if (p < 1) { c.strokeStyle = `rgb(255 255 255 / ${.9 * (1 - p)})`; c.lineWidth = 2; c.beginPath(); c.arc(f.x, f.y, r + 4 + p * 26, 0, Math.PI * 2); c.stroke(); }
+      }
       if (f === this.hover) { c.fillStyle = 'rgb(255 255 255 / .55)'; c.beginPath(); c.arc(f.x, f.y, r + 7, 0, Math.PI * 2); c.fill(); }
+      if (f.fall?.landed) { c.fillStyle = 'rgb(0 30 60 / .18)'; c.beginPath(); c.ellipse(f.x, f.y + r - 1, r * 1.1, r * .35, 0, 0, Math.PI * 2); c.fill(); }
       this.orb(f.x, f.y, r, col);
-      if (f.rule.status === 'approved') { c.strokeStyle = 'rgb(255 255 255 / .95)'; c.lineWidth = 1.6; c.beginPath(); c.arc(f.x, f.y, r + 2.2, 0, Math.PI * 2); c.stroke(); }
+      if (approved) { c.strokeStyle = 'rgb(255 255 255 / .95)'; c.lineWidth = 1.8; c.beginPath(); c.arc(f.x, f.y, r + 2.4, 0, Math.PI * 2); c.stroke(); }
     }
   }
   loop = () => {
     this.grow(); this.draw();
     if (!this.done) this.raf = requestAnimationFrame(this.loop); else this.raf = 0;
   };
+  animate() {   // runs only while a fruit is falling, rising or pulsing
+    if (this.fx) return;
+    if (Aero.RM) { while (this.animating()) this.stepFruit(); this.draw(); return; }
+    const tick = () => { this.stepFruit(); this.draw(); this.fx = this.animating() ? requestAnimationFrame(tick) : 0; };
+    this.fx = requestAnimationFrame(tick);
+  }
   start(seed) {
+    cancelAnimationFrame(this.fx); this.fx = 0;
     cancelAnimationFrame(this.raf); this.reset(seed);
     if (Aero.RM) { this.finishInstantly(); this.draw(); return; }
     this.raf = requestAnimationFrame(this.loop);
@@ -252,21 +333,28 @@ class Tree {
   toClient(x, y) { const r = this.C.getBoundingClientRect(); return {x:r.left + x * r.width / this.W, y:r.top + y * r.height / this.H}; }
   ruleAt(e) {
     const p = this.toLogical(e); let best = null, bd = 14;
-    for (const f of this.ruleFruit) { if (f.rp < 1) continue; const d = Math.hypot(f.x - p.x, f.y - p.y); if (d < bd) { bd = d; best = f; } }
+    for (const f of this.ruleFruit) { if (f.rp < 1 && !f.fall) continue; const d = Math.hypot(f.x - p.x, f.y - p.y); if (d < bd) { bd = d; best = f; } }
     return best;
   }
 }
 
 /* ============ Generations card ============ */
-$('genRows').innerHTML = GENS.map(g => `<div class="row gen" data-gen="${g.gen}"><span class="orb sm"></span><span class="nm">Gen ${g.gen}</span>
-  <span class="fit" title="Fitness ${g.fitness}"><i style="--w:${Math.round(g.fitness * 100)}%"></i></span><span class="hp">${g.avgHops.toFixed(1)} hops</span><span class="chip info">${g.rules}</span></div>`).join('');
+$('genRows').innerHTML = FRUIT.map(g => `<div class="row gen ${g.status}" data-gen="${g.gen}" title="${g.status === 'proposed' ? 'Proposed: click to approve or reject' : g.status === 'approved' ? 'Approved: the agent routes by these rules' : 'Rejected: fell from the tree'}"><span class="orb sm"></span><span class="nm">Gen ${g.gen}</span>
+  <span class="fit" title="Fitness ${g.fitness}"><i style="--w:${Math.round(g.fitness * 100)}%"></i></span><span class="hp">${g.avgHops.toFixed(2)} hops</span><span class="chip info">${g.rules}</span></div>`).join('');
 const rows = [...document.querySelectorAll('.gen')];
+const paintRows = () => rows.forEach((r, i) => { r.classList.remove('approved', 'rejected', 'proposed'); r.classList.add(FRUIT[i].status); });
+const tally = () => { const a = FRUIT.filter(g => g.status === 'approved').length, r = FRUIT.filter(g => g.status === 'rejected').length;
+  return `${FRUIT.length} generations · ${a} approved · ${r} fell`; };
+rows.forEach((row, i) => row.addEventListener('click', () => {
+  if (!tree.done) return;
+  const f = tree.ruleFruit.find(x => x.item === FRUIT[i]); if (f) openRule(f);
+}));
 function setGen(n) {
   rows.forEach((r, i) => { r.classList.toggle('done', i < n); r.classList.toggle('on', i === n - 1); });
   const g = GENS[n - 1], el = $('genN');
   if (!g) { el.textContent = 'Gen 0'; $('genH').textContent = '–'; $('genFrom').textContent = `Seeding from last quarter's ${WF.stats.requestsRouted.toLocaleString()} requests`; $('ruleCount').textContent = '0 rules'; return; }
-  el.textContent = `Gen ${g.gen}`; $('genH').textContent = g.avgHops.toFixed(1);
-  $('genFrom').textContent = g.gen === 1 ? 'Replaying the old routes' : `down from ${GENS[0].avgHops.toFixed(1)} at Gen 1 · fitness ${g.fitness.toFixed(2)}`;
+  el.textContent = `Gen ${g.gen}`; $('genH').textContent = g.avgHops.toFixed(2);
+  $('genFrom').textContent = g.gen === 1 ? `Replaying ${(WF.darwinReplayed || WF.stats.requestsRouted).toLocaleString()} past requests` : `down from ${GENS[0].avgHops.toFixed(2)} at Gen 1 · fitness ${g.fitness.toFixed(2)}`;
   $('ruleCount').textContent = `${g.rules} rules`;
   el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); setTimeout(() => el.classList.remove('bump'), 450);
 }
@@ -275,13 +363,14 @@ function setLive(evolving) { $('liveTxt').textContent = evolving ? 'evolving' : 
 /* ============ Wire up ============ */
 const tree = new Tree($('tree'));
 tree.onGeneration = n => { tree.genComplete = n; setGen(n); };
-tree.onSettled = () => { setLive(false); $('ruleCount').textContent = `${GENS.at(-1).rules} rules · ${RULES.length} on the tree`; };
+tree.onSettled = () => { setLive(false); $('ruleCount').textContent = tally(); };
 let seed = 7;
 function grow() { closeRule(); hideTip(); setGen(0); setLive(true); tree.start(seed++); }
 
 const tip = $('tip');
 function hideTip() { tip.classList.add('off'); $('tree').classList.remove('hit'); }
-function statusChip(s) { return s === 'approved' ? ['chip', 'Approved'] : s === 'rejected' ? ['chip bad', 'Rejected'] : ['chip warn', 'Proposed · needs admin']; }
+function statusChip(s) { return s === 'approved' ? ['chip', 'Approved · agent routes by it'] : s === 'rejected' ? ['chip bad', 'Rejected · fell from the tree'] : ['chip warn', 'Proposed · needs admin']; }
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 $('tree').addEventListener('pointermove', e => {
   if (!tree.done) return;
   const f = tree.ruleAt(e);
@@ -289,23 +378,25 @@ $('tree').addEventListener('pointermove', e => {
   if (!f) return hideTip();
   const p = tree.toClient(f.x, f.y);
   tip.style.left = p.x + 'px'; tip.style.top = p.y + 'px';
-  tip.querySelector('span').textContent = `Gen ${f.rule.gen} · ${f.rule.text}`;
-  tip.querySelector('i').style.background = f.rule.status === 'rejected' ? '#9DB0C3' : Aero.hex(Aero.palette().person);
+  tip.querySelector('span').textContent = `Gen ${f.item.gen} · ${f.item.avgHops.toFixed(2)} hops · ${f.item.rules} rule${f.item.rules === 1 ? '' : 's'}`;
+  tip.querySelector('i').style.background = f.item.status === 'rejected' ? '#9DB0C3' : Aero.hex(Aero.palette().person);
   tip.classList.remove('off'); $('tree').classList.add('hit');
 });
 $('tree').addEventListener('pointerleave', () => { if (tree.hover) { tree.hover = null; tree.draw(); } hideTip(); });
 
 let open = null;
 function paintRule() {
-  const r = open.rule, [cls, txt] = statusChip(r.status);
-  $('rGen').textContent = `Rule · evolved in Gen ${r.gen}`; $('rTxt').textContent = r.text;
-  $('rSaves').textContent = `Saves ${r.saves}`; $('rStatus').className = cls; $('rStatus').textContent = txt;
+  const r = open.item, [cls, txt] = statusChip(r.status);
+  $('rGen').textContent = `Generation ${r.gen} of ${FRUIT.length}`;
+  $('rTxt').textContent = `${plural(r.rules, 'rule')} · ${r.avgHops.toFixed(2)} avg hops`;
+  $('rList').innerHTML = ''; r.ruleTexts.forEach(t => { const li = document.createElement('li'); li.textContent = t; $('rList').append(li); });
+  $('rSaves').textContent = `Fitness ${Math.round(r.fitness * 100)}%`; $('rStatus').className = cls; $('rStatus').textContent = txt;
   $('rOk').disabled = r.status === 'approved'; $('rNo').disabled = r.status === 'rejected';
   $('rOk').style.opacity = r.status === 'approved' ? .55 : 1; $('rNo').style.opacity = r.status === 'rejected' ? .55 : 1;
 }
 function openRule(f) {
   open = f; paintRule();
-  const card = $('rule'), p = tree.toClient(f.x, f.y), w = 300, h = 230;
+  const card = $('rule'), p = tree.toClient(f.x, f.y), w = 320, h = 300;
   let x = p.x > innerWidth / 2 ? p.x - w - 24 : p.x + 24, y = p.y - h / 2;
   x = Math.max(12, Math.min(innerWidth - w - 12, x)); y = Math.max(12, Math.min(innerHeight - h - 110, y));
   card.style.left = x + 'px'; card.style.top = y + 'px'; card.classList.add('open'); hideTip();
@@ -314,14 +405,34 @@ function closeRule() { $('rule').classList.remove('open'); open = null; }
 $('tree').addEventListener('click', e => { if (!tree.done) return; const f = tree.ruleAt(e); f ? openRule(f) : closeRule(); });
 $('rClose').addEventListener('click', closeRule);
 addEventListener('keydown', e => { if (e.key === 'Escape') closeRule(); });
-$('rOk').addEventListener('click', () => {
-  open.rule.status = 'approved'; paintRule(); tree.draw();
-  Aero.toast('evo', 'Darwin evolved a better rule', open.rule.text, `Approved by admin <span class="hops">saves ${open.rule.saves}</span>`);
-});
-$('rNo').addEventListener('click', () => {
-  open.rule.status = 'rejected'; paintRule(); tree.draw();
-  Aero.toast('evo', 'Rule rejected', open.rule.text, 'Darwin will breed a different route next generation');
-});
+/* Approve / Reject a generation: saved in the database (through the web server), and Darwin's rule
+   approvals follow, so the agent's routing changes too. */
+async function decide(f, action) {
+  const g = f.item, before = g.status, after = action === 'approve' ? 'approved' : 'rejected';
+  const settle = () => { if (open === f) paintRule(); paintRows(); $('ruleCount').textContent = tally(); };
+  g.status = after; settle();
+  if (after === 'approved') { if (f.fall) tree.lift(f); else tree.glow(f); } else tree.drop(f);
+  tree.animate();
+  if (!LIVE) {   // sample data: animate, but say plainly that nothing was saved
+    Aero.toast('evo', after === 'approved' ? 'Approved (preview only)' : 'Rejected (preview only)', `Generation ${g.gen}`, `Not saved: open ${LIVE_URL} to save it`);
+    return;
+  }
+  try {
+    const res = await fetch(`/api/darwin/generations/${g.gen}/${action}`, {method:'POST'});
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(out.error || res.status);
+    const where = out.store === 'tiger' ? 'Saved to Tiger' : 'Saved locally (Tiger not configured)';
+    if (after === 'approved') Aero.toast('evo', `Generation ${g.gen} approved`, `${plural(g.rules, 'rule')} · ${g.avgHops.toFixed(2)} avg hops`, `The agent now routes by its rules · ${where}`);
+    else Aero.toast('evo', `Generation ${g.gen} rejected`, `${plural(g.rules, 'rule')} · ${g.avgHops.toFixed(2)} avg hops`, `It fell from the tree · ${where}`);
+  } catch (err) {   // not saved: put the fruit back how it was
+    g.status = before; settle();
+    if (before === 'rejected') tree.drop(f); else if (f.fall) tree.lift(f);
+    tree.animate();
+    Aero.toast('evo', 'Not saved', `Generation ${g.gen}`, String(err.message || err));
+  }
+}
+$('rOk').addEventListener('click', () => open && decide(open, 'approve'));
+$('rNo').addEventListener('click', () => open && decide(open, 'reject'));
 $('regrow').addEventListener('click', grow);
 
 Aero.onTheme(() => { if (!tree.raf) tree.draw(); });   // re-tint by redrawing; a growing tree picks it up next frame

@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "web": "tsx src/web.ts",
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "terminal": "SURFACES=terminal tsx src/index.ts",

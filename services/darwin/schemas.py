@@ -99,7 +99,7 @@ class ExhaustiveCheck(BaseModel):
 class EvolveParams(BaseModel):
     seed: int = 42
     population: int = Field(30, ge=4, le=500)
-    generations: int = Field(25, ge=1, le=500)
+    generations: int = Field(10, ge=1, le=500)  # the best set is found by generation 2
     max_rules: int = Field(3, ge=1, le=5)
     origin: Literal["all", "seed"] = "all"
 

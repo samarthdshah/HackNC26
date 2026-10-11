@@ -90,7 +90,7 @@ At the start of each run, Darwin builds the candidate rules from the loaded data
 ### 3.2 Search
 
 - A genome is a set of 1 to 3 rules, at most one entry rule per task type.
-- Population 30, 25 generations, seeded RNG (default seed 42) so runs repeat exactly.
+- Population 30, 10 generations (the best set appears by generation 2), seeded RNG (default seed 42) so runs repeat exactly.
 - Selection: tournament of 3, plus elitism (best 2 carried over).
 - Crossover: uniform over the union of both parents' rules, capped at 3.
 - Initial population: single-rule genomes, so the fitness curve shows rules combining (seed 42: 3197.0 → 3082.6 → 3061.9 by generation 2).
@@ -154,7 +154,7 @@ About rule 1: the `insights_checkout` view says 43 min direct vs 233 min routed.
 `POST /evolve` request (every field optional):
 
 ```json
-{ "seed": 42, "population": 30, "generations": 25, "max_rules": 3, "origin": "all" }
+{ "seed": 42, "population": 30, "generations": 10, "max_rules": 3, "origin": "all" }
 ```
 
 Response:

@@ -148,7 +148,8 @@ app.add_middleware(
 def health():
     data, _ = loaded("all")
     latest = state["latest"]
-    return Health(ok=latest is not None, tiger=True, login=db.LOGIN, requests=len(data.requests),
+    tiger = db.tiger_configured()
+    return Health(ok=latest is not None, tiger=tiger, login=db.LOGIN if tiger else "fixtures (no Tiger configured)", requests=len(data.requests),
                   run_id=latest.run_id if latest else None)
 
 
