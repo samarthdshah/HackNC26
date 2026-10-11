@@ -64,39 +64,46 @@ export const hex = (n: number) => "#" + n.toString(16).padStart(6, "0");
 export const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, RM ? 1 : ms));
 
-/* ---------- Toast ---------- */
+/* ---------- Toasts: a stack top right, just left of the menu; new ones slide in below older ones ---------- */
 export type ToastKind = "route" | "myc" | "evo" | "msg";
-let toastT: ReturnType<typeof setTimeout> | undefined;
+type ToastEl = HTMLDivElement & { hideT?: ReturnType<typeof setTimeout> };
 
 function ensureToast() {
-  let el = document.getElementById("toast");
+  let el = document.getElementById("toasts");
   if (el) return el;
   el = document.createElement("div");
-  el.id = "toast";
+  el.id = "toasts";
   el.setAttribute("role", "status");
-  el.innerHTML = `<div class="in"><span class="orb" id="tOrb">W</span><div><div class="k" id="tK"></div><div class="m" id="tM"></div><div class="s" id="tS"></div></div></div>`;
+  el.setAttribute("aria-live", "polite");
   document.body.appendChild(el);
   return el;
 }
 
 // kind: 'route' (green W), 'myc' (iridescent ✦), 'evo' (↯), 'msg' (chat bubble). m and s are trusted HTML.
 export function toast(kind: ToastKind | string, k: string, m: string, s = "") {
-  const el = ensureToast();
-  el.classList.toggle("myc", kind === "myc");
-  el.querySelector("#tK")!.textContent = k;
-  el.querySelector("#tM")!.innerHTML = m;
-  el.querySelector("#tS")!.innerHTML = s;
-  const o = el.querySelector<HTMLElement>("#tOrb")!;
+  const box = ensureToast();
+  const el = document.createElement("div") as ToastEl;
   const route = !["myc", "evo", "msg"].includes(kind);
-  o.className = route ? "logo-orb" : "orb";
-  o.textContent = route ? "" : kind === "myc" ? "✦" : kind === "evo" ? "↯" : "✉";
-  el.classList.remove("show");
+  el.className = "toast" + (kind === "myc" ? " myc" : "");
+  el.innerHTML = `<div class="in"><span class="${route ? "logo-orb" : "orb"}">${route ? "" : kind === "myc" ? "✦" : kind === "evo" ? "↯" : "✉"}</span><div><div class="k"></div><div class="m"></div><div class="s"></div></div></div>`;
+  el.querySelector(".k")!.textContent = k;
+  el.querySelector(".m")!.innerHTML = m;
+  el.querySelector(".s")!.innerHTML = s;
+  box.appendChild(el);
   void el.offsetWidth;
-  el.classList.add("show");
-  clearTimeout(toastT);
-  toastT = setTimeout(hideToast, 6500); // never parks on top of content
+  el.classList.add("show"); // slides in from the right
+  while (box.children.length > 4) box.firstElementChild!.remove(); // keep the stack short
+  el.hideT = setTimeout(() => dismiss(el), 6500); // never parks on top of content
 }
-export function hideToast() { document.getElementById("toast")?.classList.remove("show"); }
+
+function dismiss(el: ToastEl) {
+  clearTimeout(el.hideT);
+  el.classList.remove("show");
+  setTimeout(() => el.remove(), 600);
+}
+export function hideToast() {
+  document.querySelectorAll<ToastEl>("#toasts .toast.show").forEach(dismiss);
+}
 
 /* ---------- Candy buttons: replay the icon animation on hover/focus ---------- */
 export function wireCandy(scope: ParentNode = document) {

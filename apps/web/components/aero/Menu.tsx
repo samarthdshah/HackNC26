@@ -1,5 +1,5 @@
 "use client";
-// Top-right hamburger (logo orb): fans out into Tour, Details and the three themes.
+// Top-right hamburger (logo orb): drops down into Tour, Details and the three themes.
 
 import { useEffect, useRef, useState } from "react";
 import { PALETTES, card, getTheme, onTheme, tour } from "@/lib/aero/runtime";
@@ -11,6 +11,12 @@ export default function Menu() {
   const [open, setOpen] = useState(false);
   const [theme, setThemeState] = useState(0);
   const ref = useRef<HTMLElement>(null);
+
+  // The toast stack slides left while the menu is open (v7: body.menu-open).
+  useEffect(() => {
+    document.body.classList.toggle("menu-open", open);
+    return () => document.body.classList.remove("menu-open");
+  }, [open]);
 
   useEffect(() => {
     setThemeState(getTheme());
