@@ -267,7 +267,14 @@ export async function handleAs(
   const handle: Handle = { platform: "web", id: person };
   const background = (h: Handoff) => void dispatch(person, h, "web").catch((err) => console.error(`[web] ${err}`));
 
-  const owed = opts.requestId && waitingOn(person).find((p) => requestOf(p.threadId) === opts.requestId);
+  const owedNow = () => (opts.requestId ? waitingOn(person).find((p) => requestOf(p.threadId) === opts.requestId) : undefined);
+  // The request may still be mid-run, about to ask this person; let it pause first so an early
+  // reply isn't mistaken for small talk.
+  let owed = owedNow();
+  if (opts.requestId && !owed) {
+    await settle(10_000);
+    owed = owedNow();
+  }
   if (owed) {
     emit("message_in", person, { text, platform: "web" }, { request_id: opts.requestId });
     background({ type: "resume", threadId: owed.threadId, text });
