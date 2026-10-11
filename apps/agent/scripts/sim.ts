@@ -4,6 +4,7 @@
 export {};
 process.env.REMINDER_MS ??= "600000";
 process.env.TIGER_DISABLED = "1"; // never write test traffic into the team's Tiger tables
+process.env.WAYFINDER_LOGS_DIR = "logs-sim"; // own bindings, checkpoints and map; live state in logs/ is never touched
 
 const { initMessenger } = await import("../src/messenger.ts");
 const { handleInbound } = await import("../src/graph/supervisor.ts");

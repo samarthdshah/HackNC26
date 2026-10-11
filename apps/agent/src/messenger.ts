@@ -2,7 +2,7 @@
 // text; everyone else is mirrored into the terminal chat so a single tester can
 // see (and, with /as, answer) every message the agent sends.
 
-import { voice, type Space, type SpectrumInstance } from "spectrum-ts";
+import { voice, type Message, type Space, type SpectrumInstance } from "spectrum-ts";
 import { emit } from "./events.ts";
 import { handleFor } from "./org/directory.ts";
 import { nameOf } from "./org/entities.ts";
@@ -28,6 +28,27 @@ export function rememberSpace(platform: string, space: Space) {
   if (platform === "terminal") terminalSpace = space;
 }
 
+// Each iMessage sender's latest inbound message. Some Photon projects may only *reply* to a
+// number ("Target not allowed for this project" on new sends); replying to this keeps
+// follow-ups flowing until the number is fully allowed.
+const lastInbound = new Map<string, Message>();
+export function rememberInbound(handleId: string, message: Message) {
+  lastInbound.set(handleId, message);
+}
+const notAllowed = (err: unknown) => /not allowed for this project/i.test(String(err));
+
+async function sendImessage(handleId: string, content: Parameters<Space["send"]>[0]) {
+  try {
+    const space = await imessage(app!).space.create(handleId);
+    await space.send(content);
+  } catch (err) {
+    const last = lastInbound.get(handleId);
+    if (!notAllowed(err) || !last) throw err;
+    console.warn("[messenger] new send refused by Photon for this number; replying in its thread instead");
+    await last.reply(content);
+  }
+}
+
 export function setWarRoom(space: Space | undefined) {
   warRoom = space;
 }
@@ -40,11 +61,7 @@ export async function sendTo(personId: string, text: string, requestId?: string)
 
   if (sink) return void (await sink(personId, text));
 
-  if (handle?.platform === "imessage" && imessageEnabled && app) {
-    const space = await imessage(app).space.create(handle.id);
-    await space.send(text);
-    return;
-  }
+  if (handle?.platform === "imessage" && imessageEnabled && app) return sendImessage(handle.id, text);
   const line = `→ ${nameOf(personId)}: ${text}`;
   if (terminalSpace) await terminalSpace.send(line);
   else console.log(`[mirror] ${line}`);
@@ -56,9 +73,7 @@ export async function sendVoiceTo(personId: string, audio: Buffer, caption: stri
   emit("message_out", "agent", { to: personId, kind: "voice", caption, bytes: audio.length }, { request_id: requestId });
   if (sink) return void (await sink(personId, `🔊 [voice note] ${caption}`));
   if (handle?.platform === "imessage" && imessageEnabled && app) {
-    const space = await imessage(app).space.create(handle.id);
-    await space.send(voice(audio, { mimeType: "audio/mpeg", name: "wayfinder.mp3" }));
-    return;
+    return sendImessage(handle.id, voice(audio, { mimeType: "audio/mpeg", name: "wayfinder.mp3" }));
   }
   const line = `→ ${nameOf(personId)}: 🔊 [voice note] ${caption}`;
   if (terminalSpace) await terminalSpace.send(line);

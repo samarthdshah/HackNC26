@@ -10,8 +10,8 @@ import { loadOrgData } from "./data/org.ts";
 import { closeTiger } from "./data/tiger.ts";
 import { allPaused, restore } from "./graph/runner.ts";
 import { handleInbound } from "./graph/supervisor.ts";
-import { initMessenger, rememberSpace } from "./messenger.ts";
-import { allBindings } from "./org/directory.ts";
+import { initMessenger, rememberInbound, rememberSpace } from "./messenger.ts";
+import { allBindings, personFor } from "./org/directory.ts";
 import { syncMapFromTiger } from "./org/map.ts";
 import { startServer } from "./server.ts";
 import { startSpectrum } from "./spectrum/app.ts";
@@ -25,10 +25,11 @@ async function handle(space: Space, message: Message): Promise<void> {
 
   rememberSpace(message.platform, space);
   const handle = { platform: message.platform, id: message.sender.id };
+  if (message.platform === "imessage") rememberInbound(handle.id, message);
   const reply = await handleInbound(handle, message.content.text.trim(), space);
   if (reply) {
     await message.reply(reply);
-    emit("message_out", "agent", { text: reply, platform: message.platform });
+    emit("message_out", "agent", { to: personFor(handle), text: reply, platform: message.platform });
   }
 }
 
@@ -38,7 +39,7 @@ console.log(`[agent] org map from ${await syncMapFromTiger()}`);
 const restored = await restore();
 if (restored.requests) console.log(`[agent] restored ${restored.requests} requests, ${restored.waiting} waiting on people, ${restored.resumed} resumed`);
 
-startServer(() => ({ surfaces: env.surfaces, paused: allPaused().length }));
+startServer(() => ({ surfaces: env.surfaces, paused: allPaused().length, bound: Object.keys(allBindings()) }));
 
 const { app, imessageEnabled } = await startSpectrum();
 initMessenger({ app, imessageEnabled });
@@ -56,16 +57,27 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => void Promise.allSettled([app.stop(), closeTiger()]).finally(() => process.exit(0)));
 }
 
+async function fail(message: Message, err: unknown) {
+  console.error("[agent] handler failed", err);
+  emit("error", "agent", { message: String(err) });
+  const text = isAiUnavailable(err)
+    ? `I can't think right now: ${err.reason}. Commands like /status still work; try again once that's fixed.`
+    : "Something went wrong on my end, try again in a sec.";
+  await message.reply(text).catch(() => {});
+}
+
 for await (const [space, message] of app.messages) {
   // Don't await: one slow request shouldn't block other chats.
-  void space
-    .responding(() => handle(space, message))
-    .catch(async (err: unknown) => {
-      console.error("[agent] handler failed", err);
-      emit("error", "agent", { message: String(err) });
-      const text = isAiUnavailable(err)
-        ? `I can't think right now: ${err.reason}. Commands like /status still work; try again once that's fixed.`
-        : "Something went wrong on my end, try again in a sec.";
-      await message.reply(text).catch(() => {});
-    });
+  // The typing indicator is a nicety: if Photon refuses it, handle the message without it.
+  let state: "waiting" | "running" | "done" = "waiting";
+  const run = async () => {
+    state = "running";
+    await handle(space, message);
+    state = "done";
+  };
+  void space.responding(run).catch(async (err: unknown) => {
+    if (state === "waiting") return run().catch((e) => fail(message, e));
+    if (state === "done") return console.warn(`[agent] typing indicator: ${err}`);
+    await fail(message, err);
+  });
 }

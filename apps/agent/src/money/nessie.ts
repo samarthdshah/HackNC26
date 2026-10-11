@@ -4,7 +4,7 @@
 // When Nessie is unreachable, writes go to a local ledger and say so (simulated: true).
 
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { logFile } from "../logs.ts";
 import { budgets, company, departments } from "../data/fixtures.ts";
 import { env, required } from "../env.ts";
 
@@ -41,8 +41,8 @@ export const listAccounts = () => nessie<NessieAccount[]>("/accounts");
 
 // ── department accounts ─────────────────────────────────────────────────────
 
-const stateFile = fileURLToPath(new URL("../../logs/nessie.json", import.meta.url));
-const ledgerFile = fileURLToPath(new URL("../../logs/ledger.jsonl", import.meta.url));
+const stateFile = logFile("nessie.json");
+const ledgerFile = logFile("ledger.jsonl");
 type Ids = { customer?: string; accounts: Record<string, string> };
 let ids: Ids = existsSync(stateFile) ? JSON.parse(readFileSync(stateFile, "utf8")) : { accounts: {} };
 
@@ -107,11 +107,16 @@ export async function transferBetweenBudgets(fromDept: string, toDept: string, a
 export async function billVendor(departmentId: string, vendorName: string, amountUsd: number, description: string) {
   try {
     const account = await accountFor(departmentId);
+    const today = new Date().toISOString().slice(0, 10);
+    // This Nessie stores a bill without recurring_date / upcoming_payment_date, then can't
+    // read it back, which breaks every bills read on the account. Always send both.
     const res = await post<{ objectCreated: { _id: string } }>(`/accounts/${account}/bills`, {
       status: "pending",
       payee: vendorName,
       nickname: description.slice(0, 60),
-      payment_date: new Date().toISOString().slice(0, 10),
+      payment_date: today,
+      recurring_date: Number(today.slice(8, 10)),
+      upcoming_payment_date: today,
       payment_amount: amountUsd,
     });
     return { tx_id: res.objectCreated._id, rail: "nessie bill", simulated: false as const };

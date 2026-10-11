@@ -11,7 +11,7 @@
 // to logs/runner.json, so restore() picks every request back up after a restart.
 
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { logFile } from "../logs.ts";
 import { Command, INTERRUPT, isInterrupted } from "@langchain/langgraph";
 import { AsyncLocalStorageProviderSingleton } from "@langchain/core/singletons";
 import { SqliteSaver } from "@langchain/langgraph-checkpoint-sqlite";
@@ -31,8 +31,8 @@ import type { Launch, OState, Request, Resume, Step, Waiting } from "./state.ts"
 
 type GraphName = "orchestrator" | Step["kind"];
 
-const dbFile = fileURLToPath(new URL("../../logs/checkpoints.sqlite", import.meta.url));
-const registryFile = fileURLToPath(new URL("../../logs/runner.json", import.meta.url));
+const dbFile = logFile("checkpoints.sqlite");
+const registryFile = logFile("runner.json");
 
 function compileAll() {
   const checkpointer = SqliteSaver.fromConnString(dbFile);
@@ -263,6 +263,9 @@ async function continuation(id: string): Promise<"resume" | "start" | "none"> {
 export function resume(threadId: string, payload: Resume): Promise<void> {
   return enqueue(threadId, () => run(threadId, new Command({ resume: payload })));
 }
+
+/** The request a thread (orchestrator or specialist agent) belongs to. */
+export const requestOf = (threadId: string) => threads.get(threadId)?.requestId;
 
 /** Paused threads waiting on this person, oldest first. */
 export function waitingOn(personId: string): Paused[] {

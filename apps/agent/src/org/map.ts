@@ -4,13 +4,13 @@
 // one org_edge_changes row per change (previous confidence, reason, request).
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { logFile } from "../logs.ts";
 import type { OrgEdge } from "@wayfinder/shared";
 import { edges as chartEdges } from "../data/fixtures.ts";
 import { readEdges, type EdgeChange } from "../data/tiger.ts";
 import { emitEdge } from "../events.ts";
 
-const file = fileURLToPath(new URL("../../logs/edges.json", import.meta.url));
+const file = logFile("edges.json");
 
 const sameHop = (a: OrgEdge, b: OrgEdge) => a.from === b.from && a.to === b.to && a.task_type === b.task_type;
 

@@ -41,7 +41,7 @@ async function price(s: S) {
 }
 
 function checkPermissionNode(s: S): Command {
-  const r = checkPermission({ person: s.request.requester, action: s.step.description, amount_usd: s.amount });
+  const r = checkPermission({ person: s.request.requester, action: s.step.description, amount_usd: s.amount, to_department: s.step.to_department });
   ev(s, "permission_checked", { amount_usd: s.amount, ...r });
   if (r.allowed) {
     return new Command({

@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 dist/
 apps/agent/logs/
+apps/agent/logs-*/
 
 # macOS
 .DS_Store

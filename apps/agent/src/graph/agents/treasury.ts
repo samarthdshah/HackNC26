@@ -7,7 +7,7 @@
 // idempotent per step so a retry can never pay twice.
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { logFile } from "../../logs.ts";
 import { Annotation, Command, END, START, StateGraph } from "@langchain/langgraph";
 import type { ToolIO } from "@wayfinder/shared";
 import { z } from "zod";
@@ -32,7 +32,7 @@ const TreasuryState = Annotation.Root({
 type S = typeof TreasuryState.State;
 
 // Idempotency: one payment per request step, ever.
-const paidFile = fileURLToPath(new URL("../../../logs/payments.json", import.meta.url));
+const paidFile = logFile("payments.json");
 const paid: Record<string, Payment> = existsSync(paidFile) ? JSON.parse(readFileSync(paidFile, "utf8")) : {};
 const record = (key: string, p: Payment) => {
   paid[key] = p;
@@ -41,7 +41,7 @@ const record = (key: string, p: Payment) => {
 
 function guard(s: S): Command {
   const approved = fromBriefing(s.briefing, "amount_usd");
-  const selfOk = checkPermission({ person: s.request.requester, action: s.step.description, amount_usd: s.step.amount_usd }).allowed;
+  const selfOk = checkPermission({ person: s.request.requester, action: s.step.description, amount_usd: s.step.amount_usd, to_department: s.step.to_department }).allowed;
   const ceiling = approved ?? (selfOk ? (s.step.amount_usd ?? 0) : 0);
   if (ceiling <= 0) {
     return new Command({

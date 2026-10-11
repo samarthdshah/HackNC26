@@ -6,12 +6,12 @@
 // persisted so a restart continues the numbering.
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { logFile } from "../logs.ts";
 import { emit } from "../events.ts";
 
 export type HopOutcome = "forwarded" | "bounced" | "delegated" | "handled";
 
-const file = fileURLToPath(new URL("../../logs/hops.json", import.meta.url));
+const file = logFile("hops.json");
 const state: Record<string, { seq: number; last: string }> = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
 
 const isActor = (id: string | undefined): id is string => Boolean(id && /^(p_|dept_)/.test(id));

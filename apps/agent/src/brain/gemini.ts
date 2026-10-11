@@ -1,6 +1,6 @@
 // Gemini wrapper: plain text, schema-checked JSON, and a function-calling loop.
 
-import { GoogleGenAI, type Content, type FunctionDeclaration, type GenerateContentResponse } from "@google/genai";
+import { FunctionCallingConfigMode, GoogleGenAI, type Content, type FunctionDeclaration, type GenerateContentResponse } from "@google/genai";
 import { z } from "zod";
 import { env, required } from "../env.ts";
 
@@ -124,6 +124,17 @@ export async function toolLoop(
     );
     contents.push({ role: "user", parts });
   }
-  console.warn(`[gemini] tool loop hit ${maxTurns} turns`, JSON.stringify(calls));
-  return { text: "I couldn't finish that one, can you rephrase?", calls };
+  // Out of turns: answer from what the tools already returned rather than giving up.
+  console.warn(`[gemini] tool loop hit ${maxTurns} turns, answering from results so far`, JSON.stringify(calls));
+  const final = await generate({
+    model: env.gemini.model,
+    contents: [...contents, { role: "user", parts: [{ text: "Answer now using what you found. No more tool calls." }] }],
+    config: {
+      systemInstruction,
+      temperature: 0.2,
+      tools: [{ functionDeclarations: declarations }],
+      toolConfig: { functionCallingConfig: { mode: FunctionCallingConfigMode.NONE } },
+    },
+  });
+  return { text: final.text?.trim() || "I couldn't finish that one, can you rephrase?", calls };
 }

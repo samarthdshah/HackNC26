@@ -3,14 +3,14 @@
 // play every role. Bindings persist to logs/contacts.json.
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { logFile } from "../logs.ts";
 
 export interface Handle {
   platform: string; // "imessage" | "terminal"
   id: string; // phone/email for iMessage, sender id for terminal
 }
 
-const file = fileURLToPath(new URL("../../logs/contacts.json", import.meta.url));
+const file = logFile("contacts.json");
 const key = (h: Handle) => `${h.platform}:${h.id}`;
 
 // person id -> handle
