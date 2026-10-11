@@ -1,6 +1,7 @@
 // Aero runtime: the v6 shared/aero.js as a module (theme, toast, title card, tour).
 // The dock and menu are React components (components/aero); everything else keeps the
 // v6 DOM behaviour so ported page scripts work unchanged. Client-only.
+import { prefetchVoice, speakLine, stopVoice } from "./voice";
 
 export type Palette = {
   name: string;
@@ -154,11 +155,29 @@ function wireCard() {
 let tourEl: HTMLElement | undefined;
 let endActiveTour: (() => void) | undefined;
 
-export function tour() {
+export type TourOpts = {
+  voice?: boolean; // narrate each step with AVATAR's voice and advance when it finishes
+  include?: (n: number) => boolean; // which data-tour steps to show (by their number)
+  label?: string; // extra text for the step counter ("page 2 of 6")
+  prefix?: string; // spoken before the first step
+  onDone?: () => void; // the last step finished (not skipped)
+  onLeave?: () => void; // the page unmounted mid-tour
+  onSkip?: () => void; // the person pressed Skip or Escape
+  waitMs?: number; // keep looking this long for steps (a page may still be loading its data)
+  alive?: () => boolean; // false once this tour is no longer wanted (e.g. the person left the page)
+};
+
+export function tour(opts: TourOpts = {}) {
+  if (opts.alive && !opts.alive()) return;
   const steps = [...document.querySelectorAll<HTMLElement>("[data-tour]")]
     .map((el) => { const [n, t, x] = el.dataset.tour!.split("|"); return { el, n: +n, t, x }; })
+    .filter((s) => !opts.include || opts.include(s.n))
     .sort((a, b) => a.n - b.n);
-  if (!steps.length) return;
+  if (!steps.length) {
+    if ((opts.waitMs ?? 0) > 0) { setTimeout(() => tour({ ...opts, waitMs: opts.waitMs! - 500 }), 500); return; }
+    opts.onDone?.();
+    return;
+  }
   const tc = document.querySelector(".title-card");
   const wasCollapsed = tc?.classList.contains("collapsed");
   card(true);
@@ -173,18 +192,33 @@ export function tour() {
   const spot = host.querySelector<HTMLElement>(".spot")!;
   const tip = host.querySelector<HTMLElement>(".tour-tip")!;
   const page = document.body.dataset.page;
-  let i = 0;
+  let i = 0, said = 0, over = false, voiceWarned = false;
+  const visible = () => steps.filter((s) => s.el.isConnected && s.el.getClientRects().length && s.el.getBoundingClientRect().width > 0);
+  const line = (s: { t: string; x: string }, k: number) => `${k === 0 && opts.prefix ? opts.prefix + " " : ""}${s.t}. ${s.x}`;
+  const narrate = (k: number) => {
+    const vis = visible(), s = vis[k], me = ++said;
+    if (!s) return;
+    if (vis[k + 1]) prefetchVoice(line(vis[k + 1], k + 1));
+    const advance = () => { if (!over && me === said) go(1); };
+    speakLine(line(s, k)).then(() => setTimeout(advance, 450)).catch((err: unknown) => {
+      // No voice (no key, ElevenLabs down, or audio blocked): keep going at reading pace.
+      if (!voiceWarned) toast("msg", "Voice unavailable", "The tour will continue without sound", String(err instanceof Error ? err.message : err).replace(/[<&]/g, (c) => (c === "<" ? "&lt;" : "&amp;")));
+      voiceWarned = true;
+      setTimeout(advance, Math.min(9000, 1800 + line(s, k).split(/\s+/).length * 330));
+    });
+  };
   const place = () => {
-    const vis = steps.filter((s) => s.el.isConnected && s.el.getClientRects().length && s.el.getBoundingClientRect().width > 0);
+    const vis = visible();
     const s = vis[i];
-    if (!s) return end();
+    if (!s) return end("done");
     s.el.scrollIntoView?.({ block: "nearest", behavior: RM ? "auto" : "smooth" });
+    if (opts.voice) narrate(i);
     setTimeout(() => {
       const r = s.el.getBoundingClientRect(), pad = 8, W = innerWidth, H = innerHeight;
       Object.assign(spot.style, { left: r.left - pad + "px", top: r.top - pad + "px", width: r.width + pad * 2 + "px", height: r.height + pad * 2 + "px" });
       tip.querySelector("h4")!.textContent = s.t;
       tip.querySelector("p")!.textContent = s.x;
-      tip.querySelector(".n")!.textContent = `${i + 1} of ${vis.length}`;
+      tip.querySelector(".n")!.textContent = `${opts.voice ? "🔊 " : ""}${i + 1} of ${vis.length}${opts.label ? ` · ${opts.label}` : ""}`;
       tip.querySelector<HTMLElement>("[data-t=back]")!.style.visibility = i ? "visible" : "hidden";
       tip.querySelector("[data-t=next]")!.textContent = i === vis.length - 1 ? "Done" : "Next";
       const tw = Math.min(320, W - 24), th = tip.offsetHeight || 160;
@@ -195,33 +229,87 @@ export function tour() {
       Object.assign(tip.style, { left: x + "px", top: y + "px", width: tw + "px" });
     }, RM ? 0 : 260);
   };
-  const end = () => {
+  const end = (why: "done" | "skip" | "leave" = "skip") => {
+    if (over) return;
+    over = true;
+    if (opts.voice) stopVoice();
     host.classList.remove("on");
     document.removeEventListener("keydown", key);
     endActiveTour = undefined;
     store.set("wf-tour-" + page, "1");
     if (wasCollapsed !== false) card(false);
+    (why === "done" ? opts.onDone : why === "leave" ? opts.onLeave : opts.onSkip)?.();
   };
   const go = (d: number) => {
     const n = steps.filter((s) => s.el.isConnected && s.el.getClientRects().length).length;
     i += d;
     if (i < 0) i = 0;
-    if (i >= n) return end();
+    if (i >= n) return end("done");
     place();
   };
-  const key = (e: KeyboardEvent) => { if (e.key === "Escape") end(); if (e.key === "ArrowRight") go(1); if (e.key === "ArrowLeft") go(-1); };
+  const key = (e: KeyboardEvent) => { if (e.key === "Escape") end("skip"); if (e.key === "ArrowRight") go(1); if (e.key === "ArrowLeft") go(-1); };
   tip.onclick = (e) => {
     const t = (e.target as HTMLElement).closest<HTMLElement>("[data-t]")?.dataset.t;
-    if (t === "skip") end();
+    if (t === "skip") end("skip");
     if (t === "back") go(-1);
     if (t === "next") go(1);
   };
   spot.onclick = () => go(1);
   endActiveTour?.();
-  endActiveTour = end;
+  endActiveTour = () => end("leave");
   document.addEventListener("keydown", key);
   host.classList.add("on");
   place();
+}
+
+/* ---------- Voice tour: AVATAR narrates every page's tour, then moves to the next page ---------- */
+// Module state survives client-side navigation, so the tour carries on when the next page mounts.
+let voice: { order: PageId[]; idx: number; navigating: boolean } | null = null;
+
+export const voiceTourActive = () => Boolean(voice);
+
+/** Start from the current page and visit all six (call from a click, after unlockVoice()). */
+export function voiceTour() {
+  const here = document.body.dataset.page as PageId;
+  const start = Math.max(0, PAGES.findIndex((p) => p.id === here));
+  voice = { order: [...PAGES.slice(start), ...PAGES.slice(0, start)].map((p) => p.id), idx: 0, navigating: false };
+  runVoicePage();
+}
+
+export function stopVoiceTour() {
+  voice = null;
+  stopVoice();
+  endActiveTour?.();
+}
+
+function runVoicePage() {
+  if (!voice) return;
+  const k = voice.idx, total = voice.order.length, pg = PAGES.find((p) => p.id === voice!.order[k])!;
+  tour({
+    voice: true,
+    waitMs: 8000, // e.g. Currents shows "Loading…" (no tour steps) until its data arrives
+    alive: () => voice !== null && voice.idx === k && document.body.dataset.page === pg.id,
+    include: (n) => k === 0 || n < 90, // the dock and menu steps only once, on the first page
+    label: `${pg.label}, page ${k + 1} of ${total}`,
+    prefix: k === 0 ? `Welcome to AVATAR. Here's a guided tour of all ${total} pages, starting with ${pg.label}.` : `Next, ${pg.label}.`,
+    onDone: nextVoicePage,
+    onSkip: () => { voice = null; toast("msg", "Voice tour stopped", "Pick it up again from the menu", "🔊 Voice tour"); },
+    onLeave: () => { if (voice && !voice.navigating) { voice = null; stopVoice(); } }, // the person navigated away themselves
+  });
+}
+
+function nextVoicePage() {
+  if (!voice) return;
+  voice.idx++;
+  if (voice.idx >= voice.order.length) {
+    voice = null;
+    toast("msg", "Tour complete", "That's all of AVATAR", "Text AVATAR a goal any time.");
+    void speakLine("That's the tour of AVATAR. Text me a goal any time, and I'll find the people to make it happen.").catch(() => {});
+    return;
+  }
+  voice.navigating = true;
+  const href = PAGES.find((p) => p.id === voice!.order[voice!.idx])!.href;
+  window.dispatchEvent(new CustomEvent("aero:navigate", { detail: href })); // the Menu routes client-side (keeps audio unlocked)
 }
 
 /**
@@ -238,7 +326,13 @@ export function enterPage(page: PageId, opts: { tourDelay?: number } = {}) {
   ensureToast();
   let tourTimer: ReturnType<typeof setTimeout> | undefined;
   const q = new URLSearchParams(location.search);
-  if (!q.has("notour") && !store.get("wf-tour-" + page)) tourTimer = setTimeout(tour, opts.tourDelay ?? 1400);
+  if (voice && voice.order[voice.idx] === page) {
+    // The voice tour just navigated here: narrate this page once its scene has settled.
+    voice.navigating = false;
+    tourTimer = setTimeout(runVoicePage, opts.tourDelay ?? 1400);
+  } else if (voice) {
+    voice = null; stopVoice(); // the person went somewhere else mid-tour
+  } else if (!q.has("notour") && !store.get("wf-tour-" + page)) tourTimer = setTimeout(() => tour(), opts.tourDelay ?? 1400);
   window.dispatchEvent(new CustomEvent("aero:page", { detail: page }));
   return () => {
     clearTimeout(tourTimer);
@@ -255,5 +349,5 @@ if (isBrowser) {
   });
 }
 
-export const Aero = { PALETTES, PAGES, RM, get theme() { return theme; }, palette, hex, css, setTheme, onTheme, toast, hideToast, tour, card, wireCandy, sleep };
+export const Aero = { PALETTES, PAGES, RM, get theme() { return theme; }, palette, hex, css, setTheme, onTheme, toast, hideToast, tour, voiceTour, stopVoiceTour, card, wireCandy, sleep };
 export type AeroApi = typeof Aero;

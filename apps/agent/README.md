@@ -20,7 +20,7 @@ Agent server: Photon Spectrum, multi-agent LangGraph orchestration on Gemini, ap
 | `npm run voice:test -- "text"` | Sends an ElevenLabs voice note to `DEMO_PHONE` over iMessage |
 | `npm run tiger:test` | One live request through C's events trigger: prints the derived request, hops and edge history, then cleans up. Needs the owner login: `TIGER_DATABASE_URL` as `tsdbadmin` with its password, or `TIGER_OWNER_PASSWORD` (`-- --keep` leaves the rows for Insights) |
 | `npm run darwin:test` | Checkout incident with Darwin's approved rule: expects "Routing to Platform Engineering directly (Darwin: …)" and the ask to Aisha |
-| HTTP | `GET /live` (SSE of shared `LiveUpdate`s) and `GET /health` on `AGENT_PORT` (8787) for the website |
+| HTTP | `POST /summary` (Currents' 🔊 Summary button) · `GET /live` (SSE of shared `LiveUpdate`s) and `GET /health` on `AGENT_PORT` (8787) for the website |
 
 ## Playing the cast
 
@@ -30,7 +30,7 @@ Each phone or terminal is bound to one person from the fixtures:
 - In the terminal: `/as leo`, send a request, then `/as raj` to answer as Raj. Messages to people who aren't bound to a phone show up in the terminal as `→ Name: …`.
 - In a group chat: `/warroom` makes it the live status channel.
 
-Other commands: `/retry` (continue requests paused by an AI outage), `/briefing` (voice rundown), `/status`, `/map data_access`, `/who priya`, `/whoami`, `/voice <text>`, `/reset`, `/help`.
+Other commands: `/summary` (spoken-style summary of your requests: text plus a voice note, or read aloud in the terminal), `/speak on|off` (terminal voice: AVATAR's replies read aloud on this machine via ElevenLabs; or `TERMINAL_VOICE=on`), `/retry` (continue requests paused by an AI outage), `/briefing` (voice rundown), `/status`, `/map data_access`, `/who priya`, `/whoami`, `/voice <text>`, `/reset`, `/help`.
 
 ## Orchestration (multi-agent, LangGraph)
 

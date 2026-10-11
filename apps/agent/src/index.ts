@@ -10,11 +10,12 @@ import { loadOrgData } from "./data/org.ts";
 import { closeTiger } from "./data/tiger.ts";
 import { allPaused, restore } from "./graph/runner.ts";
 import { handleInbound } from "./graph/supervisor.ts";
-import { initMessenger, rememberInbound, rememberSpace } from "./messenger.ts";
+import { initMessenger, rememberInbound, rememberSpace, setTerminalPerson } from "./messenger.ts";
 import { allBindings, personFor } from "./org/directory.ts";
 import { syncMapFromTiger } from "./org/map.ts";
 import { startServer } from "./server.ts";
 import { startSpectrum } from "./spectrum/app.ts";
+import { speak } from "./voice/speaker.ts";
 
 const seen = new Set<string>();
 
@@ -26,9 +27,13 @@ async function handle(space: Space, message: Message): Promise<void> {
   rememberSpace(message.platform, space);
   const handle = { platform: message.platform, id: message.sender.id };
   if (message.platform === "imessage") rememberInbound(handle.id, message);
+  const terminal = message.platform === "terminal";
+  if (terminal) setTerminalPerson(personFor(handle));
   const reply = await handleInbound(handle, message.content.text.trim(), space);
+  if (terminal) setTerminalPerson(personFor(handle)); // /as may have changed who the terminal plays
   if (reply) {
     await message.reply(reply);
+    if (terminal) void speak(reply); // terminal voice (TERMINAL_VOICE=on or /speak on)
     emit("message_out", "agent", { to: personFor(handle), text: reply, platform: message.platform });
   }
 }

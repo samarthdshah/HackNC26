@@ -217,6 +217,16 @@ export interface SayResponse {
 export interface IntroRequest { a: string; b: string; why: string; topic: string; by?: string }
 export interface IntroResponse { ok: boolean; group: string; virtual: boolean; event_id: string }
 
+/** POST /summary: a short spoken-style summary of one request (Currents' Summary button). */
+export interface SummaryRequest {
+  request_id?: string;
+  title: string;
+  status: string;
+  requester?: string; // display name
+  steps: { who: string; kind: string; text: string; at?: string }[]; // the request's transactions, oldest first
+}
+export interface SummaryResponse { ok: boolean; text: string }
+
 /** First SSE message on GET /live. boot_id changes when the agent restarts. */
 export interface LiveHello { boot_id: string; bound: string[] }
 

@@ -5,12 +5,14 @@
 //   GET  /health  liveness plus what the agent is connected to
 //   POST /say     the website speaks as a person, as if they had texted (Currents compose)
 //   POST /intro   Lagoon's Introduce: text two people an introduction
+//   POST /summary Currents' Summary button: a short spoken-style summary of one request
 //   GET  /darwin  Darwin's latest run as generations with the admin's decisions (data/evolution.ts)
 //   POST /darwin/generations/:gen/approve|reject   record a decision and push it to Darwin
 // Initial state comes from Tiger (B reads its views); /live only carries changes.
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import type { IntroRequest, IntroResponse, LiveHello, SayRequest, SayResponse } from "@wayfinder/shared";
+import type { IntroRequest, IntroResponse, LiveHello, SayRequest, SayResponse, SummaryRequest, SummaryResponse } from "@wayfinder/shared";
+import { summarizeRequest } from "./brain/summary.ts";
 import { getPerson, source } from "./data/fixtures.ts";
 import { DarwinHttpError, decide, view as darwinView } from "./data/evolution.ts";
 import { tigerReady } from "./data/tiger.ts";
@@ -21,7 +23,7 @@ import { openGroup } from "./messenger.ts";
 import { allBindings } from "./org/directory.ts";
 import { nameOf } from "./org/entities.ts";
 
-const ROUTES = ["GET /live", "GET /health", "POST /say", "POST /intro", "GET /darwin", "POST /darwin/generations/:gen/(approve|reject)"];
+const ROUTES = ["GET /live", "GET /health", "POST /say", "POST /intro", "POST /summary", "GET /darwin", "POST /darwin/generations/:gen/(approve|reject)"];
 const MAX_BODY = 16 * 1024;
 
 class HttpError extends Error {
@@ -81,6 +83,16 @@ async function intro(req: IncomingMessage): Promise<IntroResponse> {
   return { ok: true, group: group.id, virtual: group.id.startsWith("virtual:"), event_id: event.id };
 }
 
+async function summary(req: IncomingMessage): Promise<SummaryResponse> {
+  const body = await readJson<SummaryRequest>(req);
+  const title = typeof body.title === "string" ? body.title.trim().slice(0, 200) : "";
+  if (!title) throw new HttpError(400, "title is required");
+  const steps = (Array.isArray(body.steps) ? body.steps : []).map((x) => ({
+    who: String(x?.who ?? "").slice(0, 60), kind: String(x?.kind ?? "").slice(0, 20), text: String(x?.text ?? "").slice(0, 400), at: x?.at ? String(x.at).slice(0, 40) : undefined,
+  }));
+  return { ok: true, text: await summarizeRequest({ title, status: String(body.status ?? "").slice(0, 20), requester: body.requester ? String(body.requester).slice(0, 60) : undefined, steps }) };
+}
+
 function live(req: IncomingMessage, res: ServerResponse) {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
@@ -124,6 +136,7 @@ export function startServer(info: () => Record<string, unknown> = () => ({})) {
       }
       if (req.method === "POST" && path === "/say") { authorise(req); return json(res, 202, await say(req)); }
       if (req.method === "POST" && path === "/intro") { authorise(req); return json(res, 200, await intro(req)); }
+      if (req.method === "POST" && path === "/summary") { authorise(req); return json(res, 200, await summary(req)); }
       if (req.method === "GET" && path === "/darwin") return json(res, 200, await darwinView());
       const gen = req.method === "POST" && /^\/darwin\/generations\/(\d+)\/(approve|reject)$/.exec(path);
       if (gen) {

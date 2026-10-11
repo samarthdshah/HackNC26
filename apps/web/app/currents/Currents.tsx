@@ -4,9 +4,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { SayResponse, TxKind, WfQuery, WfTx } from "@wayfinder/shared";
+import type { SayResponse, SummaryRequest, SummaryResponse, TxKind, WfQuery, WfTx } from "@wayfinder/shared";
 import { useAeroPage } from "@/lib/aero/usePage";
 import { hideToast, toast } from "@/lib/aero/runtime";
+import { speakLine, stopVoice, unlockVoice } from "@/lib/aero/voice";
 import { useWF } from "@/lib/wf/store";
 import { clock, duration } from "@/lib/wf/format";
 import { STYLE } from "./style";
@@ -38,6 +39,8 @@ export default function Currents() {
   const miniRef = useRef<SVGSVGElement>(null);
   const flowRef = useRef<SVGSVGElement>(null);
   const tickRef = useRef<HTMLSpanElement>(null);
+  const [summary, setSummary] = useState<"idle" | "busy" | "playing">("idle");
+  useEffect(() => () => stopVoice(), [q?.id]); // switching request (or leaving) stops a summary mid-sentence
   const listRef = useRef<HTMLDivElement>(null);
   const [touched, setTouched] = useState<string[]>([]);
   const [replay, setReplay] = useState(0);
@@ -133,6 +136,37 @@ export default function Currents() {
     }
   };
 
+  /* ---------- Summary: AVATAR reads out where this request stands (ElevenLabs) ---------- */
+  const summarize = async () => {
+    if (!q) return;
+    if (summary !== "idle") { stopVoice(); setSummary("idle"); return; } // second press stops it
+    unlockVoice(); // inside the click, so the clip can play once it's ready
+    setSummary("busy");
+    const who = (id: string) => (id === "wf" || id === "agent" ? "AVATAR" : helpers.nameOf(id));
+    const body: SummaryRequest = {
+      request_id: q.id, title: q.title, status: q.rawStatus, requester: who(q.requester),
+      steps: rows.slice(-30).map((m) => ({ who: who(m.from), kind: m.kind, text: m.text.slice(0, 300), at: m.t })),
+    };
+    let text: string;
+    try {
+      const r = await fetch("/api/agent/summary", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(30e3) });
+      const res = (await r.json()) as SummaryResponse;
+      if (!r.ok || !res.ok || !res.text) throw new Error("no summary");
+      text = res.text;
+    } catch {
+      // Agent down or out of AI credits: a plain summary from the hops still works.
+      const path = [...new Set(q.hops.map((h) => who(h.who)))];
+      const where = q.rawStatus === "resolved" ? "It's resolved" : q.rawStatus === "denied" ? "It was denied" : q.rawStatus === "stuck" ? "It's stuck" : `It's with ${path.at(-1) ?? "AVATAR"} now`;
+      text = `${q.title}, asked by ${who(q.requester)}. It went through ${q.hops.length} ${q.hops.length === 1 ? "hop" : "hops"}${path.length ? `: ${path.join(", ")}` : ""}. ${where}.`;
+    }
+    const esc = (x: string) => x.replace(/[<&]/g, (c) => (c === "<" ? "&lt;" : "&amp;"));
+    toast("msg", "Summary", esc(q.title), esc(text));
+    setSummary("playing");
+    try { await speakLine(text); }
+    catch (err) { toast("msg", "Voice unavailable", "Here's the summary as text", esc(String(err instanceof Error ? err.message : err))); }
+    finally { setSummary("idle"); }
+  };
+
   /* ---------- states without a query ---------- */
   if (!wf || !q) {
     const msg = error ? `Couldn't load data: ${error}` : !wf ? "Loading…" : "No requests yet. Text AVATAR to start one.";
@@ -141,7 +175,8 @@ export default function Currents() {
         <style dangerouslySetInnerHTML={{ __html: STYLE }} />
         <Sea />
         <main className="wrap">
-          <section className="head milk still title-card" aria-labelledby="pt">
+          <section className="head milk still title-card" aria-labelledby="pt"
+            data-tour="1|Currents|Once you text AVATAR a request, this page follows it end to end: who it went to, who passed it on, and who finally owned it. There's nothing in flight yet.">
             <div className="bar"><span className="logo-orb"></span>One query, end to end<span className="live"><i></i>live</span></div>
             <div className="body">
               <div className="top"><h1 className="page-title" id="pt">Currents</h1></div>
@@ -211,7 +246,9 @@ export default function Currents() {
         </section>
 
         <aside className="tx milk still" aria-label="Transactions" data-tour="5|Transactions|Every message, approval and payment on this request. Type below to message AVATAR about it.">
-          <div className="bar">Transactions<span className="live"><i></i><span id="activeCount">{active} active {active === 1 ? "chat" : "chats"}</span></span></div>
+          <div className="bar">Transactions<span className="live"><i></i><span id="activeCount">{active} active {active === 1 ? "chat" : "chats"}</span></span>
+            <button className="pill ghost summary" onClick={summarize} aria-label="Hear a summary of this request" title="AVATAR reads out where this request stands">
+              {summary === "busy" ? "Summarising…" : summary === "playing" ? "■ Stop" : "🔊 Summary"}</button></div>
           <div className="chats" id="chatsRow"><span className={`orb sm ${q.status === "done" ? "" : "amber"}`}></span><span>{q.status === "done" ? "Closed" : "Open"} thread with <b style={{ color: "var(--ink)" }}>{owner}</b> · {rows.length} messages</span></div>
           <div className="list" id="txList" ref={listRef} aria-live="polite">
             {rows.map((m) => {
