@@ -17,7 +17,7 @@ type Filter = "active" | "done"; // v7: Active / Past only
 // Plain-language status: who has it now, and how long it has been open.
 function status(q: WfQuery, h: WFHelpers, now: number) {
   const last = q.hops.at(-1);
-  const who = last ? h.nameOf(last.who) : "Wayfinder";
+  const who = last ? h.nameOf(last.who) : "AVATAR";
   const open = q.status === "active" ? duration(now - new Date(q.startedIso).getTime()) : q.elapsed;
   if (q.status === "done") return { chip: "Done", cls: "", line: `Done · took ${q.elapsed}` };
   if (!last || last.verdict === "pending") return { chip: "Waiting", cls: "warn", line: `Waiting on ${who} · ${open}` };
@@ -56,16 +56,16 @@ export default function RootsPage() {
   const mine = wf?.queries ?? [];
   const nActive = mine.filter((q) => q.status === "active").length;
   const list = mine.filter((q) => q.status === filter);
-  const empty = !wf ? "Loading…" : !mine.length ? "Nothing yet. Text Wayfinder to start." : "Nothing here yet.";
+  const empty = !wf ? "Loading…" : !mine.length ? "Nothing yet. Text AVATAR to start." : "Nothing here yet.";
   const play = (id: string) => api.current?.playQuery(id);
 
   return (
     <div ref={rootRef}>
       <style dangerouslySetInnerHTML={{ __html: css }} />
-      <canvas id="scene" aria-label="Wayfinder org as a glass mycelium network: departments, teams and people" />
+      <canvas id="scene" aria-label="AVATAR org as a glass mycelium network: departments, teams and people" />
 
       <section id="mine" className="milk float title-card" aria-label="Roots: your requests"
-        data-tour="1|Your requests|Everything you've asked Wayfinder lives here: what's still moving and what's finished.">
+        data-tour="1|Your requests|Everything you've asked AVATAR lives here: what's still moving and what's finished.">
         <div className="bar"><span className="logo-orb" /><span className="live"><i />live</span></div>
         <div className="body">
           <div>
@@ -102,7 +102,7 @@ export default function RootsPage() {
       </section>
 
       <div id="legend" aria-label="Legend" data-tour="5|Reading the map|Bubble size is rank. Green dots are a request moving; pink dots are Mycelium introducing two people.">
-        <span className="opt"><i className="dot l" style={{ background: "radial-gradient(circle at 35% 30%,#fff,#5BD86B 50%,#1F8F37)" }} />Wayfinder</span>
+        <span className="opt"><i className="dot l" style={{ background: "radial-gradient(circle at 35% 30%,#fff,#5BD86B 50%,#1F8F37)" }} />AVATAR</span>
         <span><i className="dot l" id="lg-dept" />Department</span>
         <span><i className="dot m" id="lg-sub" />Team</span>
         <span><i className="dot s" id="lg-person" />Person</span>

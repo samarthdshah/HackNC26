@@ -24,7 +24,9 @@ import { sendTo, setWarRoom } from "../messenger.ts";
 import { bind, personFor, type Handle } from "../org/directory.ts";
 import { describePerson, nameOf, resolveEntity } from "../org/entities.ts";
 import { allEdges, resetMap } from "../org/map.ts";
+import { summarizeFor } from "../brain/summary.ts";
 import { tts } from "../voice/elevenlabs.ts";
+import { setSpeaking, speak, speaking, spoken } from "../voice/speaker.ts";
 import { resetHops } from "./hops.ts";
 import { requestOf, retryFailed } from "./runner.ts";
 import { allPaused, listRequests, resetRunner, resume, settle, snapshot, startRequest, waitingOn } from "./runner.ts";
@@ -44,7 +46,7 @@ type Handoff = { type: "start"; goal: string } | { type: "resume"; threadId: str
 type S = typeof SupervisorState.State;
 type Ctx = LangGraphRunnableConfig<{ space?: Space }>;
 
-const HELP = `Commands: /iam <name> · /as <name> (terminal) · /status · /briefing · /retry · /map <task_type> · /warroom · /voice <text> · /who <name> · /whoami · /reset`;
+const HELP = `Commands: /iam <name> · /as <name> (terminal) · /status · /briefing · /summary · /speak on|off · /retry · /map <task_type> · /warroom · /voice <text> · /who <name> · /whoami · /reset`;
 
 // ── identify ───────────────────────────────────────────────────────────────
 
@@ -108,6 +110,23 @@ async function command(s: S, config: Ctx): Promise<Partial<S>> {
       if (!space) return { reply: "Run /warroom inside the group chat you want status posts in." };
       setWarRoom(space);
       return { reply: "📡 This chat is now the war room. Status updates on every request will land here." };
+    case "/summary": {
+      // A spoken-style summary of your requests: text here, plus a voice note (iMessage) or read aloud (terminal).
+      if (!s.person) return { reply: "Tell me who you are first: /iam <name>" };
+      const text = await summarizeFor(s.person);
+      if (s.handle.platform === "terminal") { if (!speaking()) void speak(text, { force: true }); }
+      else if (space) {
+        try { await space.send(voice(await tts(spoken(text)), { mimeType: "audio/mpeg", name: "avatar-summary.mp3" })); } catch (err) { console.warn(`[summary] voice note failed: ${err}`); }
+      }
+      return { reply: `📝 ${text}` };
+    }
+    case "/speak": {
+      // Terminal voice: read AVATAR's replies aloud on this machine.
+      const on = arg ? /^(on|yes|1|true)$/i.test(arg) : !speaking();
+      setSpeaking(on);
+      if (on) void speak("Voice on. I'll read my replies out loud.", { force: true });
+      return { reply: on ? "🔊 Voice on: I'll read my replies aloud here. /speak off to stop." : "🔇 Voice off." };
+    }
     case "/voice": {
       if (!space) return { reply: "No chat to send a voice note to." };
       const audio = await tts(arg || `Hi, this is Wayfinder for ${company.name}. Voice is working.`);

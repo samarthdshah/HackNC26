@@ -7,7 +7,7 @@ import { THEME_BOOT } from "@/lib/aero/runtime";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Wayfinder",
+  title: "AVATAR",
   description: "Discover. Connect. Coordinate. Evolve.",
 };
 

@@ -29,6 +29,7 @@ export const STYLE = `
 /* Main flow: flat on purpose, no glow or gloss */
 .flow{grid-column:1;grid-row:2;display:flex;flex-direction:column;min-height:0}
 .flow .bar .pill{margin-left:auto;padding:5px 12px;font-size:13px}
+.tx .bar .summary{margin-left:8px;padding:4px 10px;font-size:12px;white-space:nowrap}   /* 🔊 Summary: AVATAR reads this request out */
 .flow .stage{flex:1;position:relative;padding:8px 16px 0}
 .flow .stage{min-height:0}
 #flow{position:absolute;inset:8px 16px 0;width:calc(100% - 32px);height:calc(100% - 8px);display:block;overflow:visible}

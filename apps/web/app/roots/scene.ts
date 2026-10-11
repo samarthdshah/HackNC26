@@ -30,7 +30,7 @@ type Route = { dots: THREE.Mesh[]; mat: THREE.MeshBasicMaterial };
 
 const Y_SPREAD = 1.35; // v7: vertical spacing between nodes (stays above the water at WATER_Y)
 const WATER_Y = -23, SUN = new THREE.Vector3(-0.55, 0.32, -0.77).normalize(), UP = new THREE.Vector3(0, 1, 0);
-const ROUTE_COLOR = 0x1f9a3a; // Wayfinder green: flat, unlit dots
+const ROUTE_COLOR = 0x1f9a3a; // AVATAR green: flat, unlit dots
 
 const NOISE = `
 vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;} vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
@@ -122,7 +122,7 @@ export function mount(root: HTMLElement, initial: WF): RootsApi {
   const P3 = () => ({ dept: new THREE.Color(tok("--c-primary")).offsetHSL(0, 0, -0.1).getHex(), team: tok("--c-secondary"), person: tok("--c-warm") });
   const person = (id: string) => WF.people.find((p) => p.id === id);
   const dept = (id: string) => WF.org.find((d) => d.id === id);
-  const nameOf = (id: string) => (id === "wf" || id === "agent" ? "Wayfinder" : person(id)?.first ?? WF.actorNames[id] ?? id);
+  const nameOf = (id: string) => (id === "wf" || id === "agent" ? "AVATAR" : person(id)?.first ?? WF.actorNames[id] ?? id);
 
   /* ============ Renderer, camera, environment (v4) ============ */
   const canvas = $("scene") as HTMLCanvasElement;
@@ -254,7 +254,7 @@ export function mount(root: HTMLElement, initial: WF): RootsApi {
       if (a == null || b == null) return;
       const k = a < b ? `${a}-${b}` : `${b}-${a}`; if (a === b || seen.has(k)) return; seen.add(k); pairs.push([a, b, s]);
     };
-    add(0, new THREE.Vector3(), 0, { name: "Wayfinder" });
+    add(0, new THREE.Vector3(), 0, { name: "AVATAR" });
     const R = 27, nD = WF.org.length, deptIx: Record<string, number> = {}, subIx: Record<string, number> = {}, personIx: Record<string, number> = {};
     WF.org.forEach((dep, i) => {
       const a = (i / nD) * Math.PI * 2, pos = new THREE.Vector3(R * Math.cos(a), Math.sin(i * 2.1) * 5, R * Math.sin(a));
@@ -381,7 +381,7 @@ export function mount(root: HTMLElement, initial: WF): RootsApi {
     paintLegend(); labels.forEach(paintLabelDot);
   }
 
-  /* ============ Wayfinder core: glass sphere around a green heart (v4) ============ */
+  /* ============ AVATAR core: glass sphere around a green heart (v4) ============ */
   const coreGroup = new THREE.Group(); scene.add(coreGroup);
   const heart = new THREE.Mesh(new THREE.SphereGeometry(1.5, 48, 32), new THREE.MeshPhysicalMaterial({ color: 0x3fd66a, emissive: 0x2fbf5a, emissiveIntensity: 0.55, roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.05 }));
   const shell = new THREE.Mesh(new THREE.SphereGeometry(2.7, 64, 48), new THREE.MeshPhysicalMaterial({ color: 0xe8fbff, roughness: 0.02, metalness: 0, clearcoat: 1, clearcoatRoughness: 0, transparent: true, opacity: 0.26, envMapIntensity: 2.2, depthWrite: false }));
@@ -517,7 +517,7 @@ export function mount(root: HTMLElement, initial: WF): RootsApi {
       if (n.dept !== S.focus) focusDept(n.dept!);
       else if (n.kind === 3) {
         const p = person(n.person!);
-        if (p) toast("route", p.deptName + " · " + p.subName, esc(p.name), n.person === ME ? "That’s you." : esc(p.role || "Wayfinder knows what they own."));
+        if (p) toast("route", p.deptName + " · " + p.subName, esc(p.name), n.person === ME ? "That’s you." : esc(p.role || "AVATAR knows what they own."));
       }
       pulseAt(n.pos); return;
     }
@@ -600,7 +600,7 @@ export function mount(root: HTMLElement, initial: WF): RootsApi {
     const { stops, path } = chainPath([q.requester, ...q.hops.map((h) => h.who)]); if (path.length < 2) return;
     showTemp(stops);
     const last = q.hops.at(-1)!, lastName = esc(nameOf(last.who));
-    toast("route", "Wayfinder is routing", `${esc(nameOf(q.requester))} → ${lastName}`, esc(q.title));
+    toast("route", "AVATAR is routing", `${esc(nameOf(q.requester))} → ${lastName}`, esc(q.title));
     const r = await travel(path, ROUTE_COLOR, RM ? 1 : 420, alive); if (!alive()) return;
     const n = q.hops.filter((h) => !h.synthetic).length || q.hops.length;
     if (q.status === "done") toast("route", "Resolved", esc(q.title), `${esc(q.elapsed)}${q.usual ? `, usually ${esc(q.usual)}` : ""} <span class="hops">${n} ${n === 1 ? "hop" : "hops"}</span>`);

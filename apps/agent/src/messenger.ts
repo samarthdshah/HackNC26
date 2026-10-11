@@ -7,6 +7,7 @@ import { emit } from "./events.ts";
 import { handleFor } from "./org/directory.ts";
 import { nameOf } from "./org/entities.ts";
 import { imessage } from "./spectrum/app.ts";
+import { speak } from "./voice/speaker.ts";
 
 type Sink = (to: string, text: string) => Promise<void> | void;
 type GroupSpace = { id: string; send: (text: string) => Promise<unknown> };
@@ -26,6 +27,12 @@ export function initMessenger(opts: { app?: SpectrumInstance; imessageEnabled?: 
 /** Remember the terminal chat so mirrored messages have somewhere to go. */
 export function rememberSpace(platform: string, space: Space) {
   if (platform === "terminal") terminalSpace = space;
+}
+
+// Who the terminal is playing right now (/as leo): their messages are read aloud when voice is on.
+let terminalPerson: string | undefined;
+export function setTerminalPerson(personId: string | undefined) {
+  terminalPerson = personId;
 }
 
 // Each iMessage sender's latest inbound message. Some Photon projects may only *reply* to a
@@ -65,6 +72,7 @@ export async function sendTo(personId: string, text: string, requestId?: string)
   const line = `→ ${nameOf(personId)}: ${text}`;
   if (terminalSpace) await terminalSpace.send(line);
   else console.log(`[mirror] ${line}`);
+  if (terminalSpace && personId === terminalPerson) void speak(text);
 }
 
 /** Send an audio voice note (falls back to the caption where audio can't go). */
@@ -78,6 +86,8 @@ export async function sendVoiceTo(personId: string, audio: Buffer, caption: stri
   const line = `→ ${nameOf(personId)}: 🔊 [voice note] ${caption}`;
   if (terminalSpace) await terminalSpace.send(line);
   else console.log(`[mirror] ${line}`);
+  // A voice note for whoever the terminal is playing is meant to be heard: play it.
+  if (terminalSpace && personId === terminalPerson) void speak(caption, { force: true });
 }
 
 /**

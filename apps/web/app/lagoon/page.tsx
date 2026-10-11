@@ -67,13 +67,13 @@ export default function LagoonPage() {
         </defs>
       </svg>
 
-      <section id="intro" className="milk float still title-card" data-tour="1|Lagoon|Wayfinder notices when other people are working on the same thing you are, so you can team up instead of starting from scratch.">
+      <section id="intro" className="milk float still title-card" data-tour="1|Lagoon|AVATAR notices when other people are working on the same thing you are, so you can team up instead of starting from scratch.">
         <div className="bar"><span className="logo-orb" />Discovery garden<span className="live"><i />Mycelium</span></div>
         <div className="body">
           <h1 className="page-title">Lagoon</h1>
           <p className="page-sub">People working on the same thing as you.</p>
           <div className="more"><div>
-            <p className="page-sub" style={{ fontSize: 14 }}>Mycelium reads the questions people send Wayfinder and spots overlap. Each bubble is a topic you share; bigger bubbles hold more people. Nobody is introduced until you tap Introduce.</p>
+            <p className="page-sub" style={{ fontSize: 14 }}>Mycelium reads the questions people send AVATAR and spots overlap. Each bubble is a topic you share; bigger bubbles hold more people. Nobody is introduced until you tap Introduce.</p>
             <div className="stats">
               <span className="chip" id="nSeeds">{wf ? `${topics.length} ${topics.length === 1 ? "topic" : "topics"} · ${people.size} ${people.size === 1 ? "person" : "people"}` : "…"}</span>
               <span className="chip info" id="nIntros">{wf ? `${wf.stats.introsMade} ${wf.stats.introsMade === 1 ? "intro" : "intros"} made` : "…"}</span>
@@ -89,7 +89,7 @@ export default function LagoonPage() {
         <svg id="jfSvg" xmlns="http://www.w3.org/2000/svg" viewBox="95 125 340 320" aria-label="You, as a jellyfish" dangerouslySetInnerHTML={{ __html: JELLY }} />
         <div className="you">
           <span className="lbl"><i style={{ background: "var(--c-warm)" }} />You · <span id="meName">{me?.name ?? ""}</span></span>
-          {wf && !topics.length && <span className="lbl person" id="lagoonEmpty">No shared topics yet. Text Wayfinder and Mycelium will spot overlap.</span>}
+          {wf && !topics.length && <span className="lbl person" id="lagoonEmpty">No shared topics yet. Text AVATAR and Mycelium will spot overlap.</span>}
           <button className="pill ghost" id="moreTopics" hidden data-tour="5|More topics|Only your five strongest topics float in the lagoon, so it never gets crowded. The rest are tucked in here." />
         </div>
       </div>

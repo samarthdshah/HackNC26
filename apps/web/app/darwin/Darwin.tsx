@@ -12,6 +12,7 @@ import { useLiveStatus } from "@/lib/wf/live";
 import { useWF } from "@/lib/wf/store";
 import type { DarwinMeta } from "@/lib/wf/darwin";
 import { STYLE } from "./style";
+import Aquarium from "./egg/Aquarium";
 import { mount, sampleGenerations, type Action, type Scene } from "./scene";
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
@@ -90,7 +91,7 @@ export default function Darwin({ meta, initial }: { meta: DarwinMeta | null; ini
       <style dangerouslySetInnerHTML={{ __html: STYLE }} />
       <div id="stage"><canvas id="tree" aria-label={live ? "Darwin's evolution tree: each ring of branches is a generation, each orange fruit is that generation's best rule set" : "Darwin's evolution tree: each ring of branches is a generation, each orange fruit is an evolved routing rule"}></canvas></div>
 
-      <section id="head" className="milk float title-card" aria-live="polite" data-tour="1|Darwin Growth|Darwin replays past requests and keeps the routes that need fewer hops. It is Wayfinder improving itself.">
+      <section id="head" className="milk float title-card" aria-live="polite" data-tour="1|Darwin Growth|Darwin replays past requests and keeps the routes that need fewer hops. It is AVATAR improving itself.">
         <div className="bar"><span className="logo-orb"></span>Evolve<span className="live"><i id="liveDot"></i><span id="liveTxt">{has ? "evolving" : "idle"}</span></span></div>
         <div className="body">
           <h1 className="page-title">Darwin Growth</h1>
@@ -125,6 +126,8 @@ export default function Darwin({ meta, initial }: { meta: DarwinMeta | null; ini
       </section>
 
       <div id="tip" className="lbl off"><i></i><span></span></div>
+
+      <Aquarium />
 
       <section id="rule" className="milk float still" role="dialog" aria-label={live ? "Generation" : "Evolved rule"}>
         <div className="bar"><span id="rGen">Rule</span><button className="x" id="rClose" aria-label="Close">×</button></div>

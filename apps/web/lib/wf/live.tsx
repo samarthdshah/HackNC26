@@ -69,7 +69,7 @@ function announce(u: LiveUpdate, name: (id: string) => string) {
   if (u.kind === "edge") {
     const e = u.data as OrgEdge;
     if (e.source === "learned" && e.confidence > 0) {
-      toast("route", "Wayfinder learned", esc(`${taskLabel(e.task_type)} → ${name(e.to)}`), esc(`confidence ${Math.round(e.confidence * 100)}%`));
+      toast("route", "AVATAR learned", esc(`${taskLabel(e.task_type)} → ${name(e.to)}`), esc(`confidence ${Math.round(e.confidence * 100)}%`));
     }
     return;
   }
@@ -78,7 +78,7 @@ function announce(u: LiveUpdate, name: (id: string) => string) {
   const title = esc(String(p.title ?? ""));
   switch (e.type) {
     case "request_created": return toast("route", "New request", esc(`${who(e.actor)}: ${p.title ?? p.goal ?? ""}`), esc(taskLabel(String(p.task_type ?? ""))));
-    case "routed": return toast("route", "Wayfinder is routing", esc(`→ ${who(p.owner)}`), title);
+    case "routed": return toast("route", "AVATAR is routing", esc(`→ ${who(p.owner)}`), title);
     case "redirected": return toast("route", "Not us → learned", esc(`${taskLabel(String(p.task_type ?? ""))} goes to ${name(String(p.to ?? ""))}`), title);
     case "approval_requested": return toast("msg", "Approval by text", esc(`Asked ${who(p.approver)}`), title);
     case "approved": return toast("route", "Approved", esc(`${who(p.approver)} said yes`), title);
