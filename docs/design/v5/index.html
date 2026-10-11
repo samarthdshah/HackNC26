@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wayfinder Home Tree</title>
+<link rel="stylesheet" href="shared/aero.css">
+<style>
+html,body{overflow:hidden}
+/* Sky: theme gradient from aero.css, plus the v4 sun and Vista light ribbons */
+#sky{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+#sky .sun{position:absolute;left:8%;top:-14%;width:60vmax;height:60vmax;border-radius:50%;
+  background:radial-gradient(circle,rgb(255 252 235/.95) 0,rgb(255 248 220/.55) 6%,rgb(255 255 255/.18) 22%,transparent 55%)}
+#sky svg{position:absolute;inset:0;width:100%;height:100%}
+#sky .rib{fill:none;stroke:#fff;stroke-linecap:round;filter:blur(6px)}
+#sky .haze{position:absolute;left:0;right:0;bottom:0;height:38%;background:linear-gradient(180deg,transparent,rgb(255 255 255/.45))}
+canvas#globe{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:1}
+
+/* Hero card on the left */
+#heroWrap{position:fixed;z-index:10;left:5vw;top:0;bottom:96px;display:flex;align-items:center;pointer-events:none}
+#hero{width:min(480px,40vw);opacity:0;pointer-events:auto}
+#hero .body{padding:20px 22px 22px}
+#hero .page-title{font-size:72px;margin:4px 0 6px;color:var(--ink)}
+#hero .tag{font-size:21px;font-weight:300;line-height:1.3;margin-bottom:10px}
+#hero .tag b{font-weight:600;color:var(--accent-lo)}
+#hero .page-sub{margin-bottom:16px}
+#hero .ctas{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+#hero .eng{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+#hero .eng .milk{padding:12px 12px 13px;border-radius:14px}
+#hero .eng .orb{width:28px;height:28px;font-size:13px;margin-bottom:8px}
+#hero .eng h3{font-size:15px;font-weight:600;line-height:1.1;margin-bottom:3px}
+#hero .eng p{font-size:12px;line-height:1.35;color:var(--ink-2)}
+#hero .reveal{opacity:0}
+
+/* Stat pins: glass labels anchored to cubes */
+#pins{position:fixed;inset:0;z-index:6;pointer-events:none}
+#leaders{position:fixed;inset:0;width:100%;height:100%;z-index:5;pointer-events:none}
+#leaders line{stroke:#fff;stroke-width:1.5;stroke-opacity:.9;filter:drop-shadow(0 1px 1px rgb(0 40 100/.35))}
+#leaders circle{fill:#fff;filter:drop-shadow(0 1px 2px rgb(0 40 100/.4))}
+.pin{position:absolute;left:0;top:0;opacity:0;transition:opacity .45s var(--ease)}
+.pin .lbl{flex-direction:column;align-items:flex-start;gap:3px;padding:8px 12px 8px 11px;border-radius:14px}
+.pin .v{font-size:20px;font-weight:700;line-height:1;color:var(--ink);display:flex;align-items:center;gap:7px}
+.pin .v i{width:10px;height:10px}
+.pin .l{font-size:12px;font-weight:400;color:var(--ink-2);line-height:1}
+.pin .chip{margin-top:2px}
+
+#skip{position:fixed;right:24px;bottom:110px;z-index:12;transition:opacity .4s}
+#skip.gone{opacity:0;pointer-events:none}
+
+@media (max-width:700px){
+  #heroWrap{left:12px;right:12px;bottom:84px;align-items:flex-end}
+  #hero{width:100%}
+  #hero .page-title{font-size:46px}
+  #hero .tag{font-size:17px}
+  #hero .eng,#hero .page-sub{display:none}
+  #hero .ctas{margin-bottom:0}
+  .pin .v{font-size:16px} .pin .l{font-size:11px}
+  .pin.m-hide{display:none}
+  #skip{bottom:auto;top:16px;right:12px}
+}
+</style>
+</head>
+<body data-page="home">
+<div id="sky" aria-hidden="true">
+  <div class="sun"></div>
+  <svg viewBox="0 0 1440 900" preserveAspectRatio="none">
+    <path class="rib" d="M-40 300 C 300 180, 700 420, 1500 220" stroke-width="22" stroke-opacity=".22"/>
+    <path class="rib" d="M-40 360 C 380 260, 760 470, 1500 300" stroke-width="6" stroke-opacity=".35"/>
+    <path class="rib" d="M-40 640 C 420 560, 900 760, 1500 600" stroke-width="30" stroke-opacity=".12"/>
+  </svg>
+  <div class="haze"></div>
+</div>
+<canvas id="globe" aria-label="Wayfinder globe: a sphere of glass cubes showing what Wayfinder has done"></canvas>
+<svg id="leaders" aria-hidden="true"></svg>
+<div id="pins" aria-live="polite"></div>
+
+<div id="heroWrap"><section id="hero" class="milk still">
+  <div class="bar"><span class="orb" style="width:24px;height:24px;font-size:12px">W</span>Wayfinder OS · Home Tree<span class="live"><i></i>live</span></div>
+  <div class="body">
+    <div class="k reveal">HackNC 2026 · AI coordinator in iMessage</div>
+    <h1 class="page-title reveal">Wayfinder</h1>
+    <p class="tag reveal"><b>Discover.</b> <b>Connect.</b> <b>Coordinate.</b> <b>Evolve.</b></p>
+    <p class="page-sub reveal">Tell it a goal and it finds the people, resources, and approvals needed to make it happen. Along the way it learns how your organization really works.</p>
+    <div class="ctas reveal">
+      <a class="pill" href="roots.html">Explore the Roots</a>
+      <a class="pill ghost" href="insights.html">See the Glow</a>
+    </div>
+    <div class="eng">
+      <article class="milk reveal"><span class="orb">W</span><h3>Coordinate</h3><p>Breaks a goal into steps and sends each to its real owner.</p></article>
+      <article class="milk reveal"><span class="orb pink">✦</span><h3>Discover</h3><p>Mycelium matches needs and skills, then introduces people.</p></article>
+      <article class="milk reveal"><span class="orb amber">↯</span><h3>Evolve</h3><p>Darwin replays past requests and evolves shorter routes.</p></article>
+    </div>
+  </div>
+</section></div>
+
+<button id="skip" class="pill ghost" type="button">Skip intro</button>
+<div class="err" id="err">This scene needs WebGL and a network connection for three.js.</div>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+<script src="shared/aero.js"></script>
+<script src="shared/data.js"></script>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const $ = id => document.getElementById(id);
+const RM = Aero.RM, DEG = Math.PI / 180;
+const mobile = () => innerWidth <= 700;
+
+/* ============ Renderer, camera, light ============ */
+let renderer;
+try { renderer = new THREE.WebGLRenderer({canvas:$('globe'), antialias:true, alpha:true}); } catch (e) { $('err').style.display = 'block'; throw e; }
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+const scene = new THREE.Scene();
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(renderer), .03).texture;
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 1, 20000);
+scene.add(new THREE.HemisphereLight(0xdff4ff, 0x2a7fd0, 1.1));
+const sun = new THREE.DirectionalLight(0xfff6e0, 2.0); sun.position.set(-600, 1000, 1000); scene.add(sun);
+scene.add(new THREE.AmbientLight(0xaaccff, .35));
+
+/* ============ The cube globe (pen port: one cube per sphere vertex, now instanced) ============ */
+const R = 800, W_SEG = 30, H_SEG = 50, CUBE = 20;
+const sphere = new THREE.SphereGeometry(R, W_SEG, H_SEG), pa = sphere.attributes.position;
+const cubes = [];   // {p0, n, tx, ty, q, row}
+for (let row = 1; row < H_SEG; row++) for (let u = 0; u < W_SEG; u++) {   // skip poles and the seam duplicate
+  const k = row * (W_SEG + 1) + u, p0 = new THREE.Vector3(pa.getX(k), pa.getY(k), pa.getZ(k)), n = p0.clone().normalize();
+  const tx = new THREE.Vector3(0, 1, 0).cross(n).normalize(), ty = n.clone().cross(tx).normalize();
+  const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(p0, new THREE.Vector3(), new THREE.Vector3(0, 1, 0)));
+  cubes.push({p0, n, tx, ty, q, row});
+}
+const COUNT = cubes.length;
+const mat = new THREE.MeshPhysicalMaterial({color:0xffffff, roughness:.18, metalness:0, clearcoat:1, clearcoatRoughness:.08, flatShading:true});
+const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(CUBE, CUBE, CUBE), mat, COUNT);
+mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+const globe = new THREE.Group(); globe.add(mesh); scene.add(globe);
+
+/* ============ Anchors for the stat pins: picked by where they land on screen when settled ============ */
+const S = WF.stats, fmt = n => n.toLocaleString('en-US');
+const PINS = [
+  {v:fmt(S.hoursSaved), l:'hours saved', ang:145, c:'person'},
+  {v:fmt(S.peopleHelped), l:'people helped', ang:192, c:'hub', m:true},
+  {v:`${S.departments}`, l:`departments · ${S.subDepartments} teams`, ang:232, c:'hub'},
+  {v:fmt(S.requestsRouted), l:'requests routed', ang:62, c:'person', m:true},
+  {v:`${S.avgHopsBefore} → ${S.avgHopsAfter}`, l:'avg hops per request', ang:308, c:'match', chip:`${S.medianBefore} → ${S.medianResolve}`},
+];
+const FINAL = {az:0, el:8 * DEG, dist:2500, shift:.23, shiftY:.03};   // shift: globe center moves right by this share of the width
+function cameraAt(az, el, dist, out = new THREE.Vector3()) { return out.set(Math.sin(az) * Math.cos(el) * dist, Math.sin(el) * dist, Math.cos(az) * Math.cos(el) * dist); }
+(function pickAnchors() {
+  const camPos = cameraAt(FINAL.az, FINAL.el, FINAL.dist), fwd = camPos.clone().normalize();
+  const right = new THREE.Vector3(0, 1, 0).cross(fwd).normalize(), up = fwd.clone().cross(right).normalize(), used = new Set();
+  PINS.forEach(pin => { const a = pin.ang * DEG, r = .74;
+    const want = right.clone().multiplyScalar(Math.cos(a) * r).addScaledVector(up, Math.sin(a) * r).addScaledVector(fwd, Math.sqrt(1 - r * r));
+    let best = -1, bd = -2; cubes.forEach((c, i) => { const d = c.n.dot(want); if (d > bd && !used.has(i)) { bd = d; best = i; } });
+    used.add(best); pin.i = best; });
+})();
+const anchorSet = new Map(PINS.map(p => [p.i, p]));
+
+/* ============ Colors: palette bands by latitude, anchors in accent colors ============ */
+function paint(pal) {
+  const c = new THREE.Color();
+  cubes.forEach((cb, i) => {
+    const pin = anchorSet.get(i);
+    if (pin) c.set(pal[pin.c]);
+    else { const lv = pal.levels.slice(0, 4), t = Math.abs(cb.row / H_SEG - .5) * 2 * (lv.length - 1), j = Math.min(lv.length - 2, Math.floor(t));
+      c.set(lv[j]).lerp(new THREE.Color(lv[j + 1]), t - j); c.offsetHSL(((i * 37) % 7 - 3) * .006, 0, ((i * 13) % 5 - 2) * .02); }
+    mesh.setColorAt(i, c);
+  });
+  mesh.instanceColor.needsUpdate = true;
+}
+paint(Aero.palette());
+
+/* ============ Pins DOM ============ */
+const pinsEl = $('pins'), svg = $('leaders');
+PINS.forEach(p => {
+  const d = document.createElement('div'); d.className = 'pin' + (p.m ? ' m-hide' : '');
+  d.innerHTML = `<div class="lbl"><span class="v"><i class="dot"></i>${p.v}</span><span class="l">${p.l}</span>${p.chip ? `<span class="chip">${p.chip}</span>` : ''}</div>`;
+  pinsEl.appendChild(d); p.el = d; p.dot = d.querySelector('i');
+  p.line = document.createElementNS('http://www.w3.org/2000/svg', 'line'); p.end = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); p.end.setAttribute('r', 3);
+  svg.append(p.line, p.end); p.line.style.opacity = p.end.style.opacity = 0;
+});
+function paintPins(pal) { PINS.forEach(p => p.dot.style.background = `radial-gradient(circle at 35% 30%,#fff,${Aero.hex(pal[p.c])} 55%)`); }
+paintPins(Aero.palette());
+Aero.onTheme((i, pal) => { paint(pal); paintPins(pal); });
+
+/* ============ Animation state (GSAP drives these numbers) ============ */
+const st = {amp:1, az:-70 * DEG, el:-22 * DEG, dist:1550, shift:0, shiftY:0, pins:0, time:0, speed:.6};
+function settleTarget() { return mobile() ? {az:FINAL.az, el:FINAL.el, dist:3500, shift:0, shiftY:.2} : {az:FINAL.az, el:FINAL.el, dist:FINAL.dist, shift:FINAL.shift, shiftY:FINAL.shiftY}; }
+
+function applyView() {
+  const w = innerWidth, h = innerHeight;
+  camera.aspect = w / h;
+  camera.setViewOffset(w, h, -w * st.shift, h * st.shiftY, w, h);   // slides the globe right (or up on phones) without moving it in 3D
+  camera.updateProjectionMatrix();
+}
+
+const m4 = new THREE.Matrix4(), pos = new THREE.Vector3(), scl = new THREE.Vector3(), camPos = new THREE.Vector3();
+function updateCubes() {
+  const d = st.time * st.speed, A = st.amp;
+  for (let i = 0; i < COUNT; i++) {
+    const c = cubes[i], ph = d + i;
+    // the pen's smooth wave: each cube drifts in its tangent plane; integrated so it stays bounded
+    pos.copy(c.p0).addScaledVector(c.tx, -Math.cos(ph) * 90 * A).addScaledVector(c.ty, Math.sin(ph) * 90 * A);
+    let s = Math.pow(Math.abs(Math.sin(ph)) + .5, 2); s = 1 + (s - 1) * Math.max(A, .18);
+    if (anchorSet.has(i)) s = 2.4 + Math.sin(st.time * 2 + i) * .15;
+    scl.setScalar(s); m4.compose(pos, c.q, scl); mesh.setMatrixAt(i, m4);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+}
+
+const v = new THREE.Vector3(), o = new THREE.Vector3(), toCam = new THREE.Vector3();
+function updatePins() {
+  if (st.pins <= 0) { PINS.forEach(p => { p.el.style.opacity = 0; p.line.style.opacity = p.end.style.opacity = 0; }); return; }
+  const w = innerWidth, h = innerHeight, heroR = mobile() ? 0 : $('hero').getBoundingClientRect().right + 8;
+  o.set(0, 0, 0).project(camera); const cx = (o.x + 1) / 2 * w, cy = (1 - o.y) / 2 * h;
+  PINS.forEach((p, k) => {
+    mesh.getMatrixAt(p.i, m4); v.setFromMatrixPosition(m4);
+    const facing = toCam.copy(camera.position).sub(v).normalize().dot(cubes[p.i].n);
+    v.project(camera); const x = (v.x + 1) / 2 * w, y = (1 - v.y) / 2 * h;
+    let dx = x - cx, dy = y - cy; const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+    const len = mobile() ? 30 : 58; let ex = x + dx * len, ey = y + dy * len;
+    const r = p.el.getBoundingClientRect(), left = dx < 0;
+    let lx = left ? ex - r.width : ex, ly = ey - r.height / 2;
+    if (left && lx < heroR) { lx = heroR; ex = Math.max(ex, lx + r.width); }
+    lx = Math.max(8, Math.min(w - r.width - 8, lx)); ly = Math.max(8, Math.min(h - r.height - 96, ly));
+    const a = (p.m && mobile()) ? 0 : st.pins * THREE.MathUtils.smoothstep(facing, .05, .35) * Math.min(1, Math.max(0, st.pins * PINS.length - k));
+    p.el.style.transform = `translate(${lx}px,${ly}px)`; p.el.style.opacity = a;
+    p.line.setAttribute('x1', x); p.line.setAttribute('y1', y); p.line.setAttribute('x2', left ? lx + r.width : lx); p.line.setAttribute('y2', ly + r.height / 2);
+    p.end.setAttribute('cx', x); p.end.setAttribute('cy', y); p.line.style.opacity = p.end.style.opacity = a;
+  });
+}
+
+/* ============ Intro: one wave pass, glide right, settle, reveal ============ */
+const tl = gsap.timeline({paused:true});
+const tgt = settleTarget();
+tl.to(st, {az:22 * DEG, el:10 * DEG, dist:1800, duration:5.2, ease:'sine.inOut'})
+  .to(st, {...tgt, amp:.14, speed:.32, duration:2.4, ease:'power3.inOut'}, '>-0.4')
+  .add(() => { $('skip').classList.add('gone'); }, '<')
+  .to('#hero', {opacity:1, x:0, duration:.7, ease:'power2.out', startAt:{x:-30}}, '>-0.9')
+  .to('#hero .reveal', {opacity:1, y:0, duration:.5, stagger:.07, ease:'power2.out', startAt:{y:10}, clearProps:'transform'}, '<0.15')
+  .to(st, {pins:1, duration:1.4, ease:'none'}, '<0.3')
+  .add(() => { if (mobile()) return; const q = WF.queries[0], last = q.hops.at(-1);
+    Aero.toast('route', 'Wayfinder is routing', `${WF.me.first} → ${WF.nameOf(last.who)}`, `${q.title.toLowerCase()} <span class="hops">${q.hops.length} hops</span>`);
+    setTimeout(Aero.hideToast, 6000); }, '>0.6');
+
+function skip() { if (tl.progress() < 1) tl.progress(1); }
+$('skip').addEventListener('click', skip);
+addEventListener('keydown', e => { if (e.key === 'Escape' || e.key === ' ') skip(); });
+$('globe').addEventListener('pointerdown', skip);
+
+/* ============ Loop ============ */
+const clock = new THREE.Clock();
+function frame() {
+  requestAnimationFrame(frame);
+  const dt = Math.min(.05, clock.getDelta()); st.time += RM ? 0 : dt;
+  // gentle idle sway once settled; amplitude follows st.amp so nothing loops back to the intro
+  const sway = tl.progress() >= 1 && !RM ? Math.sin(st.time * .12) * 3 * DEG : 0;
+  cameraAt(st.az + sway, st.el + Math.sin(st.time * .09) * sway * .3, st.dist, camPos); camera.position.copy(camPos); camera.lookAt(0, 0, 0);
+  applyView(); updateCubes(); renderer.render(scene, camera); updatePins();
+}
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight);
+  if (tl.progress() >= 1) Object.assign(st, settleTarget()); });
+
+gsap.ticker.lagSmoothing(0);   // keep the intro on wall-clock time even when frames are slow
+if (RM || new URLSearchParams(location.search).has('settled')) { tl.progress(1); } else { tl.play(); }
+frame();
+</script>
+</body>
+</html>

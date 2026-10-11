@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wayfinder Lagoon</title>
+<link rel="stylesheet" href="shared/aero.css">
+<style>
+html,body{overflow:hidden}
+/* ============ Ocean backdrop: Aero aqua, retinted per theme ============ */
+#sea{position:fixed;inset:0;z-index:0;background:linear-gradient(180deg,#8fe0f6 0%,#2aa9d8 28%,#0b74a8 62%,#0a4f7c 85%,#0d324e 100%);transition:background .8s}
+:root[data-theme="1"] #sea{background:linear-gradient(180deg,#b4f0d6 0%,#3fbf9f 28%,#0f7f72 62%,#0b5652 85%,#0b3a3e 100%)}
+:root[data-theme="2"] #sea{background:linear-gradient(180deg,#ffd2b8 0%,#e5849a 28%,#9a4c8e 62%,#5a3484 85%,#2a1f4e 100%)}
+#ocean{position:fixed;inset:0;z-index:1}
+#ocean canvas{display:block;width:100%;height:100%}
+/* soft light rays from the surface */
+#rays{position:fixed;inset:0;z-index:2;pointer-events:none;overflow:hidden;mix-blend-mode:screen}
+#rays i{position:absolute;top:-20%;height:130%;transform-origin:50% 0;filter:blur(10px);
+  background:linear-gradient(180deg,rgb(255 255 255/.42),rgb(255 255 255/.12) 45%,transparent 80%);animation:ray 11s ease-in-out infinite alternate}
+@keyframes ray{from{opacity:.35;rotate:var(--r)}to{opacity:.9;rotate:calc(var(--r) + 4deg)}}
+#surface{position:fixed;left:0;right:0;top:0;height:120px;z-index:2;pointer-events:none;
+  background:radial-gradient(120% 100% at 50% 0%,rgb(255 255 255/.45),transparent 70%)}
+
+/* ============ Tentacle links ============ */
+#links{position:fixed;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;overflow:visible}
+#links .glow{fill:none;stroke:url(#linkGrad);stroke-linecap:round;filter:url(#linkBlur);transition:opacity .5s}
+#links .core{fill:none;stroke:rgb(255 255 255/.85);stroke-linecap:round;transition:opacity .5s}
+#links .flow{fill:none;stroke:url(#linkGrad);stroke-linecap:round;stroke-dasharray:3 22;transition:opacity .5s}
+#links g.off path{opacity:0!important}
+#links g.hot .glow{opacity:1!important}
+
+/* ============ Jellyfish: you ============ */
+#jelly{position:fixed;left:50%;top:48%;z-index:5;width:min(300px,36vh);translate:-50% -50%;pointer-events:none}
+#jelly svg{width:100%;height:auto;display:block;overflow:visible;
+  filter:drop-shadow(0 0 16px color-mix(in srgb,var(--accent-hi) 75%,transparent)) drop-shadow(0 0 46px color-mix(in srgb,var(--match) 40%,transparent))}
+#jelly .you{position:absolute;left:50%;top:100%;translate:-50% -4px;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:auto}
+#jelly .you .lbl{font-size:14px}
+
+/* ============ Seed cards in orbit ============ */
+#seeds{position:fixed;inset:0;z-index:8;pointer-events:none}
+.seed{position:absolute;left:0;top:0;width:240px;perspective:900px;pointer-events:auto;will-change:transform;transition:opacity .5s var(--ease)}
+.seed.hidden{opacity:0;pointer-events:none}
+.seed .milk{border-radius:18px;animation:seedIn .8s var(--spring) backwards;animation-delay:calc(var(--k,0) * 120ms + 300ms)}
+.seed.sent .milk{animation:none}
+@keyframes seedIn{from{opacity:0;transform:scale(.8)}}
+.seed .body{padding:12px 14px 12px;display:grid;gap:8px}
+.seed .who{display:flex;align-items:center;gap:10px}
+.seed .who .orb{width:38px;height:38px;font-size:16px}
+.seed .nm{font-weight:600;font-size:15px;line-height:1.15}
+.seed .dp{font-size:12px;color:var(--ink-2)}
+.seed .topic .chip{white-space:nowrap}
+.seed .topic{display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:600;font-size:14px}
+.seed .why{font-size:13px;line-height:1.35;color:var(--ink-2)}
+.seed .ctl{padding:4px 14px 4px 4px;font-size:14px;justify-self:start}
+.seed .ctl[disabled]{cursor:default;transform:none;opacity:.95}
+.seed.sent .milk{box-shadow:0 0 0 2px rgb(255 255 255/.9),0 0 24px color-mix(in srgb,var(--match) 70%,transparent),0 8px 28px rgb(0 40 100/.18)}
+
+/* ============ Corner card ============ */
+#intro{left:28px;top:28px;width:330px}
+#intro .body{display:grid;gap:10px}
+#intro .stats{display:flex;gap:8px;flex-wrap:wrap}
+
+@media (max-width:700px){
+  html,body{overflow:auto}
+  #intro{position:relative;left:auto;top:auto;width:auto;margin:12px}
+  #jelly{position:relative;left:auto;top:auto;translate:none;margin:8px auto 40px;width:200px}
+  #links{display:none}
+  #seeds{position:relative;inset:auto;display:grid;gap:12px;padding:0 12px 110px}
+  .seed{position:relative;width:auto;transform:none!important}
+  .seed.hidden{display:none}
+}
+</style>
+</head>
+<body data-page="lagoon">
+<div id="sea" aria-hidden="true"></div>
+<div id="ocean" aria-hidden="true"></div>
+<div id="rays" aria-hidden="true"></div>
+<div id="surface" aria-hidden="true"></div>
+
+<svg id="links" aria-hidden="true">
+  <defs>
+    <linearGradient id="linkGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" style="stop-color:var(--accent-hi)"/>
+      <stop offset=".55" style="stop-color:#bff4ff"/>
+      <stop offset="1" style="stop-color:var(--match)"/>
+    </linearGradient>
+    <filter id="linkBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5"/></filter>
+    <filter id="pulseGlow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+</svg>
+
+<section id="intro" class="milk float">
+  <div class="bar"><span class="orb pink" style="width:24px;height:24px;font-size:12px">✦</span>Seeds<span class="live"><i></i>Mycelium</span></div>
+  <div class="body">
+    <div class="k">Discovery garden</div>
+    <h1 class="page-title">Lagoon</h1>
+    <p class="page-sub">People whose questions drift near yours. Mycelium spots the overlap and introduces you once you both agree.</p>
+    <div class="stats"><span class="chip" id="nSeeds"></span><span class="chip info" id="nIntros"></span></div>
+    <div class="seg" role="group" aria-label="Filter seeds">
+      <button data-f="all" aria-pressed="true">All</button><button data-f="query" aria-pressed="false">Queries</button><button data-f="resource" aria-pressed="false">Resources</button><button data-f="team" aria-pressed="false">Teammates</button>
+    </div>
+  </div>
+</section>
+
+<div id="jelly">
+  <svg id="jfSvg" xmlns="http://www.w3.org/2000/svg" viewBox="95 125 340 320" aria-label="You, as a jellyfish">
+    <defs>
+      <filter id="turbulence" filterUnits="objectBoundingBox" x="-10%" y="-10%" width="120%" height="120%">
+        <feTurbulence id="feturbulence" baseFrequency="0.02 0.03" result="turbulence" type="fractalNoise" numOctaves="1" seed="1"/>
+        <feDisplacementMap id="displacement" xChannelSelector="R" yChannelSelector="G" in="SourceGraphic" in2="turbulence" scale="13"/>
+      </filter>
+      <radialGradient id="jfFace" cx="50%" cy="38%" r="65%">
+        <stop offset="0" stop-color="#fff"/>
+        <stop offset=".62" stop-color="#fff" stop-opacity=".95"/>
+        <stop offset="1" style="stop-color:var(--accent-hi);stop-opacity:.85"/>
+      </radialGradient>
+      <linearGradient id="jfBell" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#fff" stop-opacity=".75"/>
+        <stop offset="1" style="stop-color:var(--accent-soft);stop-opacity:.5"/>
+      </linearGradient>
+      <linearGradient id="jfIrid" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#ff9bd8"/><stop offset=".33" stop-color="#8fe3ff"/><stop offset=".66" stop-color="#c8ff9a"/><stop offset="1" stop-color="#ffd38a"/>
+      </linearGradient>
+      <linearGradient id="jfTent" gradientUnits="userSpaceOnUse" x1="0" y1="250" x2="0" y2="440">
+        <stop offset="0" stop-color="#fff"/>
+        <stop offset="1" style="stop-color:var(--accent-hi);stop-opacity:.35"/>
+      </linearGradient>
+    </defs>
+    <g class="jellyfish" filter="url(#turbulence)">
+      <g fill="url(#jfTent)">
+        <path class="tentacle" d="M226.31 258.64c.77 8.68 2.71 16.48 1.55 25.15-.78 8.24-5 15.180-7.37 23-3.1 10.84-4.65 22.55 1.17 32.52 4.65 7.37 7.75 11.71 5.810 21.25-2.33 8.67-7.37 16.91-2.71 26 4.26 8.68 7.75 4.34 8.14-3 .39-12.14 0-24.28.77-36 .78-16.91-12-27.75-2.71-44.23 7-12.15 11.24-33 7.76-46.83z" opacity=".49"/>
+        <path class="tentacle" d="M246.47 259.51a75 75 0 0 1 3.1 33.39c-1.55 11.71-8.91 20.82-8.91 33 0 10 3.48 18.21 5.81 27.75 2.71 10.410.39 19.51-.78 30.35-1.55 9.11-4.65 24.29-.77 33.39s7.37 4.77 7.37-2.6c0-6.07-.78-11.71-1.17-17.770-.39-8.25 3.1-12.58 5-20.39 5.43-21.24-9.3-42.06-3.49-63.31 2.72-11.27 10.86-22.55 11.25-34.26.38-6.07-1.55-14.74-2.72-20.38z" opacity=".66"/>
+        <path class="tentacle" d="M276.54 262.11c-1.55 9.11 2.21 17.35-.51 26.89-3.87 12.57-8.2 23.41-8.58 37.29 0 10.41 5.78 15.61 7.72 25.150 2.72 11.28-2.73 19.95-5.44 30.35-1.94 6.51-3.11 15.62-.79 22.12 3.49 8.24 5.43 7.81 3.88 18.21-.78 4.77-2.72 17.35 4.26 19.09 5.430.86 5.82-6.94 5.82-11.72-.39-12.57-3.49-24.28-3.11-37.29.39-14.31 4.66-27.75 5.82-42.06.39-7.37-1.94-13-3.49-19.95-2.33-10.4-.78-15.170 3.1-24.71 4.65-10.85 5.28-21.25 6.06-33 .77-6.07 2.53-13-.54-18.65v.44z" opacity=".45"/>
+        <path class="tentacle" d="M300.34 261.25c1.55 14.3 7 19.94 1.17 34.68-5.43 12.15-8.53 22.12-3.88 35.13 3.88 10.84 5.43 18.21 3.88 30.36-1.56 10-2.33 19.94 4.26 28.61 13.57 17.35 10.86-10.4 8.14-19.07-1.55-6.08-3.49-11.71-2.71-18.22 1.16-8.24 3.88-14.31 1.55-23-1.55-6.07-5-10.41-3.88-17.35s5.82-12.14 6.59-19.51c1.17-7.37 3.49-30.35-3.1-35.56z" opacity=".6"/>
+        <path class="tentacle" d="M254.44 253.48c-8.78 25.12-15.81 53.28 2.61 77.35 11.06 14.46 42.58 51.91 38.16 69.8-3.91 15.83-20.78 24.73-14.17 28.18 8.22 3.21 22.2-26 18.7-41.25-3.89-16.94-17.68-35.47-34.38-54.78-2.48-2.86-13.15-18.09-14-35.580-1-19.92 12.84-42.61 12.38-42.62-3.13-.02-8.1-4.53-9.3-1.1z"/>
+        <path class="tentacle" d="M276.84 253.3c7.24 20.7 13 43.91-2.15 63.75-9.11 11.91-35.1 42.78-31.45 57.53 3.22 13.05 13.8 19.9 11.68 23.22-2.87 3.86-16.15-16.76-16.55-25.86-.72-16.2 12.73-33.92 29.47-53.28 2-2.36 10.84-14.91 11.57-29.33.82-16.41-10.59-35.12-10.2-35.12 2.54-.02 6.64-3.74 7.63-.91z"/>
+        <path class="tentacle" d="M295.27 254.27c5.83 16.69 12.69 18.82 1.58 35.22a45 45 0 0 0-6.67 19.22c-.52 6.52 6.09 13.33 5.5 19.6-2.35 24.92-17.13 46.55-19.33 44.29-4.35-4.6 22.07-28.6 12.46-51.16-8.38-19.64 6.49-36.53 9.9-42.49 2.75-4.8-11.51-24.51-11.42-24.51 2.05-.01 5.93-.6 7.98-.17z"/>
+        <path class="tentacle" d="M256.56 252.22c-7 6.09-17.21 14-23.17 24-5.55 9.25-7.06 20.43-7.66 27.88-.53 6.52 2.21 13.76 5.49 19.6 14 24.92-15.62 46.55-19.330 44.29-4.55-4 14.59-16.95 17.41-23.45 2.91-6.69-.07-16.29-5-27.71-8.38-19.64 1-39.25 4.37-45.2 2.75-4.81 19.82-19 19.91-19 2.1-.07 5.92-.84 7.98-.41z"/>
+        <path class="tentacle" d="M288.76 254.4c7 6.09 17.21 14 23.17 24 5.55 9.25 7.06 20.43 7.66 27.88.53 6.52-2.21 13.76-5.49 19.6-14 24.93 9 45 19.33 44.29 6.58-4.07-14.59-16.95-17.41-23.45-2.91-6.69.07-16.28 5-27.71 8.38-19.64-1-39.25-4.37-45.2-2.75-4.81-19.82-19-19.91-19-2.1-.06-5.92-.81-7.98-.41z"/>
+      </g>
+      <path class="face" d="M283.26 178.86c-17.72-1.84-36.33 5.33-52.24 17.37a110.1 110.1 0 0 0-22.14 22.06c-8.54 11.67-14 31.93-7.48 47.29 8.82 20.73 29.67 14.17 44.32 15.6 14.34 1.55 28.68-.52 43-.52 10.47 0 20.94 1 31.4-.51 9.36-1.39 21.38-9.12 24-22.07 4.24-21-13.770-45.52-24.270-58.37-10.69-13.1-23.39-19.48-36.59-20.85z" fill="url(#jfFace)"/>
+      <path class="outerJelly" d="M340.52 295.71c-10.12 1.19-15.63-.12-20.38-1.64-3.63-1.17-6.84-2.44-11.37-2.83l-1-.06c-1-.06-2.05-.06-3.17 0a21.37 21.37 0 0 0-8 2.28c-1.27.59-2.6 1.21-4.09 1.82a42.23 42.23 0 0 1-10.6 3c-1 .16-2 .29-3.11.37-1.56.14-3.26.22-5.09.22h-.51c-1.74 0-3.35-.08-4.84-.2-.6 0-1.15-.08-1.7-.15a47.37 47.37 0 0 1-9.43-1.8 8.25 8.25 0 0 1-.92-.29 75 75 0 0 1-8-3.34L248 293a19.06 19.06 0 0 0-6.86-1.81c-1.27-.06-2.44-.12-3.56-.14h-1a51.6 51.6 0 0 0-9.87.67c-8 1.38-10.86 4.29-22.82 4.060-22.13 0-9.51-11.13-11-17.8-7.24-33.11-.69-63.69 18-83.91 14.65-15.86 35.74-24.25 61-24.25 23.56 0 43.94 8.81 59 25.44 19.21 21.29 27 53.84 20 83-1.67 6.46 10.68 14.95-10.37 17.45z" fill="url(#jfBell)" opacity=".62" stroke="url(#jfIrid)" stroke-width="2.6"/>
+      <path class="freckle" fill="#f6c9de" d="M330 225.23a4.16 4.16 0 0 0-.1.55c-.52 3.79 3.9 6.73 5.91 3 2.42-4.46-4.66-8.14-5.81-3.55z"/>
+      <path class="freckle" fill="#f6c9de" d="M322.89 215.5a3.94 3.94 0 0 0-1.32 3.61 3 3 0 1 0 5.91 0c.27-3.81-2.76-4.98-4.59-3.61z"/>
+      <path class="freckle" fill="#f6c9de" d="M206.88 241.24c-.88 2-.11 4.56 3.36 4.27 3.87-.33 5.42-5.85.75-6.62a3.79 3.79 0 0 0-4.11 2.35z"/>
+      <path class="freckle" fill="#f6c9de" d="M210.11 225.75c.83-.07 1.7.52 1.92 2.17.4 3-2.5 3.09-3.4.6a2 2 0 0 1 1.48-2.77z"/>
+    </g>
+    <g id="bubbles" fill="#fff">
+      <path class="bubble" d="M384.85 167.41c-7.37 4.94-6.92 18 4.34 16.82a19.89 19.89 0 0 0 3.34-.71c13.54-4.17 9.8-20.35-3.66-17.77a10.52 10.52 0 0 0-4.02 1.660z" opacity=".67"/>
+      <path class="bubble" d="M130.5 266.76c-6 4-5.590 14.59 3.51 13.61a15.22 15.22 0 0 0 2.7-.57c11-3.38 7.93-16.47-3-14.38a8.85 8.85 0 0 0-3.210 1.34z" opacity=".75"/>
+      <path class="bubble" d="M424.53 152.72c2.41-6-5.11-13.82-12-7.41s2.41 15.31 9.3 10.64a7.19 7.19 0 0 0 2.7-3.23z" opacity=".89"/>
+      <path class="bubble" d="M392.89 142.46c1.65-4.09-3.5-9.45-8.22-5.07s1.65 10.47 6.36 7.28a4.87 4.87 0 0 0 1.86-2.21z" opacity=".47"/>
+      <path class="bubble" d="M114 242.88c-2-.26-4.34 1.09-3.68 4.42 1.68 8.05 11.35-3.48 3.68-4.42z" opacity=".54"/>
+      <path class="bubble" d="M110.78 259.61c3.62-2.73 4.8-9.7-.42-12.31-7.07-3.53-12.93 6.88-6.75 11.86 2.68 2.16 5.26 1.890 7.17.45z" opacity=".94"/>
+      <path class="bubble" d="M141.82 214.42c-2.7.07-5.63 2.5-4.54 5.75 1.68 4.62 9.19 2.19 8.37-2.49a3.6 3.6 0 0 0-3.83-3.26z" opacity=".77"/>
+    </g>
+    <g class="face-parts">
+      <path class="eye" fill="#7f9aa8" d="M262 233.63a3.1 3.1 0 1 0-3 3.19 3.1 3.1 0 0 0 3-3.19z"/>
+      <path class="eye" fill="#7f9aa8" d="M294 232.72a3.1 3.1 0 1 0-3 3.18 3.1 3.1 0 0 0 3-3.18z"/>
+      <path class="mouth" d="M286.84 244s-.11-.12-.32-.31a9.91 9.91 0 0 1-.81-.76l-.5-.53c-.16-.2-.31-.41-.48-.61s-.27-.46-.41-.69a6.83 6.83 0 0 1-.29-.75 5.86 5.86 0 0 1-.06-3 7.71 7.71 0 0 1 .29-1.05 3.46 3.46 0 0 1 .13-.39.49.49 0 1 0-.8-.55 3.310 3.310 0 0 0-.33.38 5.42 5.42 0 0 0-.68 1.12 5.32 5.32 0 0 0-.53 2.93 4.34 4.34 0 0 0 .07.52h-.08a9.59 9.59 0 0 1-1.64.53 11.21 11.21 0 0 1-1.15.22 10.31 10.31 0 0 1-1.29.17 12 12 0 0 1-1.41.1c-.48 0-1.070.05-1.48 0l-1.46-.06c-.48 0-.94-.11-1.39-.15s-.88-.17-1.29-.23-.78-.2-1.13-.29-.65-.22-.93-.31a5 5 0 0 1-.67-.28 2.56 2.56 0 0 0 0-.27 5.080 5.08 0 0 0 0-1.1 6 6 0 0 0-1.12-3 2.650 2.65 0 0 0-.32-.39.5.5 0 0 0-.67-.15.49.49 0 0 0-.15.68 3.33 3.33 0 0 1 .12.39 9.13 9.13 0 0 1 .26 1.06 5.81 5.81 0 0 1-.14 3 6.81 6.81 0 0 1-.31.74l-.43.67c-.18.2-.34.41-.49.61l-.52.51a9 9 0 0 1-.83.74c-.21.18-.33.3-.33.3a.49.49 0 0 0 .5.81s.16-.05.44-.17a6.14 6.14 0 0 0 1.15-.56c.22-.15.48-.3.72-.49s.49-.43.73-.68.45-.57.67-.87.24-.49.35-.74a2.77 2.77 0 0 0 .42.27 7 7 0 0 0 1 .53 7.33 7.33 0 0 0 1.23.48 8.56 8.56 0 0 0 1.41.38c.5.08 1 .2 1.54.24l1.6.09c.61 0 1.05 0 1.58-.07a11.79 11.79 0 0 0 1.53-.18 9.58 9.58 0 0 0 1.44-.31 8.32 8.32 0 0 0 1.25-.42 6.92 6.92 0 0 0 1-.47 5.28 5.28 0 0 0 .6-.36c.09.19.18.37.26.55s.42.62.64.89.48.49.71.71.49.35.71.51a7.4 7.4 0 0 0 1.130.59l.44.18a.47.47 0 0 0 .51-.11.48.48 0 0 0 .01-.6z" fill="#9fb4c0" opacity=".8"/>
+    </g>
+  </svg>
+  <div class="you"><span class="lbl"><i style="background:var(--person)"></i>You · <span id="meName"></span></span></div>
+</div>
+
+<div id="seeds"></div>
+<div class="err" id="err">The ocean needs WebGL. Your seeds still work.</div>
+
+<script src="shared/aero.js"></script>
+<script src="shared/data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+
+const RM = Aero.RM, $ = id => document.getElementById(id), PI = Math.PI;
+const me = WF.me;
+$('meName').textContent = me.name;
+
+/* ============ Light rays ============ */
+[[8, 9, -14], [24, 6, -6], [41, 11, 3], [58, 7, 9], [74, 10, 15], [90, 6, 20]].forEach(([l, w, r], i) => {
+  const b = document.createElement('i'); Object.assign(b.style, {left:l + '%', width:w + 'vw', animationDelay:(-i * 2.3) + 's'}); b.style.setProperty('--r', r + 'deg'); $('rays').appendChild(b); });
+
+/* ============ Ocean (ported from the pasted pen, three r162 + BufferGeometry) ============ */
+const SHAPES = {
+  seabed:{radius:660, height:700, rSeg:50, hSeg:20, ampR:20, speedC:.015, rotation:.005, y:-620, z:-50, step:.000005},
+  water:{groups:22, members:20, depth:450, step:.0015},
+  fish:{radius:4, height:15, segments:12},
+};
+const SEABED = [0x4fae9e, 0x6cbf5c, 0xd99a7a];   // per theme: seafoam, kelp, coral sand
+const FOG = [0x3ab6d8, 0x3fb59a, 0xc06a8e];
+let ocean = null;
+try { ocean = buildOcean(); } catch (e) { console.warn(e); $('err').style.display = 'block'; }
+
+function buildOcean() {
+  const W = innerWidth, H = innerHeight;
+  const renderer = new THREE.WebGLRenderer({alpha:true, antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(W, H);
+  $('ocean').appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(FOG[Aero.theme], -200, 1150);
+  const camera = new THREE.PerspectiveCamera(60, W / H, 1, 10000);
+  camera.position.set(0, 350, 600); camera.rotation.x = -PI / 32;
+  scene.add(new THREE.AmbientLight(0x9fe8ff, .55), new THREE.HemisphereLight(0xffffff, 0x0a3a5a, 1.0));
+  const sun = new THREE.DirectionalLight(0xfffbe8, 1.1); sun.position.set(-200, 900, 300); scene.add(sun);
+
+  // Seabed: rotated bumpy cylinder; vertices merged so the bumps don't tear at the seam
+  let g = new THREE.CylinderGeometry(SHAPES.seabed.radius, SHAPES.seabed.radius, SHAPES.seabed.height, SHAPES.seabed.rSeg, SHAPES.seabed.hSeg);
+  g.rotateX(-PI / 2); g.deleteAttribute('normal'); g.deleteAttribute('uv'); g = mergeVertices(g);
+  const pos = g.getAttribute('position'), bumps = [];
+  for (let i = 0; i < pos.count; i++) bumps.push({x:pos.getX(i), y:pos.getY(i), ang:Math.random() * PI * 2, amp:Math.random() * SHAPES.seabed.ampR, speed:SHAPES.seabed.speedC + Math.random() * SHAPES.seabed.speedC});
+  const seabedMat = new THREE.MeshPhongMaterial({color:SEABED[Aero.theme], flatShading:true, shininess:30, specular:0x88ccdd});
+  const seabed = new THREE.Mesh(g, seabedMat); seabed.position.set(0, SHAPES.seabed.y, SHAPES.seabed.z); scene.add(seabed);
+
+  // Water ring: fish (kept from the pen) and glass seeds (in place of bottles, cans, tires)
+  const seedGeo = new THREE.SphereGeometry(1, 18, 14);
+  const seedMats = Aero.palette().levels.map(c => new THREE.MeshPhongMaterial({color:c, emissive:new THREE.Color(c).multiplyScalar(.28), specular:0xffffff, shininess:140, transparent:true, opacity:.82}));
+  const coneHead = new THREE.ConeGeometry(SHAPES.fish.radius, SHAPES.fish.height * 8 / 15, SHAPES.fish.segments);
+  const coneBody = new THREE.ConeGeometry(SHAPES.fish.radius, SHAPES.fish.height, SHAPES.fish.segments);
+  const coneTail = new THREE.ConeGeometry(SHAPES.fish.radius / 2, SHAPES.fish.height * 7 / 15, Math.round(SHAPES.fish.segments / 3));
+  function fish() {
+    const m = new THREE.Object3D(), h = SHAPES.fish.height;
+    const mat = new THREE.MeshPhongMaterial({color:new THREE.Color(`rgb(255,${Math.floor(95 + Math.random() * 100)},${Math.floor(Math.random() * 20)})`), flatShading:true, shininess:60});
+    const head = new THREE.Mesh(coneHead, mat), body = new THREE.Mesh(coneBody, mat), tail = new THREE.Mesh(coneTail, mat);
+    body.rotation.x = PI; body.position.y -= h * .77; tail.position.y -= h * 4 / 3; m.add(head, body, tail); return m;
+  }
+  const water = new THREE.Object3D(), seeds = [];
+  const step = PI * 2 / SHAPES.water.groups;
+  for (let j = 0; j < SHAPES.water.groups; j++) {
+    const angle = step * j;
+    for (let i = 0; i < SHAPES.water.members; i++) {
+      const type = Math.floor(Math.random() * 30); let obj, offset;
+      if (type < 22) {
+        offset = (PI / 4) * (Math.random() * .4 - .8);
+        obj = new THREE.Mesh(seedGeo, seedMats[type % seedMats.length]); obj.scale.setScalar(2.4 + Math.random() * 4.2);
+        obj.userData.bob = Math.random() * PI * 2; seeds.push(obj);
+      } else {
+        offset = (PI / 8) * (Math.random() * .4 - .8);
+        obj = fish(); obj.rotation.z = angle + offset;
+      }
+      obj.position.z = -Math.random() * SHAPES.water.depth;
+      const depth = SHAPES.seabed.height + Math.random() * SHAPES.water.depth * 1.5;
+      obj.position.x = Math.cos(angle + offset) * depth; obj.position.y = Math.sin(angle + offset) * depth;
+      obj.userData.base = obj.position.y; water.add(obj);
+    }
+  }
+  water.position.y = SHAPES.seabed.y; scene.add(water);
+
+  // Woodsprites: soft glowing seed points that drift up through the view
+  const SN = RM ? 70 : 160, sp = [], ss = [], sc = [], sd = [];
+  for (let i = 0; i < SN; i++) { sp.push(THREE.MathUtils.randFloatSpread(1100), Math.random() * 760, THREE.MathUtils.randFloat(-420, 260)); ss.push(THREE.MathUtils.randFloat(6, 16)); sd.push(Math.random() * 100, THREE.MathUtils.randFloat(4, 12)); }
+  const sGeo = new THREE.BufferGeometry();
+  sGeo.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3)); sGeo.setAttribute('aSize', new THREE.Float32BufferAttribute(ss, 1)); sGeo.setAttribute('aSeed', new THREE.Float32BufferAttribute(sd, 2));
+  sGeo.setAttribute('aColor', new THREE.Float32BufferAttribute(new Float32Array(SN * 3), 3));
+  const sMat = new THREE.ShaderMaterial({transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, uniforms:{uTime:{value:0}, uPixel:{value:renderer.getPixelRatio()}},
+    vertexShader:`attribute float aSize; attribute vec2 aSeed; attribute vec3 aColor; uniform float uTime, uPixel; varying vec3 vCol; varying float vSpin; varying float vFade;
+      void main(){ vec3 p = position; float t = uTime * aSeed.y;
+        p.y = mod(p.y + t, 760.0); p.x += sin(uTime * 0.3 + aSeed.x) * 22.0; p.z += cos(uTime * 0.25 + aSeed.x) * 14.0;
+        vec4 mv = modelViewMatrix * vec4(p, 1.0); gl_PointSize = aSize * uPixel * (520.0 / -mv.z); gl_Position = projectionMatrix * mv;
+        vCol = aColor; vSpin = uTime * 0.4 + aSeed.x; vFade = smoothstep(0.0, 60.0, p.y) * smoothstep(760.0, 640.0, p.y); }`,
+    fragmentShader:`varying vec3 vCol; varying float vSpin; varying float vFade;
+      void main(){ vec2 c = gl_PointCoord * 2.0 - 1.0; float d = length(c); if (d > 1.0) discard;
+        float ang = atan(c.y, c.x) + vSpin;
+        float tendril = pow(abs(cos(ang * 4.0)), 24.0) * smoothstep(1.0, 0.15, d) * 0.55;
+        float core = smoothstep(0.22, 0.0, d), halo = smoothstep(1.0, 0.0, d) * 0.35;
+        vec3 col = mix(vCol, vec3(1.0), core * 0.8);
+        gl_FragColor = vec4(col, (core + halo + tendril) * vFade); }`});
+  const sprites = new THREE.Points(sGeo, sMat); sprites.frustumCulled = false; scene.add(sprites);
+
+  function tint(pal, ti) {
+    seabedMat.color.set(SEABED[ti]); scene.fog.color.set(FOG[ti]);
+    seedMats.forEach((m, i) => { m.color.set(pal.levels[i]); m.emissive.set(pal.levels[i]).multiplyScalar(.28); });
+    const ca = sGeo.getAttribute('aColor'), cols = [0xffffff, pal.match, pal.levels[1], pal.levels[4], 0xc8ff9a].map(c => new THREE.Color(c));
+    for (let i = 0; i < SN; i++) { const c = cols[i % cols.length]; ca.setXYZ(i, c.r, c.g, c.b); } ca.needsUpdate = true;
+  }
+  tint(Aero.palette(), Aero.theme);
+
+  const mouse = {x:0, y:0};
+  addEventListener('pointermove', e => { mouse.x = e.clientX / innerWidth * 2 - 1; mouse.y = 1 - e.clientY / innerHeight * 2; });
+  addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+
+  function update(dt, time) {
+    const k = dt * 60;   // the pen stepped per frame at 60 fps
+    if (!RM) {
+      for (let i = 0; i < pos.count; i++) { const b = bumps[i]; pos.setXY(i, b.x + Math.cos(b.ang) * b.amp, b.y + Math.sin(b.ang) * b.amp); b.ang += b.speed * k; }
+      pos.needsUpdate = true;
+      seabed.rotation.z += (SHAPES.seabed.rotation * .2 + SHAPES.seabed.step) * k;
+      water.rotation.z += SHAPES.water.step * k;
+      for (const s of seeds) s.position.y = s.userData.base + Math.sin(time * .8 + s.userData.bob) * 4;
+      sMat.uniforms.uTime.value = time;
+    }
+    camera.position.x += (mouse.x * 40 - camera.position.x) * .03;
+    camera.position.y += (350 + mouse.y * 18 - camera.position.y) * .03;
+    renderer.render(scene, camera);
+  }
+  return {update, tint};
+}
+
+/* ============ Jellyfish motion (pasted TweenMax timeline, in GSAP 3) ============ */
+if (!RM && window.gsap) {
+  gsap.to('#feturbulence', {attr:{baseFrequency:'0.06 0'}, duration:5, repeat:-1, yoyo:true, ease:'none'});
+  gsap.to('#jfSvg', {y:-30, duration:3, repeat:-1, yoyo:true, ease:'sine.inOut', delay:.2});
+  gsap.from('.bubble', {scale:.2, opacity:.2, duration:4, transformOrigin:'50% 50%', ease:'none', stagger:{each:1, repeat:-1, yoyo:true}});
+  gsap.timeline({repeat:-1, repeatDelay:5})
+    .to('.eye', {scaleY:.5, opacity:.2, transformOrigin:'50% 50%', duration:.5, delay:3, ease:'back.out(1.7)'})
+    .to('.eye', {scaleY:1, opacity:1, transformOrigin:'50% 50%', duration:.5, ease:'back.out(1.7)'});
+}
+
+/* ============ Seeds: Mycelium matches that involve you ============ */
+const ORBS = ['blue', 'amber', 'pink', '', 'accent'];
+const kindOf = m => m.kind || (/spare|ticket|budget|server|license/i.test(m.why) ? 'resource' : /same team|buddy|joined/i.test(m.why + m.topic) ? 'team' : 'query');
+const mine = WF.matches.filter(m => m.a === me.id || m.b === me.id).sort((x, y) => y.score - x.score).map((m, i) => {
+  const other = WF.person(m.a === me.id ? m.b : m.a);
+  return {m, other, kind:kindOf(m), i, sent:false, x:innerWidth / 2, y:innerHeight / 2, tx:0, ty:0};
+});
+$('nSeeds').textContent = `${mine.length} seeds near you`;
+$('nIntros').textContent = `${WF.stats.introsMade} intros made`;
+
+const NS = 'http://www.w3.org/2000/svg', linksSvg = $('links');
+const svgEl = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent?.appendChild(e); return e; };
+const handshake = `<g class="icon__part p1" data-anim-end fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><circle cx="16.5" cy="8" r="3"/><path d="M3 19c.6-3.2 2.6-5 5-5s4.4 1.8 5 5M13.2 14.6c.9-.4 2-.6 3.3-.6 2.4 0 4.4 1.8 5 5"/></g>`;
+const sentIcon = `<g class="icon__part p1" data-anim-end fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17l9-10"/></g>`;
+
+function cardHTML(s) {
+  const o = s.other, pct = Math.round(s.m.score * 100);
+  const btn = s.sent
+    ? `<button class="ctl" disabled><span class="sq green"><svg class="i-bob" viewBox="0 0 24 24" aria-hidden="true">${sentIcon}</svg></span><span>Intro sent ✓</span></button>`
+    : `<button class="ctl" data-intro="${s.i}"><span class="sq green"><svg class="i-bob" viewBox="0 0 24 24" aria-hidden="true">${handshake}</svg></span><span>Introduce</span></button>`;
+  return `<div class="milk"><div class="body">
+    <div class="who"><span class="orb ${ORBS[s.i % ORBS.length]}">${o.first[0]}</span><div><div class="nm">${o.name}</div><div class="dp">${o.deptName} · ${o.subName}</div></div></div>
+    <div class="topic"><span>${s.m.topic}</span><span class="chip${pct < 75 ? ' info' : ''}">${pct}% match</span></div>
+    <p class="why">${/^both /.test(s.m.why) ? `You and ${o.first} ${s.m.why}` : s.m.why[0].toUpperCase() + s.m.why.slice(1)}.</p>
+    ${btn}</div></div>`;
+}
+mine.forEach(s => {
+  s.el = document.createElement('article'); s.el.className = 'seed'; s.el.style.setProperty('--k', s.i); s.el.innerHTML = cardHTML(s); $('seeds').appendChild(s.el);
+  s.g = svgEl('g', {}, linksSvg);
+  const w = 1.2 + s.m.score * 3.4;
+  s.glow = svgEl('path', {class:'glow', 'stroke-width':w * 3.2, opacity:.3 + s.m.score * .45}, s.g);
+  s.core = svgEl('path', {class:'core', 'stroke-width':w * .5, opacity:.35 + s.m.score * .4}, s.g);
+  s.flow = svgEl('path', {class:'flow', 'stroke-width':w * 1.2, opacity:.9}, s.g);
+  s.el.addEventListener('mouseenter', () => s.g.classList.add('hot'));
+  s.el.addEventListener('mouseleave', () => s.g.classList.remove('hot'));
+});
+Aero.wireCandy($('seeds'));
+
+/* ============ Filter ============ */
+let filter = 'all';
+document.querySelectorAll('#intro .seg button').forEach(b => b.addEventListener('click', () => {
+  filter = b.dataset.f;
+  document.querySelectorAll('#intro .seg button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  mine.forEach(s => { const on = filter === 'all' || s.kind === filter; s.el.classList.toggle('hidden', !on); s.g.classList.toggle('off', !on); });
+  layout();
+}));
+
+/* ============ Orbit layout: upper arc, keeping clear of the corner card and the dock ============ */
+const mobile = () => innerWidth <= 700;
+function layout() {
+  if (mobile()) return;
+  const vis = mine.filter(s => !s.el.classList.contains('hidden')), n = vis.length;
+  const W = innerWidth, H = innerHeight, cx = W / 2, cy = H * .48;
+  const rx = Math.min(W * .37, 560), ry = Math.min(H * .36, 310);
+  // slots: one or two on the left (below the corner card), the rest on the upper-right arc
+  const L = n >= 6 ? 2 : n >= 3 ? 1 : 0, lin = (a, b, m) => m <= 1 ? [(a + b) / 2] : Array.from({length:m}, (_, i) => a + (b - a) * i / (m - 1));
+  const slots = n === 1 ? [-90] : n === 2 ? [-125, -45] : [...lin(-200, -180, L), ...lin(-122, 24, n - L)];
+  const corner = $('intro').getBoundingClientRect();
+  vis.forEach((s, k) => {
+    const a = slots[k] * PI / 180;
+    const w = s.el.offsetWidth, h = s.el.offsetHeight;
+    let x = cx + Math.cos(a) * rx, y = cy + Math.sin(a) * ry;
+    x = Math.min(W - w / 2 - 20, Math.max(w / 2 + 20, x));
+    y = Math.min(H - 120 - h / 2, Math.max(h / 2 + 20, y));
+    if (x - w / 2 < corner.right + 14 && y - h / 2 < corner.bottom + 14) {   // would sit under the corner card
+      if (corner.right + 14 + w / 2 < cx - 140) x = Math.max(x, corner.right + 14 + w / 2); else y = corner.bottom + 14 + h / 2;
+    }
+    s.tx = x; s.ty = y;
+  });
+}
+
+/* ============ Tentacle curves ============ */
+const jfSvg = $('jfSvg');
+function jellyOrigin(i) {   // a point among the tentacles, in screen space (follows the GSAP bob)
+  const m = jfSvg.getScreenCTM(); if (!m) return {x:innerWidth / 2, y:innerHeight / 2};
+  const p = jfSvg.createSVGPoint(); p.x = 240 + (i % 5) * 16; p.y = 300 + (i % 2) * 18; const q = p.matrixTransform(m); return {x:q.x, y:q.y};
+}
+function anchor(s, o) {   // nearest point on the card's edge, facing the jellyfish
+  const w = s.el.offsetWidth, h = s.el.offsetHeight, dx = o.x - s.x, dy = o.y - s.y;
+  const sx = Math.abs(dx) / (w / 2), sy = Math.abs(dy) / (h / 2), f = 1 / Math.max(sx, sy, 1e-3);
+  return {x:s.x + dx * f, y:s.y + dy * f};
+}
+function curve(s, t) {
+  const o = jellyOrigin(s.i), e = anchor(s, o), dx = e.x - o.x, dy = e.y - o.y, len = Math.hypot(dx, dy) || 1;
+  const px = -dy / len, py = dx / len, wig = RM ? 0 : Math.sin(t * 1.1 + s.i * 1.7) * Math.min(60, len * .16);
+  // tentacles hang down first, then sweep out to the card
+  const c1 = {x:o.x + dx * .25 + px * wig, y:o.y + Math.max(70, len * .25) + py * wig};
+  const c2 = {x:o.x + dx * .7 - px * wig * .8, y:o.y + dy * .7 - py * wig * .8};
+  return `M${o.x.toFixed(1)} ${o.y.toFixed(1)}C${c1.x.toFixed(1)} ${c1.y.toFixed(1)} ${c2.x.toFixed(1)} ${c2.y.toFixed(1)} ${e.x.toFixed(1)} ${e.y.toFixed(1)}`;
+}
+
+/* ============ Introduce: a pulse travels the tentacle, then the card flips ============ */
+const pulses = [];
+$('seeds').addEventListener('click', e => {
+  const b = e.target.closest('[data-intro]'); if (!b) return;
+  const s = mine[+b.dataset.intro]; if (s.sent) return; s.sent = true; b.disabled = true;
+  const dot = svgEl('circle', {r:7, fill:'#fff', filter:'url(#pulseGlow)'}, linksSvg);
+  pulses.push({s, dot, t0:performance.now(), dur:RM ? 1 : 1100});
+  s.g.classList.add('hot');
+});
+function landPulse(p) {
+  p.dot.remove(); const s = p.s, o = s.other;
+  Aero.toast('myc', 'Mycelium found a match', `${me.first} and ${o.first} should meet`, s.m.why);
+  const swap = () => { s.el.innerHTML = cardHTML(s); s.el.classList.add('sent'); Aero.wireCandy(s.el); };
+  if (RM || !window.gsap) { swap(); s.g.classList.remove('hot'); return; }
+  const card = s.el.querySelector('.milk');
+  gsap.timeline().to(card, {rotationY:90, duration:.25, ease:'power2.in'})
+    .add(() => { swap(); gsap.fromTo(s.el.querySelector('.milk'), {rotationY:-90}, {rotationY:0, duration:.45, ease:'back.out(1.8)'}); })
+    .add(() => s.g.classList.remove('hot'), '+=1.2');
+}
+
+/* ============ Loop ============ */
+const clock = new THREE.Clock(); let time = 0;
+function frame() {
+  requestAnimationFrame(frame);
+  const dt = Math.min(.05, clock.getDelta()); time += dt;
+  ocean?.update(dt, time);
+  if (!mobile()) {
+    for (const s of mine) {
+      const bx = RM ? 0 : Math.cos(time * .4 + s.i * 1.3) * 6, by = RM ? 0 : Math.sin(time * .6 + s.i) * 9;
+      s.x += (s.tx + bx - s.x) * (RM ? 1 : .06); s.y += (s.ty + by - s.y) * (RM ? 1 : .06);
+      s.el.style.transform = `translate(${(s.x - s.el.offsetWidth / 2).toFixed(1)}px,${(s.y - s.el.offsetHeight / 2).toFixed(1)}px)`;
+      const d = curve(s, time); s.glow.setAttribute('d', d); s.core.setAttribute('d', d); s.flow.setAttribute('d', d);
+      s.flow.setAttribute('stroke-dashoffset', RM ? 0 : (-time * 30 - s.i * 7).toFixed(1));
+    }
+  }
+  const now = performance.now();
+  for (let k = pulses.length - 1; k >= 0; k--) {
+    const p = pulses[k], t = Math.min(1, (now - p.t0) / p.dur), path = p.s.core, L = path.getTotalLength();
+    const pt = path.getPointAtLength(L * (1 - Math.pow(1 - t, 2))); p.dot.setAttribute('cx', pt.x); p.dot.setAttribute('cy', pt.y);
+    if (t >= 1) { pulses.splice(k, 1); landPulse(p); }
+  }
+}
+addEventListener('resize', layout);
+Aero.onTheme((ti, pal) => ocean?.tint(pal, ti));
+
+requestAnimationFrame(() => {
+  layout(); mine.forEach(s => { s.x = s.tx; s.y = s.ty + 30; });
+  frame();
+});
+setTimeout(() => Aero.toast('myc', 'Mycelium is listening', `${mine.length} seeds drifted near you`, `Strongest: ${mine[0].other.first} · ${mine[0].m.topic}`), RM ? 0 : 1600);
+</script>
+</body>
+</html>

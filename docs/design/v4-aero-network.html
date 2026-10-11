@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wayfinder Neural Org</title>
+<style>
+@font-face{font-family:Selawik;src:url(https://cdn.jsdelivr.net/npm/winstrap@0.5.12/dist/fonts/selawkl.ttf) format("truetype");font-weight:300;font-display:swap}
+@font-face{font-family:Selawik;src:url(https://cdn.jsdelivr.net/npm/winstrap@0.5.12/dist/fonts/selawk.ttf) format("truetype");font-weight:400;font-display:swap}
+@font-face{font-family:Selawik;src:url(https://cdn.jsdelivr.net/npm/winstrap@0.5.12/dist/fonts/selawksb.ttf) format("truetype");font-weight:600;font-display:swap}
+@font-face{font-family:Selawik;src:url(https://cdn.jsdelivr.net/npm/winstrap@0.5.12/dist/fonts/selawkb.ttf) format("truetype");font-weight:700;font-display:swap}
+:root{
+  --font:Selawik,"Segoe UI","Open Sans",system-ui,sans-serif;
+  --ink:#0B2A4A; --ink-2:#3A5A7A; --raio:16px;
+  --spring:cubic-bezier(.34,1.56,.64,1); --ease:cubic-bezier(.25,.8,.25,1);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-user-select:none;user-select:none}
+html,body{height:100%;overflow:hidden;background:#BFE6FC;font-family:var(--font);color:var(--ink)}
+canvas#scene{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+:focus-visible{outline:3px solid #fff;outline-offset:3px;box-shadow:0 0 0 6px #2A8CE8}
+
+/* ============ Glass recipes (Jopestpe "Frutiger Aero | Glass"), given jobs ============ */
+/* FrutigerAero7, milk glass: panels that hold text */
+.milk{position:absolute;z-index:10;border-radius:var(--raio);overflow:hidden;
+  background:linear-gradient(175deg,rgb(255 255 255/.74) 0%,rgb(255 255 255/.48) 45%,rgb(255 255 255/.6) 100%);
+  border:1px solid rgb(255 255 255/.8);backdrop-filter:blur(14px) brightness(1.06) saturate(1.2);-webkit-backdrop-filter:blur(14px) brightness(1.06) saturate(1.2);
+  box-shadow:0 8px 28px rgb(0 40 100/.18),inset 0 1px 0 rgb(255 255 255/.95),inset 0 -1px 0 rgb(255 255 255/.35);
+  transition:transform .4s var(--ease),box-shadow .4s var(--ease)}
+/* the pen's light sweep on hover */
+.milk::after{content:"";position:absolute;top:0;left:-100%;width:70%;height:100%;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgb(255 255 255/.55),transparent);transform:skewX(-15deg);transition:left .5s}
+.milk:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgb(0 40 100/.24),inset 0 1px 0 #fff}
+.milk:hover::after{left:150%;transition:left .8s ease-in-out}
+/* FrutigerAero6, glossy blue: title bars */
+.bar{position:relative;display:flex;align-items:center;gap:10px;padding:10px 16px;color:#fff;font-weight:600;font-size:15px;text-shadow:0 1px 2px rgb(0 30 80/.55);
+  background:linear-gradient(160deg,rgb(60 140 255/.85) 0%,rgb(0 90 210/.92) 50%,rgb(0 50 140/.9) 100%);
+  border-bottom:1px solid rgb(0 30 100/.35);box-shadow:inset 0 1px 0 rgb(200 230 255/.7)}
+.bar::before{content:"";position:absolute;top:0;left:3%;width:94%;height:50%;border-radius:12px 12px 50% 50%;pointer-events:none;background:linear-gradient(rgb(220 240 255/.55),transparent)}
+.bar > *{position:relative}
+.bar .live{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-weight:400;font-size:13px;color:#DDF2FF}
+.bar .live i{width:8px;height:8px;border-radius:50%;background:#7CFF9B;box-shadow:0 0 8px #7CFF9B}
+/* Glossy orb (Aero) */
+.orb{flex:none;border-radius:50%;display:inline-grid;place-items:center;color:#fff;font-weight:700;position:relative;
+  background:radial-gradient(circle at 35% 28%,rgb(255 255 255/.85),#5BD86B 38%,#1F9A3A 75%,#0D6A26);
+  box-shadow:inset 0 -3px 6px rgb(0 0 0/.25),inset 0 0 0 1px rgb(255 255 255/.5),0 2px 6px rgb(0 40 0/.35)}
+
+#title{left:28px;top:28px;width:330px}
+#title .body{padding:16px 18px 18px}
+#title .k{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
+#title .eng{font-weight:300;font-size:40px;line-height:1.05;margin:2px 0 6px;transition:opacity .35s,transform .35s}
+#title .eng.swap{opacity:0;transform:translateY(6px)}
+#title .d{font-size:15px;line-height:1.45;color:var(--ink-2);min-height:44px;transition:opacity .35s}
+#title .legend{display:flex;gap:14px;margin-top:12px;font-size:13px;color:var(--ink-2);flex-wrap:wrap}
+#title .legend span{display:inline-flex;align-items:center;gap:6px}
+#title .legend i{width:12px;height:12px;border-radius:50%;box-shadow:inset 0 -2px 3px rgb(0 0 0/.25),inset 0 0 0 1px rgb(255 255 255/.5)}
+
+#panel{right:28px;top:28px;width:270px}
+#panel .body{padding:14px 18px 18px;display:grid;gap:14px}
+.ptitle{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:8px}
+.theme-grid{display:flex;gap:16px;justify-content:space-between}
+.theme-button{width:46px;height:46px;border-radius:50%;position:relative;transition:transform .4s var(--spring);
+  box-shadow:0 4px 10px rgb(0 40 100/.3),inset 0 2px 4px rgb(255 255 255/.5),inset 0 -3px 6px rgb(0 0 0/.22)}
+.theme-button::before{content:"";position:absolute;top:8%;left:20%;right:20%;height:42%;border-radius:50%;background:linear-gradient(180deg,rgb(255 255 255/.9),rgb(255 255 255/.1))}
+.theme-button::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:2px solid #fff;opacity:0;transform:scale(1.12);transition:all .3s;box-shadow:0 0 12px rgb(255 255 255/.8)}
+.theme-button:hover{transform:scale(1.12) translateY(-2px)}
+.theme-button.active::after{opacity:1;transform:scale(1)}
+.theme-button .nm{position:absolute;top:calc(100% + 6px);left:50%;translate:-50% 0;font-size:11px;white-space:nowrap;color:var(--ink-2);font-weight:600}
+#t0{background:radial-gradient(circle at 30% 30%,#8FE3FF,#1E8BE0 55%,#0A4A9A)}
+#t1{background:radial-gradient(circle at 30% 30%,#D4F79A,#4CC24A 55%,#17752E)}
+#t2{background:radial-gradient(circle at 30% 30%,#FFE0A8,#FF8A5B 55%,#C2305E)}
+.themes{padding-bottom:16px}
+.dlabel{display:flex;justify-content:space-between;font-size:14px;color:var(--ink-2)}
+.dlabel b{color:var(--ink);font-weight:600}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;margin-top:6px}
+input[type=range]::-webkit-slider-runnable-track{height:10px;border-radius:99px;box-shadow:inset 0 1px 3px rgb(0 40 100/.35),0 1px 0 rgb(255 255 255/.8);
+  background:linear-gradient(180deg,rgb(255 255 255/.55),rgb(255 255 255/0) 50%),linear-gradient(90deg,#35C3F0 var(--val,60%),rgb(255 255 255/.5) var(--val,60%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;margin-top:-6px;
+  background:radial-gradient(circle at 35% 28%,#fff 0 18%,#BFF0FF 40%,#2AA8E8 85%);box-shadow:0 2px 6px rgb(0 40 100/.4),inset 0 0 0 1px rgb(255 255 255/.7);transition:transform .2s}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
+input[type=range]::-moz-range-track{height:10px;border-radius:99px;background:#9CD9F2}
+input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;border:0;background:radial-gradient(circle at 35% 28%,#fff 0 18%,#BFF0FF 40%,#2AA8E8 85%)}
+.seg{display:flex;padding:3px;border-radius:99px;background:rgb(255 255 255/.45);box-shadow:inset 0 1px 3px rgb(0 40 100/.25)}
+.seg button{flex:1;padding:6px 4px;border-radius:99px;font-size:13px;font-weight:600;color:var(--ink-2);transition:all .3s}
+.seg button[aria-pressed=true]{color:#fff;text-shadow:0 1px 1px rgb(0 0 0/.3);
+  background:linear-gradient(180deg,rgb(255 255 255/.55),rgb(255 255 255/.12) 49%,transparent 50%),linear-gradient(180deg,#4CB2FF,#1460C8);box-shadow:inset 0 0 0 1px rgb(255 255 255/.45),0 1px 3px rgb(0 40 100/.35)}
+.switch{display:flex;align-items:center;justify-content:space-between;font-size:14px;color:var(--ink-2)}
+.switch button{width:46px;height:26px;border-radius:99px;position:relative;background:rgb(0 40 100/.18);box-shadow:inset 0 1px 3px rgb(0 40 100/.35);transition:background .3s}
+.switch button::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;transition:left .35s var(--spring);
+  background:radial-gradient(circle at 35% 28%,#fff,#E6F2FA 60%,#B7CCDD);box-shadow:0 1px 3px rgb(0 0 0/.3)}
+.switch button[aria-pressed=true]{background:linear-gradient(180deg,#7EE07A,#2E9E3A)}
+.switch button[aria-pressed=true]::after{left:23px}
+
+/* ============ Controls: glass pills holding XP-style candy squares (reference only) ============ */
+#controls{position:fixed;left:50%;bottom:30px;translate:-50% 0;display:flex;gap:14px;z-index:20;padding:8px;border-radius:24px;
+  background:linear-gradient(175deg,rgb(255 255 255/.4),rgb(255 255 255/.12));border:1px solid rgb(255 255 255/.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 10px 30px rgb(0 40 100/.18),inset 0 1px 0 rgb(255 255 255/.85)}
+.ctl{display:flex;align-items:center;gap:10px;padding:6px 18px 6px 6px;border-radius:18px;font-weight:600;font-size:15px;color:var(--ink);
+  background:linear-gradient(175deg,rgb(255 255 255/.75),rgb(255 255 255/.45));border:1px solid rgb(255 255 255/.85);box-shadow:0 4px 12px rgb(0 40 100/.15);transition:transform .3s var(--spring),box-shadow .3s}
+.ctl:hover{transform:translateY(-3px);box-shadow:0 10px 22px rgb(0 40 100/.22)}
+.ctl:active{transform:translateY(0)}
+.sq{position:relative;display:flex;width:40px;height:40px;border-radius:10px;
+  box-shadow:0 0 0 2px #fff inset,-3px -3px 4px rgb(0 0 0/.35) inset,0 2px 4px rgb(0 40 100/.3)}
+.sq::before{content:"";position:absolute;inset:3px;border-radius:7px;transition:background-color .3s;background-color:rgb(255 255 255/0);
+  background-image:radial-gradient(100% 100% at 0 0,rgb(255 255 255/.6),rgb(255 255 255/0) 40%),radial-gradient(100% 100% at 90% 90%,rgb(255 255 255/.18),rgb(255 255 255/0) 50%);box-shadow:5px 5px 6px rgb(255 255 255/.15) inset}
+.ctl:hover .sq::before{background-color:rgb(255 255 255/.2)}
+.sq.green{background-color:hsl(119,51%,39%)} .sq.amber{background-color:hsl(37,96%,52%)} .sq.blue{background-color:hsl(210,80%,48%)}
+.sq svg{margin:auto;width:28px;height:28px;pointer-events:none;position:relative}
+.icon__part{animation-duration:1s}
+.anim .i-standby .p1{animation-name:standBy1}
+.anim .i-standby .p2{animation-name:standBy2}
+.anim .i-standby .p1,.anim .i-standby .p2,.anim .i-reset .p1{transform-origin:12px 12px}
+.anim .i-restart .p1{animation-name:restart1;animation-timing-function:cubic-bezier(.68,-.55,.265,1.55)}
+.anim .i-reset .p1{animation-name:reset1;animation-timing-function:cubic-bezier(.645,.03,.355,1.4)}
+@keyframes standBy1{from{animation-timing-function:cubic-bezier(.645,.045,.355,1);stroke-dashoffset:0;transform:translate(0,0)}33.33%{animation-timing-function:cubic-bezier(.645,.045,.355,1);stroke-dashoffset:-7;transform:translate(0,7px)}66.67%{animation-timing-function:cubic-bezier(.645,.03,.355,2);stroke-dashoffset:3;transform:translate(0,-6px)}to{stroke-dashoffset:0;transform:translate(0,0)}}
+@keyframes standBy2{from{animation-timing-function:cubic-bezier(.645,.045,.355,1);stroke-dashoffset:-8.378;transform:rotate(-120deg)}33.33%{animation-timing-function:cubic-bezier(.645,.045,.355,1);stroke-dashoffset:0;transform:rotate(-90deg)}66.67%{animation-timing-function:cubic-bezier(.645,.03,.355,2);stroke-dashoffset:-13.96;transform:rotate(-140deg)}to{stroke-dashoffset:-8.378;transform:rotate(-120deg)}}
+@keyframes restart1{from{stroke-dashoffset:-5}to{stroke-dashoffset:-28}}
+@keyframes reset1{from{transform:rotate(0)}to{transform:rotate(-360deg)}}
+
+/* ============ Toast: FrutigerAero2 inner-glow bubble, FrutigerAero4 iridescence for Mycelium ============ */
+#toast{position:fixed;left:28px;bottom:30px;width:360px;z-index:15;border-radius:20px;overflow:hidden;opacity:0;translate:0 16px;transition:opacity .45s var(--ease),translate .55s var(--spring);pointer-events:none;
+  background:radial-gradient(ellipse at center,rgb(255 255 255/.25),rgb(255 255 255/.5));border:1.5px solid rgb(255 255 255/.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:inset 0 0 30px rgb(255 255 255/.35),0 8px 26px rgb(0 40 100/.22)}
+#toast.show{opacity:1;translate:0 0}
+#toast::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:radial-gradient(ellipse at 50% 0%,rgb(255 255 255/.7),transparent 60%)}
+#toast.myc::after{content:"";position:absolute;top:-40%;left:-10%;width:120%;height:90%;border-radius:50%;filter:blur(10px);pointer-events:none;opacity:.9;
+  background:conic-gradient(from 200deg at 50% 30%,rgb(255 100 200/.4),rgb(100 200 255/.45),rgb(200 255 100/.3),rgb(255 200 100/.4),rgb(255 100 200/.4))}
+#toast .in{position:relative;z-index:1;display:flex;gap:12px;padding:14px 16px;align-items:center}
+#toast .orb{width:40px;height:40px;font-size:18px}
+#toast .k{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
+#toast .m{font-size:18px;font-weight:600;line-height:1.2}
+#toast .s{font-size:14px;color:var(--ink-2)}
+#toast .hops{display:inline-block;margin-left:4px;padding:0 8px;border-radius:99px;font-size:12px;font-weight:600;color:#0B6B4A;background:rgb(220 250 235/.9)}
+
+/* Labels in the scene (CSS2D): milk-glass pills, dark ink */
+.lbl{font:600 13px/1 var(--font);color:var(--ink);padding:6px 10px 6px 8px;border-radius:99px;white-space:nowrap;display:flex;align-items:center;gap:6px;
+  background:linear-gradient(180deg,rgb(255 255 255/.92),rgb(255 255 255/.7));border:1px solid #fff;box-shadow:0 3px 10px rgb(0 40 100/.22);
+  transition:opacity .5s,transform .5s var(--spring);transform:translateY(-22px)}
+.lbl i{width:9px;height:9px;border-radius:50%;box-shadow:inset 0 -1px 2px rgb(0 0 0/.3)}
+.lbl.person{font-weight:400;font-size:12px;padding:4px 9px;background:rgb(255 255 255/.8)}
+.lbl.core{font-size:15px;color:#fff;text-shadow:0 1px 2px rgb(0 60 0/.5);transform:translateY(-44px);
+  background:linear-gradient(180deg,rgb(255 255 255/.5),rgb(255 255 255/.1) 49%,transparent 50%),linear-gradient(180deg,#5BD86B,#1F8F37);border-color:rgb(255 255 255/.7)}
+.lbl.off{opacity:0;transform:translateY(-10px) scale(.9)}
+.lbl.hot{box-shadow:0 0 0 3px rgb(255 255 255/.9),0 0 18px #7FE3FF}
+
+.err{position:fixed;inset:auto 0 45% 0;text-align:center;font-size:16px;color:var(--ink);display:none;z-index:30}
+
+@media (max-width:700px){
+  #title{left:12px;right:12px;top:12px;width:auto}
+  #title .eng{font-size:30px} #title .d{min-height:0} #title .legend{display:none}
+  #panel{left:12px;right:12px;top:auto;bottom:96px;width:auto}
+  #panel .body{grid-template-columns:1fr 1fr;gap:10px}
+  #panel .themes,#panel .switch{display:none}
+  #controls{bottom:16px;gap:6px;width:calc(100% - 24px);justify-content:center}
+  .ctl{padding:4px 10px 4px 4px;font-size:13px} .sq{width:34px;height:34px}
+  #toast{left:12px;right:12px;width:auto;bottom:auto;top:200px}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<canvas id="scene" aria-label="Wayfinder org as a glass neural network"></canvas>
+
+<section id="title" class="milk" aria-live="polite">
+  <div class="bar"><span class="orb" style="width:24px;height:24px;font-size:12px">W</span>Wayfinder · Neural Org<span class="live"><i></i>live</span></div>
+  <div class="body">
+    <div class="k">Engine</div>
+    <div class="eng" id="eng">Coordinate</div>
+    <p class="d" id="engd">Breaks a goal into steps and sends each one to its real owner.</p>
+    <div class="legend"><span><i style="background:radial-gradient(circle at 35% 30%,#fff,#5BD86B 50%,#1F8F37)"></i>Wayfinder</span><span><i id="lg-hub"></i>Department</span><span><i id="lg-person"></i>Person</span></div>
+  </div>
+</section>
+
+<section id="panel" class="milk">
+  <div class="bar">Glass theme</div>
+  <div class="body">
+    <div class="themes">
+      <div class="theme-grid">
+        <button class="theme-button active" id="t0" data-theme="0" aria-label="Aqua Sky"><span class="nm">Aqua Sky</span></button>
+        <button class="theme-button" id="t1" data-theme="1" aria-label="Eco Leaf"><span class="nm">Eco Leaf</span></button>
+        <button class="theme-button" id="t2" data-theme="2" aria-label="Sunset Glass"><span class="nm">Sunset Glass</span></button>
+      </div>
+    </div>
+    <div>
+      <div class="dlabel"><span>Density</span><b id="dval">60%</b></div>
+      <input type="range" id="density" min="30" max="100" value="60" aria-label="Network density" style="--val:57%">
+    </div>
+    <div>
+      <div class="ptitle">Engine</div>
+      <div class="seg" role="group" aria-label="Engine">
+        <button data-f="0" aria-pressed="true">Coordinate</button><button data-f="1" aria-pressed="false">Discover</button><button data-f="2" aria-pressed="false">Evolve</button>
+      </div>
+    </div>
+    <div class="switch"><span>Auto tour</span><button id="auto" aria-pressed="true" aria-label="Auto tour"></button></div>
+  </div>
+</section>
+
+<div id="controls">
+  <button class="ctl" id="morph"><span class="sq green"><svg class="i-restart" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="#fff" stroke-dasharray="6 17" stroke-dashoffset="-5">
+    <polyline class="icon__part p1" points="0,0 0,11" stroke-width="3" transform="translate(12,12) rotate(0)" data-anim-end/><polyline class="icon__part p1" points="0,0 0,11" stroke-width="2" transform="translate(12,12) rotate(45)"/>
+    <polyline class="icon__part p1" points="0,0 0,11" stroke-width="3" transform="translate(12,12) rotate(90)"/><polyline class="icon__part p1" points="0,0 0,11" stroke-width="2" transform="translate(12,12) rotate(135)"/>
+    <polyline class="icon__part p1" points="0,0 0,11" stroke-width="3" transform="translate(12,12) rotate(180)"/><polyline class="icon__part p1" points="0,0 0,11" stroke-width="2" transform="translate(12,12) rotate(225)"/>
+    <polyline class="icon__part p1" points="0,0 0,11" stroke-width="3" transform="translate(12,12) rotate(270)"/><polyline class="icon__part p1" points="0,0 0,11" stroke-width="2" transform="translate(12,12) rotate(315)"/></g></svg></span><span>Morph</span></button>
+  <button class="ctl" id="freeze"><span class="sq amber"><svg class="i-standby" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="#fff">
+    <polyline class="icon__part p1" points="12,2 12,12" stroke-dasharray="10 10" stroke-width="3" data-anim-end/><circle class="icon__part p2" cx="12" cy="12" r="8" stroke-dasharray="50.265 50.265" stroke-dashoffset="-8.378" stroke-width="2" transform="rotate(-120,12,12)"/></g></svg></span><span id="freezeTxt">Freeze</span></button>
+  <button class="ctl" id="reset"><span class="sq blue"><svg class="i-reset" viewBox="0 0 24 24" aria-hidden="true"><g class="icon__part p1" data-anim-end><path fill="#fff" d="M19 12A7 7 0 0 0 8.4 6H9a1 1 0 0 1 0 2H6a1 1 0 0 1-1-1V4a1 1 0 0 1 2 0v.52a9 9 0 1 1-3.93 6.36 1 1 0 1 1 1.98.24Q5 11.55 5 12a7 7 0 1 0 14 0"/></g></svg></span><span>Reset</span></button>
+</div>
+
+<div id="toast" role="status"><div class="in"><span class="orb" id="tOrb">W</span><div><div class="k" id="tK"></div><div class="m" id="tM"></div><div class="s" id="tS"></div></div></div></div>
+<div class="err" id="err">This scene needs WebGL and a network connection for three.js.</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, RM ? 1 : ms));
+
+/* ============ Config ============ */
+const ENGINES = [
+  {name:'Coordinate', d:'Breaks a goal into steps and sends each one to its real owner.', wave:{a:1, b:0, cycles:2}},
+  {name:'Discover', d:'Mycelium finds people who should meet, and introduces them once they agree.', wave:{a:1, b:1, cycles:3}},
+  {name:'Evolve', d:'Darwin replays past requests and evolves shorter routes.', wave:{a:0, b:1, cycles:4}},
+];
+const PALETTES = [   // per level: root → outer shell, plus hub and person accents
+  {levels:[0x1a7fe0, 0x2fb5f5, 0x1fd1d1, 0x6fd9a8, 0x9fe8ff, 0xc8f3ff], hub:0x1460c8, person:0xffa63d},
+  {levels:[0x2e9d4a, 0x57c84d, 0x8fdc5a, 0x30c9a0, 0xc6ef7a, 0xe2fbb0], hub:0x1d7a3a, person:0x2fb5f5},
+  {levels:[0xff7a59, 0xffa94d, 0xffd166, 0xff6fa8, 0xffc2d6, 0xfff0c2], hub:0xd9405e, person:0x2fb5f5},
+];
+const HUBS = ['Leadership', 'Sales', 'Operations', 'Finance', 'Legal', 'Engineering', 'Data Platform', 'Analytics Eng'];
+const PEOPLE = ['Leo', 'Priya', 'Tom', 'Ana'];
+const STORIES = [
+  [['Leo', 'Analytics Eng', 'customer DB access'], ['Tom', 'Engineering', 'a staging server'], ['Priya', 'Finance', 'a conference budget'], ['Ana', 'Legal', 'a vendor NDA']],
+  [['Leo', 'Ana', 'both asked about churn models this week'], ['Priya', 'Tom', 'both stuck on the same dashboard']],
+  [['Ana', 'Legal', 'vendor contracts'], ['Leo', 'Data Platform', 'data access requests']],
+];
+const WATER_Y = -23, SUN = new THREE.Vector3(-.55, .32, -.77).normalize();
+const S = {paused:false, theme:0, density:.6, formation:0, auto:!RM, morphing:false, run:0, time:0};
+
+/* ============ Renderer, camera, environment ============ */
+let renderer;
+try { renderer = new THREE.WebGLRenderer({canvas:$('scene'), antialias:true, powerPreference:'high-performance'}); } catch (e) { $('err').style.display = 'block'; throw e; }
+const DPR = Math.min(devicePixelRatio, 2);
+renderer.setPixelRatio(DPR); renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = .92;
+const labelRenderer = new CSS2DRenderer(); labelRenderer.setSize(innerWidth, innerHeight);
+Object.assign(labelRenderer.domElement.style, {position:'fixed', inset:'0', pointerEvents:'none', zIndex:5}); document.body.appendChild(labelRenderer.domElement);
+
+const scene = new THREE.Scene();
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(renderer), .03).texture;
+const camera = new THREE.PerspectiveCamera(52, innerWidth / innerHeight, .1, 2000);
+const HOME = innerWidth / innerHeight < 1 ? new THREE.Vector3(0, 6, 78) : new THREE.Vector3(0, 4, 43);
+camera.position.copy(HOME);
+const controls = new OrbitControls(camera, renderer.domElement);
+Object.assign(controls, {enableDamping:true, dampingFactor:.05, rotateSpeed:.6, minDistance:18, maxDistance:95, enablePan:false, autoRotate:!RM, autoRotateSpeed:.25, maxPolarAngle:1.68, minPolarAngle:.5});
+controls.target.set(0, 0, 0); controls.saveState();
+scene.add(new THREE.HemisphereLight(0xdff4ff, 0x2a7fd0, 1.1));
+const sun = new THREE.DirectionalLight(0xfff6e0, 2.2); sun.position.copy(SUN).multiplyScalar(80); scene.add(sun);
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .22, .35, .97); composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+/* ============ Shared uniforms (the pen's pulse system) ============ */
+const U = {
+  uTime:{value:0}, uMorph:{value:1}, uWaterY:{value:WATER_Y}, uPixel:{value:DPR}, uRes:{value:new THREE.Vector2(innerWidth * DPR, innerHeight * DPR)},
+  uPulsePositions:{value:[new THREE.Vector3(1e3, 1e3, 1e3), new THREE.Vector3(1e3, 1e3, 1e3), new THREE.Vector3(1e3, 1e3, 1e3)]},
+  uPulseTimes:{value:[-1e3, -1e3, -1e3]}, uPulseSpeed:{value:18},
+};
+const NOISE = `
+vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;} vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
+vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);} vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
+float snoise(vec3 v){const vec2 C=vec2(1.0/6.0,1.0/3.0);const vec4 D=vec4(0.0,0.5,1.0,2.0);vec3 i=floor(v+dot(v,C.yyy));vec3 x0=v-i+dot(i,C.xxx);
+vec3 g=step(x0.yzx,x0.xyz);vec3 l=1.0-g;vec3 i1=min(g.xyz,l.zxy);vec3 i2=max(g.xyz,l.zxy);vec3 x1=x0-i1+C.xxx;vec3 x2=x0-i2+C.yyy;vec3 x3=x0-D.yyy;i=mod289(i);
+vec4 p=permute(permute(permute(i.z+vec4(0.0,i1.z,i2.z,1.0))+i.y+vec4(0.0,i1.y,i2.y,1.0))+i.x+vec4(0.0,i1.x,i2.x,1.0));float n_=0.142857142857;vec3 ns=n_*D.wyz-D.xzx;
+vec4 j=p-49.0*floor(p*ns.z*ns.z);vec4 x_=floor(j*ns.z);vec4 y_=floor(j-7.0*x_);vec4 x=x_*ns.x+ns.yyyy;vec4 y=y_*ns.x+ns.yyyy;vec4 h=1.0-abs(x)-abs(y);
+vec4 b0=vec4(x.xy,y.xy);vec4 b1=vec4(x.zw,y.zw);vec4 s0=floor(b0)*2.0+1.0;vec4 s1=floor(b1)*2.0+1.0;vec4 sh=-step(h,vec4(0.0));vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy;vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+vec3 p0=vec3(a0.xy,h.x);vec3 p1=vec3(a0.zw,h.y);vec3 p2=vec3(a1.xy,h.z);vec3 p3=vec3(a1.zw,h.w);vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0);m=m*m;return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));}`;
+const PULSE = `
+uniform vec3 uPulsePositions[3]; uniform float uPulseTimes[3]; uniform float uPulseSpeed; uniform float uTime;
+float pulseAt(vec3 p){ float tot = 0.0;
+  for (int i = 0; i < 3; i++) { float dt = uTime - uPulseTimes[i]; if (dt < 0.0 || dt > 4.0) continue;
+    float w = abs(distance(p, uPulsePositions[i]) - dt * uPulseSpeed); tot += smoothstep(3.0, 0.0, w) * smoothstep(4.0, 0.0, dt); }
+  return min(tot, 1.0); }`;
+// Morph: nodes travel from aFrom to aTo with an outward "breath" mid-flight
+const MORPH = `
+uniform float uMorph;
+vec3 morphPos(vec3 a, vec3 b){ vec3 p = mix(a, b, uMorph); float arc = sin(uMorph * 3.14159); return p + normalize(p + vec3(1e-4)) * arc * 3.0; }`;
+
+/* ============ Sky dome: Aero daylight, sun, Vista light ribbons ============ */
+const sky = new THREE.Mesh(new THREE.SphereGeometry(900, 48, 24), new THREE.ShaderMaterial({
+  side:THREE.BackSide, depthWrite:false,
+  uniforms:{uTop:{value:new THREE.Color(0x0646a8)}, uMid:{value:new THREE.Color(0x2a8fe0)}, uHor:{value:new THREE.Color(0xbfe6fb)}, uSun:{value:SUN}, uTime:U.uTime},
+  vertexShader:`varying vec3 vDir; void main(){ vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position + cameraPosition, 1.0); gl_Position = p.xyww; }`,
+  fragmentShader:`${NOISE} uniform vec3 uTop, uMid, uHor, uSun; uniform float uTime; varying vec3 vDir;
+  void main(){ vec3 d = normalize(vDir); float y = d.y;
+    vec3 col = mix(uHor, uMid, smoothstep(0.0, 0.18, y)); col = mix(col, uTop, smoothstep(0.18, 0.7, y));
+    if (y < 0.0) col = uHor;
+    float s = max(dot(d, uSun), 0.0);
+    col += vec3(1.0, 0.97, 0.88) * (pow(s, 600.0) * 2.0 + pow(s, 24.0) * 0.35 + pow(s, 6.0) * 0.05);
+    float az = atan(d.z, d.x);
+    float b1 = y - 0.22 - 0.07 * sin(az * 2.0 + 0.8 + uTime * 0.02); col += vec3(1.0) * 0.2 * exp(-pow(b1 / 0.03, 2.0));
+    float b2 = y - 0.30 - 0.05 * sin(az * 3.0 + 2.0 - uTime * 0.015); col += vec3(1.0) * 0.16 * exp(-pow(b2 / 0.012, 2.0));
+    float cl = snoise(vec3(az * 2.2, y * 9.0, uTime * 0.01)) * 0.5 + 0.5; col = mix(col, vec3(1.0), smoothstep(0.62, 0.9, cl) * smoothstep(0.3, 0.04, y) * smoothstep(-0.01, 0.05, y) * 0.22);
+    gl_FragColor = vec4(col, 1.0); }`,
+}));
+sky.renderOrder = -10; sky.frustumCulled = false; scene.add(sky);
+
+/* ============ Water: the sine aquarium formula, now a glossy sea ============ */
+const water = new THREE.Mesh(new THREE.PlaneGeometry(700, 700, 260, 260), new THREE.ShaderMaterial({
+  transparent:true, depthWrite:false,
+  uniforms:{...U, uA:{value:1}, uB:{value:0}, uCycles:{value:2}, uDir:{value:1}, uAmp:{value:1.3}, uK:{value:Math.PI * 2 / 70},
+    uDeep:{value:new THREE.Color(0x0657a8)}, uShallow:{value:new THREE.Color(0x1fb3e0)}, uHor:{value:new THREE.Color(0xbfe6fb)}, uSun:{value:SUN}},
+  vertexShader:`${PULSE} uniform float uA, uB, uCycles, uDir, uAmp, uK; varying vec3 vWorld; varying vec3 vN;
+    float h(vec2 p){ float a = uTime * 0.55, sum = max(uA + uB, 0.001);
+      float y = uAmp * (uA * cos(uK * p.x + a) + uB * cos(uDir * uCycles * uK * p.x + a)) / sum;
+      y += 0.38 * sin(p.y * 0.21 + a * 1.3) + 0.14 * sin((p.x + p.y) * 0.55 - a * 2.2);
+      for (int i = 0; i < 3; i++) { float dt = uTime - uPulseTimes[i]; if (dt < 0.0 || dt > 5.0) continue;
+        float d = distance(p, uPulsePositions[i].xz); y += 0.7 * sin(d * 1.1 - dt * 7.0) * exp(-dt * 0.7) * smoothstep(dt * 10.0 + 3.0, dt * 10.0 - 8.0, d) * exp(-d * 0.025); }
+      return y; }
+    void main(){ vec4 w = modelMatrix * vec4(position, 1.0); float y = h(w.xz), e = 0.5;
+      vN = normalize(vec3(-(h(w.xz + vec2(e, 0.0)) - y) / e, 1.0, -(h(w.xz + vec2(0.0, e)) - y) / e));
+      w.y += y; vWorld = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+  fragmentShader:`${NOISE} uniform vec3 uDeep, uShallow, uHor, uSun; uniform float uTime; varying vec3 vWorld; varying vec3 vN;
+    void main(){ vec3 V = normalize(cameraPosition - vWorld), N = normalize(vN);
+      float ndv = max(dot(N, V), 0.0), fres = pow(1.0 - ndv, 3.0);
+      vec3 col = mix(uShallow, uDeep, smoothstep(0.1, 0.9, ndv));
+      col = mix(col, vec3(0.55, 0.82, 0.97), fres * 0.6);
+      float spec = pow(max(dot(reflect(-uSun, N), V), 0.0), 140.0); col += vec3(1.0, 0.98, 0.9) * spec * 2.2;
+      float sp = snoise(vec3(vWorld.xz * 0.3, uTime * 0.5)); col += vec3(1.0) * smoothstep(0.7, 0.92, sp) * 0.3;
+      float band = sin(vWorld.x * 0.08 + vWorld.z * 0.05 + uTime * 0.4) * 0.5 + 0.5; col += vec3(0.6, 0.9, 1.0) * smoothstep(0.85, 1.0, band) * 0.08;
+      float fog = smoothstep(90.0, 420.0, length(vWorld.xz - cameraPosition.xz));
+      col = mix(col, uHor, fog);
+      gl_FragColor = vec4(col, mix(0.7 + fres * 0.28, 1.0, fog)); }`,
+}));
+water.rotation.x = -Math.PI / 2; water.position.y = WATER_Y; water.renderOrder = -5; water.frustumCulled = false; scene.add(water);
+
+/* ============ Soap bubbles rising (the pen's starfield, made Aero) ============ */
+const BN = RM ? 120 : 260, bPos = [], bSize = [], bSpeed = [];
+for (let i = 0; i < BN; i++) { bPos.push(THREE.MathUtils.randFloatSpread(220), Math.random() * 80, THREE.MathUtils.randFloat(-160, 40)); bSize.push(THREE.MathUtils.randFloat(.4, 2.2) * (Math.random() < .08 ? 2.2 : 1)); bSpeed.push(THREE.MathUtils.randFloat(.6, 2.2)); }
+const bGeo = new THREE.BufferGeometry();
+bGeo.setAttribute('position', new THREE.Float32BufferAttribute(bPos, 3)); bGeo.setAttribute('aSize', new THREE.Float32BufferAttribute(bSize, 1)); bGeo.setAttribute('aSpeed', new THREE.Float32BufferAttribute(bSpeed, 1));
+const bubbles = new THREE.Points(bGeo, new THREE.ShaderMaterial({
+  transparent:true, depthWrite:false, uniforms:{uTime:U.uTime, uPixel:U.uPixel, uWaterY:U.uWaterY},
+  vertexShader:`attribute float aSize; attribute float aSpeed; uniform float uTime, uPixel, uWaterY; varying float vFade; varying float vSeed;
+    void main(){ vec3 p = position; p.y = uWaterY + mod(p.y + uTime * aSpeed, 80.0); p.x += sin(uTime * 0.4 + position.z) * 1.2; vSeed = position.x;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0); gl_PointSize = aSize * uPixel * (900.0 / -mv.z); gl_Position = projectionMatrix * mv;
+      vFade = smoothstep(0.0, 4.0, p.y - uWaterY) * smoothstep(80.0, 60.0, p.y - uWaterY) * smoothstep(320.0, 80.0, -mv.z); }`,
+  fragmentShader:`uniform float uTime; varying float vFade; varying float vSeed;
+    void main(){ vec2 c = gl_PointCoord * 2.0 - 1.0; float d = length(c); if (d > 1.0) discard;
+      float ang = atan(c.y, c.x);
+      vec3 irid = 0.5 + 0.5 * cos(vec3(0.0, 2.1, 4.2) + ang * 2.0 + uTime * 0.6 + vSeed);
+      float rim = smoothstep(0.72, 0.97, d) * smoothstep(1.0, 0.95, d);
+      float spec = smoothstep(0.32, 0.0, length((c - vec2(-0.36, -0.42)) * vec2(1.0, 1.5)));
+      float spec2 = smoothstep(0.18, 0.0, length(c - vec2(0.42, 0.5)));
+      vec3 col = mix(vec3(0.85, 0.96, 1.0), irid, 0.45);
+      float a = (0.06 + rim * 0.6 + spec * 0.85 + spec2 * 0.35) * vFade;
+      gl_FragColor = vec4(mix(col, vec3(1.0), spec), a); }`,
+}));
+bubbles.frustumCulled = false; bubbles.renderOrder = -4; scene.add(bubbles);
+
+/* ============ Network generation (ported from the pen, unchanged logic) ============ */
+class Node {
+  constructor(position, level = 0, type = 0) { this.position = position; this.connections = []; this.level = level; this.type = type; this.size = type === 0 ? THREE.MathUtils.randFloat(.8, 1.4) : THREE.MathUtils.randFloat(.5, 1.0); this.distanceFromRoot = 0; }
+  addConnection(node, strength = 1) { if (!this.isConnectedTo(node)) { this.connections.push({node, strength}); node.connections.push({node:this, strength}); } }
+  isConnectedTo(node) { return this.connections.some(c => c.node === node); }
+}
+function generateNeuralNetwork(formationIndex, densityFactor = 1) {
+  let nodes = [], rootNode;
+  function crystallineSphere() {
+    rootNode = new Node(new THREE.Vector3(0, 0, 0), 0, 0); rootNode.size = 2; nodes.push(rootNode);
+    const layers = 5, golden = (1 + Math.sqrt(5)) / 2;
+    for (let layer = 1; layer <= layers; layer++) {
+      const radius = layer * 4, num = Math.floor(layer * 12 * densityFactor);
+      for (let i = 0; i < num; i++) {
+        const phi = Math.acos(1 - 2 * (i + .5) / num), theta = 2 * Math.PI * i / golden;
+        const pos = new THREE.Vector3(radius * Math.sin(phi) * Math.cos(theta), radius * Math.sin(phi) * Math.sin(theta), radius * Math.cos(phi));
+        const node = new Node(pos, layer, layer === layers || Math.random() < .3 ? 1 : 0); node.distanceFromRoot = radius; nodes.push(node);
+        if (layer > 1) { const prev = nodes.filter(n => n.level === layer - 1 && n !== rootNode).sort((a, b) => pos.distanceTo(a.position) - pos.distanceTo(b.position));
+          for (let j = 0; j < Math.min(3, prev.length); j++) node.addConnection(prev[j], Math.max(.3, 1 - pos.distanceTo(prev[j].position) / (radius * 2))); }
+        else rootNode.addConnection(node, .9);
+      }
+      const ln = nodes.filter(n => n.level === layer && n !== rootNode);
+      for (const node of ln) for (const near of ln.filter(n => n !== node).sort((a, b) => node.position.distanceTo(a.position) - node.position.distanceTo(b.position)).slice(0, 5))
+        if (node.position.distanceTo(near.position) < radius * .8 && !node.isConnectedTo(near)) node.addConnection(near, .6);
+    }
+    const outer = nodes.filter(n => n.level >= 3);
+    for (let i = 0; i < Math.min(20, outer.length); i++) { const a = outer[Math.floor(Math.random() * outer.length)], b = outer[Math.floor(Math.random() * outer.length)];
+      if (a !== b && !a.isConnectedTo(b) && Math.abs(a.level - b.level) > 1) a.addConnection(b, .4); }
+  }
+  function helixLattice() {
+    rootNode = new Node(new THREE.Vector3(0, 0, 0), 0, 0); rootNode.size = 1.8; nodes.push(rootNode);
+    const numHelices = 4, height = 30, maxRadius = 12, per = Math.floor(50 * densityFactor), arrays = [];
+    for (let h = 0; h < numHelices; h++) {
+      const phase = h / numHelices * Math.PI * 2, hn = [];
+      for (let i = 0; i < per; i++) {
+        const t = i / (per - 1), y = (t - .5) * height, radius = maxRadius * (Math.sin(t * Math.PI) * .7 + .3), angle = phase + t * Math.PI * 6;
+        const node = new Node(new THREE.Vector3(radius * Math.cos(angle), y, radius * Math.sin(angle)), Math.ceil(t * 5), i > per - 5 || Math.random() < .25 ? 1 : 0);
+        node.distanceFromRoot = Math.sqrt(radius * radius + y * y); node.helixT = t; nodes.push(node); hn.push(node);
+      }
+      arrays.push(hn); rootNode.addConnection(hn[0], 1);
+      for (let i = 0; i < hn.length - 1; i++) hn[i].addConnection(hn[i + 1], .85);
+    }
+    for (let h = 0; h < numHelices; h++) { const cur = arrays[h], next = arrays[(h + 1) % numHelices];
+      for (let i = 0; i < cur.length; i += 5) { const ti = Math.round(cur[i].helixT * (next.length - 1)); if (ti < next.length) cur[i].addConnection(next[ti], .7); } }
+    for (const hx of arrays) for (let i = 0; i < hx.length; i += 8) { const node = hx[i];
+      const inner = nodes.filter(n => n !== node && n !== rootNode && n.distanceFromRoot < node.distanceFromRoot * .5);
+      if (inner.length) node.addConnection(inner.sort((a, b) => node.position.distanceTo(a.position) - node.position.distanceTo(b.position))[0], .5); }
+    const all = nodes.filter(n => n !== rootNode);
+    for (let i = 0; i < Math.floor(30 * densityFactor); i++) { const a = all[Math.floor(Math.random() * all.length)];
+      const near = all.filter(n => { const d = n.position.distanceTo(a.position); return n !== a && d < 8 && d > 3 && !a.isConnectedTo(n); });
+      if (near.length) a.addConnection(near[Math.floor(Math.random() * near.length)], .45); }
+  }
+  function fractalWeb() {
+    rootNode = new Node(new THREE.Vector3(0, 0, 0), 0, 0); rootNode.size = 1.6; nodes.push(rootNode);
+    const branches = 6, maxDepth = 4;
+    function branch(start, dir, depth, strength, scale) {
+      if (depth > maxDepth) return;
+      const end = start.position.clone().add(dir.clone().multiplyScalar(5 * scale * 1.35));
+      const node = new Node(end, depth, depth === maxDepth || Math.random() < .3 ? 1 : 0); node.distanceFromRoot = end.length(); nodes.push(node); start.addConnection(node, strength);
+      if (depth < maxDepth) for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2;
+        const p1 = new THREE.Vector3(-dir.y, dir.x, 0).normalize(), p2 = dir.clone().cross(p1).normalize();
+        branch(node, dir.clone().add(p1.clone().multiplyScalar(Math.cos(a) * .7)).add(p2.clone().multiplyScalar(Math.sin(a) * .7)).normalize(), depth + 1, strength * .7, scale * .75); }
+    }
+    for (let i = 0; i < branches; i++) { const phi = Math.acos(1 - 2 * (i + .5) / branches), theta = Math.PI * (1 + Math.sqrt(5)) * i;
+      branch(rootNode, new THREE.Vector3(Math.sin(phi) * Math.cos(theta), Math.sin(phi) * Math.sin(theta), Math.cos(phi)).normalize(), 1, .9, 1); }
+    const leaves = nodes.filter(n => n.level >= 2);
+    for (const node of leaves) for (const near of leaves.filter(n => { const d = n.position.distanceTo(node.position); return n !== node && d < 10 && !node.isConnectedTo(n); })
+      .sort((a, b) => node.position.distanceTo(a.position) - node.position.distanceTo(b.position)).slice(0, 3)) if (Math.random() < .5 * densityFactor) node.addConnection(near, .5);
+    for (const node of nodes.filter(n => n.level >= 2 && n.level <= 3)) if (Math.random() < .3) {
+      const inner = nodes.filter(n => n !== node && n.distanceFromRoot < node.distanceFromRoot * .6);
+      if (inner.length) { const t = inner[Math.floor(Math.random() * inner.length)]; if (!node.isConnectedTo(t)) node.addConnection(t, .4); } }
+  }
+  [crystallineSphere, fractalWeb, helixLattice][formationIndex % 3]();   // Coordinate, Discover, Evolve
+  if (densityFactor < 1) {
+    const target = Math.ceil(nodes.length * Math.max(.3, densityFactor)), keep = new Set([rootNode]);
+    nodes.filter(n => n !== rootNode).sort((a, b) => b.connections.length / (b.distanceFromRoot + 1) - a.connections.length / (a.distanceFromRoot + 1))
+      .slice(0, target - 1).forEach(n => keep.add(n));
+    nodes = nodes.filter(n => keep.has(n)); nodes.forEach(n => n.connections = n.connections.filter(c => keep.has(c.node)));
+  }
+  return {nodes, rootNode};
+}
+
+/* ============ Formation data: sorted by depth so inner nodes morph to inner nodes ============ */
+function farthest(cands, k, avoid = []) {
+  const picked = [], pts = [...avoid];
+  if (!cands.length) return picked;
+  let first = cands[Math.floor(cands.length / 2)];
+  if (pts.length) first = cands.reduce((b, c) => Math.min(...pts.map(p => p.distanceTo(c.p))) > Math.min(...pts.map(p => p.distanceTo(b.p))) ? c : b);
+  picked.push(first); pts.push(first.p);
+  while (picked.length < k && picked.length < cands.length) {
+    const best = cands.filter(c => !picked.includes(c)).reduce((b, c) => { const dc = Math.min(...pts.map(p => p.distanceTo(c.p))), db = Math.min(...pts.map(p => p.distanceTo(b.p))); return dc > db ? c : b; });
+    picked.push(best); pts.push(best.p);
+  }
+  return picked;
+}
+function buildFormation(fi, density) {
+  const {nodes, rootNode} = generateNeuralNetwork(fi, density);
+  const rest = nodes.filter(n => n !== rootNode).sort((a, b) => a.distanceFromRoot - b.distanceFromRoot), list = [rootNode, ...rest];
+  const index = new Map(list.map((n, i) => [n, i])), pairs = [], adj = list.map(() => []), seen = new Set();
+  list.forEach((n, i) => n.connections.forEach(c => { const j = index.get(c.node); if (j == null) return; const key = i < j ? `${i}-${j}` : `${j}-${i}`;
+    if (seen.has(key)) return; seen.add(key); pairs.push([i, j, c.strength]); adj[i].push(j); adj[j].push(i); }));
+  const items = list.map((n, i) => ({i, p:n.position, n}));
+  // list is sorted by depth, so rank works for every shape (the helix has no nodes near the root)
+  const L = list.length;
+  const hubs = farthest(items.filter(c => c.i > L * .2 && c.i < L * .7 && adj[c.i].length >= 2), HUBS.length).map(c => c.i);
+  const people = farthest(items.filter(c => c.i >= L * .7 && !hubs.includes(c.i)), PEOPLE.length, hubs.map(h => list[h].position)).map(c => c.i);
+  return {list, pairs, adj, hubs, people};
+}
+
+/* ============ GPU buffers for nodes and fibers ============ */
+let F = [], N = 0;
+const B = {};   // current from/to buffers
+function colorsFor(f, theme) {
+  const pal = PALETTES[theme], c = new THREE.Color(), out = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const n = f.list[i];
+    if (!n) { c.set(pal.levels[0]); }
+    else if (f.hubs.includes(i)) c.set(pal.hub);
+    else if (f.people.includes(i)) c.set(pal.person);
+    else { c.set(pal.levels[Math.min(n.level, pal.levels.length - 1)]); c.offsetHSL(((i * 37) % 7 - 3) * .006, 0, ((i * 13) % 5 - 2) * .02); }
+    out.set([c.r, c.g, c.b], i * 3);
+  }
+  return out;
+}
+function targetsFor(f) {
+  const pos = new Float32Array(N * 3), size = new Float32Array(N), type = new Float32Array(N), dist = new Float32Array(N);
+  for (let i = 0; i < N; i++) { const n = f.list[i]; if (!n) continue;
+    pos.set([n.position.x, n.position.y, n.position.z], i * 3);
+    size[i] = i === 0 ? 0 : f.hubs.includes(i) ? 2.1 : f.people.includes(i) ? 1.5 : n.size;
+    type[i] = n.type; dist[i] = n.distanceFromRoot; }
+  return {pos, size, type, dist, col:colorsFor(f, S.theme)};
+}
+
+const nodeVert = `${NOISE} ${PULSE} ${MORPH}
+  attribute vec3 aFrom; attribute vec3 aTo; attribute float aSizeFrom; attribute float aSizeTo; attribute vec3 aColFrom; attribute vec3 aColTo; attribute float aType; attribute float aDist;
+  uniform float uMirror, uWaterY, uPixel; varying vec3 vColor; varying float vPulse; varying float vFade;
+  void main(){ vec3 p = morphPos(aFrom, aTo);
+    if (aType > 0.5) p += vec3(snoise(p * 0.08 + uTime * 0.08), snoise(p * 0.08 + 17.0 + uTime * 0.08), snoise(p * 0.08 + 31.0 + uTime * 0.08)) * 0.35;
+    vPulse = pulseAt(p);
+    if (uMirror > 0.5) p.y = 2.0 * uWaterY - p.y;
+    float breathe = sin(uTime * 0.7 + aDist * 0.15) * 0.08 + 0.92;
+    vec4 mv = modelViewMatrix * vec4(p, 1.0);
+    gl_PointSize = mix(aSizeFrom, aSizeTo, uMorph) * breathe * (1.0 + vPulse * 0.9) * uPixel * (1250.0 / -mv.z);
+    gl_Position = projectionMatrix * mv; vColor = mix(aColFrom, aColTo, uMorph); vFade = uMirror > 0.5 ? 0.32 : 1.0; }`;
+// A glass bubble drawn per point: lit body, darker rim, caustic light at the bottom, Aero gloss on top
+const nodeFrag = `varying vec3 vColor; varying float vPulse; varying float vFade;
+  void main(){ vec2 c = gl_PointCoord * 2.0 - 1.0; float d = length(c); if (d > 1.0) discard;
+    vec3 n = vec3(c.x, -c.y, sqrt(max(0.0, 1.0 - d * d)));
+    float diff = clamp(dot(n, normalize(vec3(-0.45, 0.65, 0.6))), 0.0, 1.0);
+    vec3 col = vColor * (0.5 + 0.62 * diff);
+    float caus = smoothstep(0.75, 0.0, length(c - vec2(0.12, 0.52)));
+    col += vColor * caus * 0.6 + vec3(caus * 0.1);
+    col = mix(col, vColor * 0.42, smoothstep(0.76, 0.98, d) * 0.75);
+    col += vec3(1.0) * smoothstep(0.9, 1.0, d) * 0.22;
+    float spec = smoothstep(0.52, 0.04, length((c - vec2(-0.2, -0.46)) * vec2(0.85, 1.6)));
+    col = mix(col, vec3(1.0), spec * 0.85);
+    col = mix(col, vec3(1.0), smoothstep(0.13, 0.0, length(c - vec2(-0.44, -0.36))));
+    col = mix(col, vec3(1.0), vPulse * 0.45); col += vec3(0.6, 0.95, 1.0) * smoothstep(0.7, 0.95, d) * vPulse;
+    gl_FragColor = vec4(col, smoothstep(1.0, 0.93, d) * vFade); }`;
+
+let nodeMesh, nodeMirror;
+function makeNodeMaterial(mirror) {
+  return new THREE.ShaderMaterial({uniforms:{...U, uMirror:{value:mirror ? 1 : 0}}, vertexShader:nodeVert, fragmentShader:nodeFrag, transparent:true, depthWrite:!mirror});
+}
+function buildNodeMeshes() {
+  [nodeMesh, nodeMirror].forEach(m => { if (m) { scene.remove(m); m.geometry.dispose(); m.material.dispose(); } });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
+  ['aFrom', 'aTo', 'aColFrom', 'aColTo'].forEach(k => g.setAttribute(k, new THREE.BufferAttribute(new Float32Array(N * 3), 3)));
+  ['aSizeFrom', 'aSizeTo', 'aType', 'aDist'].forEach(k => g.setAttribute(k, new THREE.BufferAttribute(new Float32Array(N), 1)));
+  nodeMesh = new THREE.Points(g, makeNodeMaterial(false)); nodeMirror = new THREE.Points(g, makeNodeMaterial(true));
+  nodeMesh.frustumCulled = nodeMirror.frustumCulled = false; nodeMesh.renderOrder = 0; nodeMirror.renderOrder = -6;
+  scene.add(nodeMesh, nodeMirror);
+}
+
+// Fibers: camera-facing ribbons shaded like glass tubes, with light beads flowing through
+const fiberVert = `${NOISE} ${PULSE} ${MORPH}
+  attribute float aT; attribute float aSide; attribute vec3 aSF; attribute vec3 aST; attribute vec3 aEF; attribute vec3 aET; attribute float aStr; attribute vec3 aCol; attribute float aPath;
+  uniform float uMirror, uWaterY, uPixel; uniform vec2 uRes;
+  varying float vSide; varying float vT; varying vec3 vColor; varying float vStr; varying float vPulse; varying float vPath; varying float vFade;
+  vec3 at(float t, vec3 S, vec3 E){ vec3 dir = E - S; vec3 perp = cross(normalize(dir + vec3(1e-5)), vec3(0.0, 1.0, 0.0)); perp = length(perp) < 0.1 ? vec3(1.0, 0.0, 0.0) : normalize(perp);
+    vec3 M = mix(S, E, 0.5) + perp * (0.35 + length(dir) * 0.03);
+    vec3 p = mix(mix(S, M, t), mix(M, E, t), t);
+    return p + perp * snoise(vec3(aPath * 0.08, t * 0.6, uTime * 0.15)) * 0.2; }
+  void main(){ vec3 S = morphPos(aSF, aST), E = morphPos(aEF, aET);
+    float t2 = aT < 0.98 ? aT + 0.02 : aT - 0.02;
+    vec3 p0 = at(aT, S, E), p1 = at(t2, S, E);
+    vPulse = pulseAt(p0);
+    if (uMirror > 0.5) { p0.y = 2.0 * uWaterY - p0.y; p1.y = 2.0 * uWaterY - p1.y; }
+    vec4 c0 = projectionMatrix * modelViewMatrix * vec4(p0, 1.0), c1 = projectionMatrix * modelViewMatrix * vec4(p1, 1.0);
+    vec2 s0 = c0.xy / c0.w * uRes * 0.5, s1 = c1.xy / c1.w * uRes * 0.5, dir = s1 - s0;
+    dir = length(dir) < 1e-4 ? vec2(1.0, 0.0) : normalize(dir) * (aT < 0.98 ? 1.0 : -1.0);
+    float w = (1.6 + aStr * 2.6) * uPixel * clamp(55.0 / c0.w, 0.55, 1.7) * (1.0 + vPulse * 0.8);
+    c0.xy += vec2(-dir.y, dir.x) * aSide * w / (uRes * 0.5) * c0.w;
+    gl_Position = c0; vSide = aSide; vT = aT; vColor = aCol; vStr = aStr; vPath = aPath; vFade = uMirror > 0.5 ? 0.3 : 1.0; }`;
+const fiberFrag = `uniform float uTime, uAlpha; varying float vSide; varying float vT; varying vec3 vColor; varying float vStr; varying float vPulse; varying float vPath; varying float vFade;
+  void main(){ float a = abs(vSide);
+    vec3 col = vColor * (0.45 + 0.45 * (1.0 - a * a));
+    col = mix(col, vec3(1.0), smoothstep(0.42, 0.0, abs(vSide + 0.32)) * 0.6);
+    float bead = pow(max(0.0, sin(vT * 16.0 - uTime * 3.0 + vPath * 1.7)), 18.0);
+    col = mix(col, vec3(1.0), bead * 0.75 * vStr); col = mix(col, vec3(1.0), vPulse * 0.6);
+    float alpha = smoothstep(1.0, 0.5, a) * (0.6 + 0.35 * vStr + bead * 0.3 + vPulse * 0.3) * uAlpha * vFade;
+    gl_FragColor = vec4(col, alpha); }`;
+function buildFibers(pairs, from, to, col) {
+  const SEG = 16, P = SEG + 1, nv = pairs.length * P * 2;
+  const A = {aT:new Float32Array(nv), aSide:new Float32Array(nv), aStr:new Float32Array(nv), aPath:new Float32Array(nv),
+    aSF:new Float32Array(nv * 3), aST:new Float32Array(nv * 3), aEF:new Float32Array(nv * 3), aET:new Float32Array(nv * 3), aCol:new Float32Array(nv * 3)};
+  const idx = new Uint32Array(pairs.length * SEG * 6); let v = 0, k = 0;
+  pairs.forEach(([a, b, s], pi) => { const base = v;
+    for (let i = 0; i < P; i++) for (const side of [-1, 1]) {
+      A.aT[v] = i / SEG; A.aSide[v] = side; A.aStr[v] = s; A.aPath[v] = pi;
+      for (let c = 0; c < 3; c++) { A.aSF[v * 3 + c] = from[a * 3 + c]; A.aST[v * 3 + c] = to[a * 3 + c]; A.aEF[v * 3 + c] = from[b * 3 + c]; A.aET[v * 3 + c] = to[b * 3 + c];
+        A.aCol[v * 3 + c] = (col[a * 3 + c] + col[b * 3 + c]) * .5; }
+      v++; }
+    for (let i = 0; i < SEG; i++) { const o = base + i * 2; idx.set([o, o + 1, o + 2, o + 1, o + 3, o + 2], k); k += 6; } });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nv * 3), 3));
+  const VEC3 = ['aSF', 'aST', 'aEF', 'aET', 'aCol'];
+  for (const key in A) g.setAttribute(key, new THREE.BufferAttribute(A[key], VEC3.includes(key) ? 3 : 1));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  const alpha = {value:1};
+  const mk = mirror => new THREE.ShaderMaterial({uniforms:{...U, uAlpha:alpha, uMirror:{value:mirror ? 1 : 0}}, vertexShader:fiberVert, fragmentShader:fiberFrag, transparent:true, depthWrite:false, side:THREE.DoubleSide});
+  const mesh = new THREE.Mesh(g, mk(false)), mirror = new THREE.Mesh(g, mk(true));
+  mesh.frustumCulled = mirror.frustumCulled = false; mesh.renderOrder = 1; mirror.renderOrder = -7;
+  scene.add(mesh, mirror);
+  return {mesh, mirror, alpha, dispose(){ scene.remove(mesh, mirror); g.dispose(); mesh.material.dispose(); mirror.material.dispose(); }};
+}
+let fibers = null;
+
+/* ============ Wayfinder core: a real glass sphere around a green heart ============ */
+const coreGroup = new THREE.Group(); scene.add(coreGroup);
+const heart = new THREE.Mesh(new THREE.SphereGeometry(1.5, 48, 32), new THREE.MeshPhysicalMaterial({color:0x3fd66a, emissive:0x2fbf5a, emissiveIntensity:.55, roughness:.15, clearcoat:1, clearcoatRoughness:.05}));
+const shell = new THREE.Mesh(new THREE.SphereGeometry(2.7, 64, 48), new THREE.MeshPhysicalMaterial({color:0xe8fbff, roughness:.02, metalness:0, clearcoat:1, clearcoatRoughness:0, transparent:true, opacity:.26, envMapIntensity:2.2, depthWrite:false}));
+const gloss = new THREE.Mesh(new THREE.SphereGeometry(2.72, 48, 32, 0, Math.PI * 2, 0, Math.PI * .32), new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.28, depthWrite:false}));
+gloss.rotation.set(-.35, 0, .3); coreGroup.add(heart, shell, gloss);
+const coreMirror = coreGroup.clone(); coreMirror.scale.y = -1; coreMirror.position.y = 2 * WATER_Y; coreMirror.traverse(o => { if (o.material) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = (o.material.opacity ?? 1) * .35; } }); scene.add(coreMirror);
+
+/* ============ Labels ============ */
+function makeLabel(text, cls, dot) { const d = document.createElement('div'); d.className = `lbl ${cls} off`; d.innerHTML = (dot ? `<i style="background:${dot}"></i>` : '') + text;
+  const o = new CSS2DObject(d); scene.add(o); return {o, d, idx:0}; }
+const coreLabel = makeLabel('Wayfinder', 'core'); coreLabel.d.classList.remove('off');
+const hubLabels = HUBS.map(h => makeLabel(h, 'hub', '#1460c8')), personLabels = PEOPLE.map(p => makeLabel(p, 'person', '#ffa63d'));
+function paintLabelDots() { const pal = PALETTES[S.theme], hex = c => '#' + new THREE.Color(c).getHexString();
+  hubLabels.forEach(l => l.d.querySelector('i').style.background = hex(pal.hub)); personLabels.forEach(l => l.d.querySelector('i').style.background = hex(pal.person));
+  $('lg-hub').style.background = `radial-gradient(circle at 35% 30%,#fff,${hex(pal.hub)} 55%)`; $('lg-person').style.background = `radial-gradient(circle at 35% 30%,#fff,${hex(pal.person)} 55%)`; }
+function assignLabels(show) { const f = F[S.formation];
+  hubLabels.forEach((l, k) => { l.idx = f.hubs[k] ?? 0; l.d.classList.toggle('off', !show || f.hubs[k] == null); });
+  personLabels.forEach((l, k) => { l.idx = f.people[k] ?? 0; l.d.classList.toggle('off', !show || f.people[k] == null); }); }
+// CPU copy of the shader's morph so labels ride along with their bubbles
+const tmpV = new THREE.Vector3();
+function nodePos(i, out = tmpV) { const m = U.uMorph.value, f = B.from, t = B.to;
+  out.set(f[i * 3] + (t[i * 3] - f[i * 3]) * m, f[i * 3 + 1] + (t[i * 3 + 1] - f[i * 3 + 1]) * m, f[i * 3 + 2] + (t[i * 3 + 2] - f[i * 3 + 2]) * m);
+  const arc = Math.sin(m * Math.PI); if (out.lengthSq() > 1e-8) out.addScaledVector(out.clone().normalize(), arc * 3); return out; }
+
+/* ============ Morphing between engines ============ */
+const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const tween = (ms, f) => new Promise(res => { if (RM) { f(1); return res(); } const t0 = performance.now(); const st = now => { const t = Math.min(1, Math.max(0, (now - t0) / ms)); f(t); t < 1 ? requestAnimationFrame(st) : res(); }; requestAnimationFrame(st); });
+function setAttr(name, arr) { const a = nodeMesh.geometry.getAttribute(name); a.array.set(arr); a.needsUpdate = true; }
+function currentArrays() {   // where every bubble is right now
+  const pos = new Float32Array(N * 3), size = new Float32Array(N), col = new Float32Array(N * 3), m = U.uMorph.value, g = nodeMesh.geometry;
+  const sf = g.getAttribute('aSizeFrom').array, st = g.getAttribute('aSizeTo').array, cf = g.getAttribute('aColFrom').array, ct = g.getAttribute('aColTo').array;
+  for (let i = 0; i < N; i++) { nodePos(i); pos.set([tmpV.x, tmpV.y, tmpV.z], i * 3); size[i] = sf[i] + (st[i] - sf[i]) * m;
+    for (let c = 0; c < 3; c++) col[i * 3 + c] = cf[i * 3 + c] + (ct[i * 3 + c] - cf[i * 3 + c]) * m; }
+  return {pos, size, col};
+}
+function setEngineText(fi) {
+  const e = $('eng'); e.classList.add('swap');
+  setTimeout(() => { e.textContent = ENGINES[fi].name; $('engd').textContent = ENGINES[fi].d; e.classList.remove('swap'); }, RM ? 0 : 300);
+  document.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.f === fi)));
+}
+let waveTween = 0;
+function setWave(w, ms = 1800) { const u = water.material.uniforms, from = {a:u.uA.value, b:u.uB.value, c:u.uCycles.value}, id = ++waveTween;
+  return tween(ms, t => { if (id !== waveTween) return; const e = ease(t); u.uA.value = from.a + (w.a - from.a) * e; u.uB.value = from.b + (w.b - from.b) * e; u.uCycles.value = from.c + (w.cycles - from.c) * e; }); }
+async function morphTo(fi, {rebuild = false} = {}) {
+  if (S.morphing) { S.pending = {fi, rebuild:rebuild || S.pending?.rebuild}; return; } S.morphing = true; S.run++; hideToast(); clearRoutes();
+  const prev = rebuild ? null : F[S.formation];
+  const cur = N ? currentArrays() : null;
+  if (rebuild) { F = [0, 1, 2].map(i => buildFormation(i, S.density)); }
+  const newN = Math.max(...F.map(f => f.list.length));
+  if (newN !== N) { N = newN; buildNodeMeshes(); }
+  S.formation = fi; setEngineText(fi); setWave(ENGINES[fi].wave);
+  const tgt = targetsFor(F[fi]);
+  const from = new Float32Array(N * 3), sizeFrom = new Float32Array(N), colFrom = new Float32Array(N * 3);
+  if (cur) { from.set(cur.pos.subarray(0, Math.min(cur.pos.length, N * 3))); sizeFrom.set(cur.size.subarray(0, Math.min(cur.size.length, N))); colFrom.set(cur.col.subarray(0, Math.min(cur.col.length, N * 3))); }
+  else colFrom.set(tgt.col);
+  B.from = from; B.to = tgt.pos;
+  setAttr('aFrom', from); setAttr('aTo', tgt.pos); setAttr('aSizeFrom', sizeFrom); setAttr('aSizeTo', tgt.size);
+  setAttr('aColFrom', colFrom); setAttr('aColTo', tgt.col); setAttr('aType', tgt.type); setAttr('aDist', tgt.dist);
+  hubLabels.concat(personLabels).forEach(l => l.d.classList.add('off'));
+  const old = fibers; const oldFib = old && prev ? buildFibers(prev.pairs.filter(([a, b]) => a < N && b < N), from, tgt.pos, colFrom) : null; old?.dispose();
+  const next = buildFibers(F[fi].pairs, from, tgt.pos, tgt.col); next.alpha.value = 0; fibers = next;
+  U.uMorph.value = 0;
+  await tween(2400, t => { const e = ease(t); U.uMorph.value = e; if (oldFib) oldFib.alpha.value = 1 - Math.min(1, t * 2.2); next.alpha.value = Math.max(0, (t - .45) / .55); });
+  oldFib?.dispose();
+  // settle: from = to, so time-based effects keep running cleanly
+  B.from = tgt.pos.slice(); setAttr('aFrom', B.from); setAttr('aSizeFrom', tgt.size); setAttr('aColFrom', tgt.col); U.uMorph.value = 1;
+  fibers.dispose(); fibers = buildFibers(F[fi].pairs, B.from, tgt.pos, tgt.col);
+  assignLabels(true); S.morphing = false; lastStory = performance.now() - 4500;
+  if (S.themeDirty) { S.themeDirty = false; applyTheme(S.theme); }
+  const p = S.pending; S.pending = null;
+  if (p && (p.fi !== S.formation || p.rebuild)) morphTo(p.fi, {rebuild:p.rebuild});
+}
+function applyTheme(ti) {
+  S.theme = ti; paintLabelDots(); if (S.morphing || !N) { S.themeDirty = true; return; }
+  const col = colorsFor(F[S.formation], ti); setAttr('aColFrom', col); setAttr('aColTo', col);
+  fibers.dispose(); fibers = buildFibers(F[S.formation].pairs, B.from, B.to, col);
+}
+
+/* ============ Pulses (the pen's click-to-energize), plus water ripples ============ */
+let lastPulse = 0;
+function pulseAt(p) { lastPulse = (lastPulse + 1) % 3; U.uPulsePositions.value[lastPulse].copy(p); U.uPulseTimes.value[lastPulse] = U.uTime.value; }
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(), plane = new THREE.Plane(), hit = new THREE.Vector3();
+let down = null;
+renderer.domElement.addEventListener('pointerdown', e => down = {x:e.clientX, y:e.clientY});
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 || S.paused) return;
+  ptr.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ptr, camera);
+  plane.normal.copy(camera.position).normalize(); plane.constant = -plane.normal.dot(camera.position) + camera.position.length() * .5;
+  if (ray.ray.intersectPlane(plane, hit)) pulseAt(hit);
+});
+
+/* ============ Stories: a request travels the real graph ============ */
+function bfs(adj, a, b) { const prev = new Map([[a, -1]]), q = [a];
+  while (q.length) { const x = q.shift(); if (x === b) break; for (const y of adj[x]) if (!prev.has(y)) { prev.set(y, x); q.push(y); } }
+  if (!prev.has(b)) return null; const path = []; for (let x = b; x !== -1; x = prev.get(x)) path.unshift(x); return path; }
+const routes = [];
+function clearRoutes() { routes.splice(0).forEach(r => { scene.remove(r.tube, r.bead); r.tube.geometry.dispose(); }); hubLabels.concat(personLabels).forEach(l => l.d.classList.remove('hot')); }
+const beadMat = new THREE.MeshPhysicalMaterial({color:0xffffff, emissive:0x9fe8ff, emissiveIntensity:.9, roughness:.05, clearcoat:1});
+async function travel(path, color, ms, {straight = false} = {}) {
+  const pts = path.map(i => nodePos(i, new THREE.Vector3()));
+  if (pts.length === 2) straight = true;
+  const curve = straight ? new THREE.QuadraticBezierCurve3(pts[0], pts[0].clone().lerp(pts.at(-1), .5).add(new THREE.Vector3(0, 6, 0)), pts.at(-1)) : new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+  const segs = Math.max(1, pts.length - 1) * 22;
+  const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, segs, .2, 10, false), new THREE.MeshPhysicalMaterial({color, emissive:color, emissiveIntensity:.35, roughness:.08, clearcoat:1, transparent:true, opacity:.92}));
+  const bead = new THREE.Mesh(new THREE.SphereGeometry(.65, 24, 16), beadMat); tube.renderOrder = 2;
+  scene.add(tube, bead); const r = {tube, bead}; routes.push(r);
+  const hops = straight ? 1 : pts.length - 1; let hopDone = 0;
+  await tween(ms, t => { tube.geometry.setDrawRange(0, Math.floor(t * segs) * 10 * 6); bead.position.copy(curve.getPoint(t));
+    const h = Math.floor(t * hops + 1e-6); while (hopDone < h) { hopDone++; pulseAt(straight ? pts.at(-1) : pts[hopDone]); } });
+  return r;
+}
+async function fadeRoute(r, ms = 700) { await tween(ms, t => { r.tube.material.opacity = .92 * (1 - t); r.bead.scale.setScalar(1 - t); }); scene.remove(r.tube, r.bead); r.tube.geometry.dispose(); routes.splice(routes.indexOf(r), 1); }
+function toast(kind, k, m, s) { const el = $('toast'); el.classList.toggle('myc', kind === 'myc'); $('tK').textContent = k; $('tM').innerHTML = m; $('tS').innerHTML = s;
+  $('tOrb').textContent = kind === 'myc' ? '✦' : kind === 'evo' ? '↯' : 'W'; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
+function hideToast() { $('toast').classList.remove('show'); }
+let storyIx = 0, lastStory = 0;
+async function story() {
+  const fi = S.formation, f = F[fi], run = ++S.run, alive = () => run === S.run && !S.morphing;
+  const list = STORIES[fi], [a, b, what] = list[storyIx++ % list.length];
+  const li = name => { const h = HUBS.indexOf(name); if (h >= 0) return {lab:hubLabels[h], i:f.hubs[h]}; const p = PEOPLE.indexOf(name); return {lab:personLabels[p], i:f.people[p]}; };
+  const A = li(a), Bn = li(b); if (A.i == null || Bn.i == null) return;
+  const path = bfs(f.adj, A.i, Bn.i); if (!path || path.length < 2) return;
+  A.lab.d.classList.add('hot'); Bn.lab.d.classList.add('hot'); pulseAt(nodePos(A.i, new THREE.Vector3()));
+  if (fi === 0) {
+    toast('route', 'Wayfinder is routing', `${a} → ${b}`, `${what}`);
+    const r = await travel(path, 0x7fe3ff, 380 * path.length + 400); if (!alive()) return;
+    toast('route', 'Delivered by iMessage', `${a} → ${b}`, `${what} <span class="hops">${path.length - 1} ${path.length === 2 ? 'hop' : 'hops'}</span>`);
+    await sleep(2600); if (!alive()) return; await fadeRoute(r);
+  } else if (fi === 1) {
+    toast('myc', 'Mycelium found a match', `${a} and ${b} should meet`, what);
+    const r = await travel(path, 0xff8fd0, 420 * path.length + 400); if (!alive()) return;
+    await sleep(2600); if (!alive()) return; await fadeRoute(r);
+  } else {
+    // Evolve: replay the old detour, then Darwin's shortcut; the sea morphs from sine A into sine B
+    const via = f.hubs[(HUBS.indexOf(b) + 3) % HUBS.length], p1 = bfs(f.adj, A.i, via), p2 = bfs(f.adj, via, Bn.i);
+    const longPath = p1 && p2 ? p1.concat(p2.slice(1)) : path;
+    toast('evo', 'Darwin is replaying last quarter', `${a} → ${b}`, `${what}: ${longPath.length - 1} hops, 9 days`);
+    setWave({a:1, b:0, cycles:4}, 900);
+    const r1 = await travel(longPath, 0xff9a6a, 300 * longPath.length + 300); if (!alive()) return;
+    await sleep(600); fadeRoute(r1, 900); setWave({a:1, b:1, cycles:4}, 1200); await sleep(700); if (!alive()) return;
+    setWave({a:0, b:1, cycles:4}, 1400);
+    const r2 = await travel([A.i, Bn.i], 0xffd86b, 1100, {straight:true}); if (!alive()) return;
+    toast('evo', 'Darwin evolved a better rule', `${a} → ${b} directly`, `${what} <span class="hops">${longPath.length - 1} hops → 1</span>`);
+    await sleep(2800); if (!alive()) return; await fadeRoute(r2);
+  }
+  A.lab.d.classList.remove('hot'); Bn.lab.d.classList.remove('hot'); hideToast();
+}
+
+/* ============ Controls ============ */
+document.querySelectorAll('.ctl').forEach(b => { const sq = b.querySelector('.sq');
+  ['mouseenter', 'focus'].forEach(ev => b.addEventListener(ev, () => sq.classList.add('anim')));
+  b.querySelector('[data-anim-end]').addEventListener('animationend', () => sq.classList.remove('anim')); });
+$('morph').addEventListener('click', () => { morphTo((S.formation + 1) % 3); lastMorph = performance.now(); });
+$('freeze').addEventListener('click', () => { S.paused = !S.paused; $('freezeTxt').textContent = S.paused ? 'Play' : 'Freeze'; controls.autoRotate = !S.paused && !RM; });
+$('reset').addEventListener('click', () => { controls.reset(); });
+document.querySelectorAll('.theme-button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.theme-button').forEach(x => x.classList.toggle('active', x === b)); applyTheme(+b.dataset.theme); }));
+document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => { if (+b.dataset.f !== S.formation) { morphTo(+b.dataset.f); lastMorph = performance.now(); } }));
+$('auto').addEventListener('click', e => { S.auto = !S.auto; e.currentTarget.setAttribute('aria-pressed', String(S.auto)); });
+$('auto').setAttribute('aria-pressed', String(S.auto));
+let dTimer; $('density').addEventListener('input', e => { const v = +e.target.value; e.target.style.setProperty('--val', ((v - 30) / 70 * 100) + '%'); $('dval').textContent = v + '%';
+  clearTimeout(dTimer); dTimer = setTimeout(() => { S.density = v / 100; morphTo(S.formation, {rebuild:true}); }, 400); });
+
+/* ============ Loop ============ */
+const clock = new THREE.Clock(); let lastMorph = performance.now();
+function frame() {
+  requestAnimationFrame(frame);
+  const dt = Math.min(.05, clock.getDelta());
+  if (!S.paused) S.time += dt; U.uTime.value = S.time;
+  const now = performance.now();
+  if (S.auto && !S.paused && !S.morphing) {
+    if (now - lastMorph > 21000) { lastMorph = now; morphTo((S.formation + 1) % 3); }
+    else if (now - lastStory > 8000) { lastStory = now; story(); }
+  }
+  const breathe = 1 + Math.sin(S.time * 1.2) * .03; heart.scale.setScalar(breathe); shell.rotation.y += dt * .2;
+  coreLabel.o.position.set(0, 0, 0);
+  if (N) hubLabels.concat(personLabels).forEach(l => l.o.position.copy(nodePos(l.idx)));
+  controls.update(); composer.render(); labelRenderer.render(scene, camera);
+}
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
+  labelRenderer.setSize(innerWidth, innerHeight); bloom.resolution.set(innerWidth, innerHeight); U.uRes.value.set(innerWidth * DPR, innerHeight * DPR); });
+
+paintLabelDots();
+F = [0, 1, 2].map(i => buildFormation(i, S.density));
+morphTo(0, {rebuild:false});
+lastStory = performance.now() - 5000;
+frame();
+</script>
+</body>
+</html>

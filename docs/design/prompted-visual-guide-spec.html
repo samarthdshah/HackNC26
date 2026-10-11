@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wayfinder Prompted Visual Guide</title>
+<style>
+  :root {
+    --bg: #fbfbfa; --text: #1b1b1a; --muted: #5e5d59; --rule: #e4e3df; --code: #f1f0ec; --accent: #1163A5; --specimen: #F7FCFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #10161b; --text: #e8eef2; --muted: #9aa8b2; --rule: #26323b; --code: #1b252d; --accent: #69CFFE; --specimen: #0b2236; }
+  }
+  :root[data-theme="dark"] { --bg: #10161b; --text: #e8eef2; --muted: #9aa8b2; --rule: #26323b; --code: #1b252d; --accent: #69CFFE; --specimen: #0b2236; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 48px 16px 96px; }
+  h1 { font-size: 34px; line-height: 1.2; margin: 0 0 4px; }
+  h2 { font-size: 24px; margin: 56px 0 12px; padding-top: 16px; border-top: 1px solid var(--rule); }
+  h3 { font-size: 18px; margin: 32px 0 8px; }
+  .byline { color: var(--muted); margin: 0 0 24px; }
+  p, li { max-width: 72ch; }
+  code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: 14px; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 15px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--rule); }
+  th { font-weight: 600; color: var(--muted); }
+  figure { margin: 16px 0 24px; }
+  figcaption { color: var(--muted); font-size: 14px; margin-top: 6px; }
+  .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; border: 1px solid rgba(0,0,0,.1); }
+  .callout { border-left: 3px solid var(--accent); padding: 4px 0 4px 16px; margin: 16px 0; }
+  .toc { columns: 2; font-size: 15px; padding-left: 20px; }
+  a { color: var(--accent); }
+  .fail { color: #B03A1E; font-weight: 600; }
+  .pass { color: #146C43; font-weight: 600; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fail { color: #FFAF94; } :root:not([data-theme="light"]) .pass { color: #B9F9D3; } }
+  :root[data-theme="dark"] .fail { color: #FFAF94; } :root[data-theme="dark"] .pass { color: #B9F9D3; }
+  .specimen { background: var(--specimen); border: 1px solid var(--rule); border-radius: 8px; padding: 16px; }
+  .specimen svg { width: 100%; height: auto; display: block; }
+  .states { display: flex; flex-wrap: wrap; gap: 8px; }
+  .state { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 8px; border-radius: 999px; font-size: 14px; font-weight: 600; border: 1px solid; background: #F7FCFF; }
+  .state i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  @media (max-width: 600px) { .toc { columns: 1; } h1 { font-size: 28px; } table { font-size: 14px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Wayfinder OS: prompted visual guide</h1>
+  <p class="byline">Person B · Oct 10, 2026 · <code>wayfinder-os/apps/web</code></p>
+
+  <div class="callout">This guide comes from the v2 art-direction prompt ("Frutiger Aero reimagined as a living operating system from 2040"). Once the team adopts it, it replaces v1's visual system. Where the prompt and the README disagree, the gap is listed in <a href="#questions">section 11</a> instead of being silently resolved.</div>
+
+  <ol class="toc">
+    <li><a href="#context">Context</a></li>
+    <li><a href="#northstar">North star and guardrails</a></li>
+    <li><a href="#principles">Principles</a></li>
+    <li><a href="#ia">Structure and controls</a></li>
+    <li><a href="#pages">Page by page</a></li>
+    <li><a href="#visual">Visual system</a></li>
+    <li><a href="#motion">Motion and live behaviour</a></li>
+    <li><a href="#demo">Signature demo</a></li>
+    <li><a href="#a11y">Responsive, accessible, fast</a></li>
+    <li><a href="#honesty">Honesty and data rules</a></li>
+    <li><a href="#questions">Open questions</a></li>
+  </ol>
+
+  <h2 id="context">1. Context</h2>
+  <p>Wayfinder OS is an AI coordinator that lives in iMessage. You give it a goal and it finds the people, resources and approvals needed to get it done. Along the way it learns how the organization really works. The website is where that work becomes visible.</p>
+  <ul>
+    <li><strong>Tagline:</strong> Discover. Connect. Coordinate. Evolve.</li>
+    <li><strong>Three engines the site has to show:</strong> Coordinate (Wayfinder) splits a goal into routed steps. Discover (Mycelium) matches needs, skills and unused resources, with consent. Evolve (Darwin) replays past workflows and evolves better routing rules that an admin approves.</li>
+    <li><strong>Who sees it:</strong> first, judges watching a 1440–1920px screen on stage while phones drive the demo. Later, admins and members looking after their own data.</li>
+    <li><strong>Data:</strong> a seeded, simulated company. A complete local demo runs without any API keys and always says when it's using fixtures.</li>
+  </ul>
+
+  <h2 id="northstar">2. North star and guardrails</h2>
+  <p><strong>Frutiger Aero, reimagined as a living operating system from 2040.</strong> Picture the hopeful, connected future of the 2000s (Vista Aero, Windows Media Center, early Apple Aqua, the Wii) rebuilt with today's tools. It's a sunlit world made of glass and water, and inside it a bioluminescent network quietly finds, coordinates and improves work.</p>
+  <ul>
+    <li><strong>Default mood:</strong> bright daytime. Clear cyan sky fading into cerulean ocean and mint ecosystems, with caustics, ripples, iridescent bubbles, brushed white surfaces and thin chrome.</li>
+    <li><strong>Optional mood:</strong> deep-ocean night mode. The same world after dark, with the network glowing. This is an alternate theme, not a cyberpunk reskin.</li>
+    <li><strong>Feel:</strong> optimistic, intelligent, organic, premium, playful and calm. It should look like a new category of software, not a dashboard.</li>
+  </ul>
+  <h3>Never</h3>
+  <ul>
+    <li>Generic Tailwind admin templates, KPI-tile grids as the main experience, or repeated 3-column feature grids.</li>
+    <li>The default dark-navy gradient with random purple glows, or too much neon.</li>
+    <li>A wall of cards in the hero.</li>
+    <li>Heavy decorative blur, or tiny translucent text.</li>
+    <li>Childish skeuomorphism, stock illustrations, or emoji used as icons.</li>
+    <li>Graphs that are only decoration, buttons that do nothing, or claims about integrations or optimizations that aren't real.</li>
+  </ul>
+
+  <h2 id="principles">3. Principles</h2>
+  <table>
+    <tr><th>Principle</th><th>What it means here</th></tr>
+    <tr><td>Canvas first, not dashboard</td><td>Each main route is one living scene with floating glass overlays. Cards hold details; they never make up the scene.</td></tr>
+    <tr><td>Consent before connection</td><td>No introduction, shared detail or consequential action happens before every relevant person approves. Pending consent is always visible, as an amber ConsentHalo.</td></tr>
+    <tr><td>Observable, not theatrical</td><td>When a slider moves, a number moves. Every animation stands for a real state change in the data.</td></tr>
+    <tr><td>One encoding everywhere</td><td>The five semantic state colors (section 6) mean the same thing on every page and always come with an icon and a label.</td></tr>
+    <tr><td>Show where data came from</td><td>Every connection, match and score can be inspected for its source. Simulated or sample data is labelled where it appears.</td></tr>
+    <tr><td>Beautiful at rest</td><td>The scene should still look good when nothing is happening. Idle motion stays slow and quiet, and live events take the focus.</td></tr>
+    <tr><td>Keyboard reachable</td><td>Every important action works without a pointer, including on the canvas.</td></tr>
+  </table>
+
+  <h2 id="ia">4. Structure and controls</h2>
+  <p>There's no sidebar. A floating top bar and a floating dock sit over a full-viewport canvas.</p>
+  <table>
+    <tr><th>Element</th><th>What it does</th></tr>
+    <tr><td>Top bar (AeroGlass, floating)</td><td>Logo orb + wordmark, workspace name, live system state (Live / Fixtures / Offline), current time, notifications, profile</td></tr>
+    <tr><td>AquaDock (bottom-center pill)</td><td>Main navigation. Icons magnify on hover and focus, and the active room gets an aqua glow under its icon. Arrow keys move along it.</td></tr>
+    <tr><td>Command palette (Cmd/Ctrl+K)</td><td>A "spatial" palette that jumps to a route, node, person or workflow. Results show their node glyph.</td></tr>
+    <tr><td>Experience the Story</td><td>Always-visible PearlButton that starts the 12-stage demo (section 8)</td></tr>
+    <tr><td>Sound / motion toggles</td><td>Ambient sound is muted by default. Reduced motion follows the OS setting and can be overridden.</td></tr>
+    <tr><td>Fixture badge</td><td>Shown whenever any data on screen is seeded or simulated</td></tr>
+  </table>
+  <h3>Routes</h3>
+  <table>
+    <tr><th>Route</th><th>Room</th><th>One line</th></tr>
+    <tr><td><code>/welcome</code></td><td>Landing</td><td>Full-viewport planet hero with a cinematic glide into the app</td></tr>
+    <tr><td><code>/universe</code></td><td>Living Universe</td><td>The organization as a navigable, breathing network</td></tr>
+    <tr><td><code>/discover</code></td><td>Discovery Garden</td><td>The "Anti-Internet": opportunities that grow from complementary needs</td></tr>
+    <tr><td><code>/agent</code></td><td>AI Agent</td><td>Ambient assistant orb, plans, handoffs and a Photon iMessage preview</td></tr>
+    <tr><td><code>/orchestrate</code></td><td>Workflow canvas</td><td>Glass islands joined by flowing streams, with approval gates</td></tr>
+    <tr><td><code>/evolution</code></td><td>Digital Darwin</td><td>A garden of evolving workflow strategies with real scoring</td></tr>
+    <tr><td><code>/time-machine</code></td><td>Time Machine</td><td>Current Reality vs Alternative Future simulation</td></tr>
+    <tr><td><code>/insights</code></td><td>Observatory</td><td>Calm, dense views of how opportunities, handoffs and bottlenecks change over time</td></tr>
+    <tr><td><code>/finance</code></td><td>Finance studio</td><td>Budget jars, allocation streams and approval timelines</td></tr>
+    <tr><td><code>/profile</code></td><td>Sanctuary</td><td>Your representative orb, with a sharing level on every token</td></tr>
+    <tr><td><code>/settings</code></td><td>Settings</td><td>Theme, motion, sound, data sources, integrations (with their real status)</td></tr>
+  </table>
+  <p><strong>Build priority if time runs short:</strong> Living Universe, the five-person discovery story, and Digital Darwin. These three have to be unforgettable; everything else is secondary.</p>
+
+  <h2 id="pages">5. Page by page</h2>
+
+  <h3>Welcome <code>/welcome</code></h3>
+  <ul>
+    <li><strong>First 5 seconds:</strong> a translucent planet-like sphere rises out of a sky-to-ocean gradient. Inside it, hundreds of glowing nodes form and dissolve connections while tiny particles travel along them. A few glass panes float nearby with context.</li>
+    <li><strong>Copy:</strong> <em>WAYFINDER OS</em>. <em>"The world is already connected. Now it can collaborate."</em> Supporting copy: <em>"Discover invisible opportunities. Connect complementary people. Coordinate complex goals. Evolve better outcomes."</em></li>
+    <li><strong>CTAs:</strong> primary PearlButton "Enter the Living Network", secondary "Watch a Discovery".</li>
+    <li><strong>Exit:</strong> the camera dives into the sphere, and its network becomes the <code>/universe</code> canvas.</li>
+    <li><strong>Must:</strong> the title sits on a calm area of the gradient, not on top of busy nodes. Under reduced motion, the scene is a still render with a fade.</li>
+  </ul>
+
+  <h3>Living Universe <code>/universe</code></h3>
+  <ul>
+    <li><strong>Scene:</strong> a full-viewport network in 2D with some depth, curved Bézier threads, and a seeded, deterministic layout settled with gentle spring physics.</li>
+    <li><strong>Nodes:</strong> people, agents, departments, skills, resources, workflows, opportunities and policies, each with its own form (section 6).</li>
+    <li><strong>Interactions:</strong> hover shows a short label and lights up the local cluster. Click opens a GlassInspector (connections, activity, permissions, next actions). Double-click focuses the cluster. Scroll and drag pan and zoom.</li>
+    <li><strong>Controls:</strong> search, filters by node type and state, legend, minimap, zoom and reset, reduced motion.</li>
+    <li><strong>Rule:</strong> a person-to-person thread only appears if its provenance can be shown. Sample data is labelled.</li>
+  </ul>
+
+  <h3>Discovery Garden <code>/discover</code></h3>
+  <ul>
+    <li><strong>Concept:</strong> a social network with no feed, likes, followers or posts. Instead there's a calm garden.</li>
+    <li><strong>Anatomy:</strong> each person has a privacy-controlled AI orb with small tokens orbiting it (skills, interests, needs, resources, preferences). A central Discovery Seed grows strands toward possible clusters. Unconfirmed opportunities are translucent buds. Confirmed ones unfold into a flower-like structure.</li>
+    <li><strong>Pipeline, shown as a step strip:</strong> Signal Received → Complementary Match → Opportunity Proposed → Individual Consent → Collaborative Plan → Workflow Launched.</li>
+    <li><strong>Showcase:</strong> five distant people (A needs a venue, B has unused event space, C teaches electronics repair, D has broken laptops, E can transport equipment). Their agents discover a community laptop-repair and sustainability workshop that nobody asked for.</li>
+    <li><strong>Controls on every proposal:</strong> Approve, Decline, Modify shared info, and Why this match?</li>
+  </ul>
+
+  <h3>AI Agent <code>/agent</code></h3>
+  <ul>
+    <li><strong>Assistant orb:</strong> a glossy, expressive orb whose inner light shows six states: idle (slow swirl), listening (rings ripple outward), thinking (particles orbit), coordinating (threads reach out to other agents), completed (soft mint bloom), error (coral flicker, then still).</li>
+    <li><strong>Conversation:</strong> glass bubbles, interactive step cards, task plans, and a live view of handoffs between agents. Not a fixed chatbot column.</li>
+    <li><strong>Photon iMessage preview:</strong> a phone-shaped frame showing sample messages, participants, requests and approvals. Every message carries a label: <em>Simulated</em>, <em>Prepared</em> or <em>Sent</em>. It only says <em>Sent</em> after the backend confirms.</li>
+    <li><strong>Also:</strong> a message composer, quick suggestions, workflow approvals, and an event timeline.</li>
+  </ul>
+
+  <h3>Workflow canvas <code>/orchestrate</code></h3>
+  <ul>
+    <li><strong>Steps</strong> are glass islands. <strong>Dependencies</strong> are moving, current-like streams.</li>
+    <li><strong>States:</strong> active islands have pulsing fluid rings, blocked ones hang as amber droplets, completed ones glow mint.</li>
+    <li><strong>Interactions:</strong> drag and drop where it's meaningful, inline controls, task details, dependency inspection, and authorization gates drawn as ConsentHalos.</li>
+    <li><strong>Goal input:</strong> a natural-language goal becomes a proposed plan (Gemini when connected, seeded output in demo mode, labelled either way). Nothing consequential runs without approval.</li>
+  </ul>
+
+  <h3>Time Machine <code>/time-machine</code></h3>
+  <ul>
+    <li><strong>Layout:</strong> layered translucent timelines with two floating panels side by side, <em>Current Reality</em> and <em>Alternative Future</em>.</li>
+    <li><strong>Temporal control:</strong> a large circular glass dial that sets staffing, budget, approvals, delays and resources, with linear sliders as the accessible fallback.</li>
+    <li><strong>Outputs:</strong> projected duration, cost, handoffs, utilization and bottlenecks, with animated graphs that change when the inputs change.</li>
+    <li><strong>Controls:</strong> play, pause, reset, scrub, and scenario comparison. Every figure shows its assumptions, its confidence, and a "Simulated" label.</li>
+  </ul>
+
+  <h3>Digital Darwin <code>/evolution</code></h3>
+  <ul>
+    <li><strong>Scene:</strong> a garden of evolving strategies. Each strategy is a glowing glass organism (a branching topology) linked into a genealogy tree.</li>
+    <li><strong>Behaviour:</strong> generation 0 holds the baselines. With each generation, mutations branch out, weak strategies dim, strong ones brighten, and the top performers carry forward. A real seeded evolutionary algorithm drives this; none of it is hard-coded animation.</li>
+    <li><strong>Metrics per generation:</strong> completion time, estimated total cost, handoffs, bottleneck severity, resource utilization, constraint violations, and composite fitness.</li>
+    <li><strong>Controls:</strong> replay, generation scrubber, compare two candidates, and show the actual scoring calculation and its assumptions.</li>
+    <li><strong>Result:</strong> a floating recommendation card for the winning candidate with a <em>Require Admin Approval</em> action.</li>
+  </ul>
+
+  <h3>Insights <code>/insights</code></h3>
+  <ul>
+    <li>An "intelligence observatory": flowing curves, timeline ribbons, heatmaps, topological views and a few sharp KPI readouts. Calm layout, lots of information.</li>
+    <li>Every chart has labelled axes with units, a source note, an empty state, and a visible uncertainty band where values are estimated.</li>
+    <li>Shows how collaboration opportunities, handoffs and bottlenecks change over time.</li>
+  </ul>
+
+  <h3>Finance <code>/finance</code></h3>
+  <ul>
+    <li>Translucent budget jars filled like EcoMeters, allocation streams flowing between them, expense comparisons, and approval timelines.</li>
+    <li>Data comes from Capital One Nessie when configured. Sample accounts and simulated budgets are labelled. Includes the laptop-repair event's costs.</li>
+  </ul>
+
+  <h3>Personal Intelligence Sanctuary <code>/profile</code></h3>
+  <ul>
+    <li>Your representative orb, with skills, goals, capabilities and interests orbiting it as glass tokens.</li>
+    <li>Every token has its own sharing level: <em>Private</em>, <em>Approved connections</em>, or <em>Organization context</em>. The level shows on the token itself as ring style plus an icon, not as color alone.</li>
+    <li>Also: consent history, pending requests, revoking permissions, data-source management, and "why does Wayfinder know this?" explanations.</li>
+  </ul>
+
+  <h3>Settings <code>/settings</code></h3>
+  <ul>
+    <li>Theme (Day / Deep Ocean), motion, sound, data sources, and the status of each integration (Connected / Fixture / Not configured). An integration only shows Connected after a real check.</li>
+  </ul>
+
+  <h3>Every page</h3>
+  <p>Each page needs designed <strong>empty</strong> states (a still glass scene with one clear next action), <strong>loading</strong> states (pearlescent shimmer skeletons in the shape of the real content), and <strong>error</strong> states (a coral droplet, plain-language cause, retry).</p>
+
+  <h2 id="visual">6. Visual system</h2>
+
+  <h3>Color tokens</h3>
+  <div class="scroll"><table>
+    <tr><th>Token</th><th>Hex</th><th>Role</th></tr>
+    <tr><td>Sky Blue</td><td><span class="swatch" style="background:#69CFFE"></span>#69CFFE</td><td>Top of the sky gradient, hover glows, night-mode links</td></tr>
+    <tr><td>Ocean Blue</td><td><span class="swatch" style="background:#1988CF"></span>#1988CF</td><td>Mid gradient, primary button fill, large headings only</td></tr>
+    <tr><td>Deep Azure</td><td><span class="swatch" style="background:#1163A5"></span>#1163A5</td><td>Links and secondary text on light glass, ocean floor</td></tr>
+    <tr><td>Aqua</td><td><span class="swatch" style="background:#83F4EA"></span>#83F4EA</td><td>Active pathways and focus glow</td></tr>
+    <tr><td>Mint</td><td><span class="swatch" style="background:#B9F9D3"></span>#B9F9D3</td><td>Completed workflows, eco ground</td></tr>
+    <tr><td>Lime</td><td><span class="swatch" style="background:#C8F46B"></span>#C8F46B</td><td>Signal sparks, live pulse. Accent only, used sparingly.</td></tr>
+    <tr><td>Pearl</td><td><span class="swatch" style="background:#F7FCFF"></span>#F7FCFF</td><td>Default glass tint, page base</td></tr>
+    <tr><td>Soft White</td><td><span class="swatch" style="background:#FFFFFF"></span>#FFFFFF</td><td>Specular highlights, brightest surfaces</td></tr>
+    <tr><td>Deep Ink</td><td><span class="swatch" style="background:#153A52"></span>#153A52</td><td>All essential text on light surfaces</td></tr>
+    <tr><td>Iridescent Lavender</td><td><span class="swatch" style="background:#CABEFF"></span>#CABEFF</td><td>Proposed ideas, opportunity seeds, pearlescent sheen</td></tr>
+    <tr><td>Coral Highlight</td><td><span class="swatch" style="background:#FFAF94"></span>#FFAF94</td><td>Failed or blocked</td></tr>
+    <tr><td>Amber <em>(added)</em></td><td><span class="swatch" style="background:#F5B83D"></span>#F5B83D</td><td>Consent required. The prompt asks for amber but gives no hex, so this one is proposed.</td></tr>
+  </table></div>
+
+  <h3>Semantic states</h3>
+  <p>The bright tokens are for glows, fills and lines. On light glass they're far too pale to use as text, so each state also gets a darker <strong>ink</strong> for its label. The color is never the only signal: each state also has an icon and a word.</p>
+  <div class="specimen states" role="img" aria-label="Five state pills: Active, Consent needed, Done, Proposed, Blocked">
+    <span class="state" style="border-color:#83F4EA;color:#0B6B64"><i style="background:#83F4EA;box-shadow:0 0 0 3px #83F4EA55"></i>↻ Active</span>
+    <span class="state" style="border-color:#F5B83D;color:#8A5300"><i style="background:#F5B83D;box-shadow:0 0 0 3px #F5B83D55"></i>◎ Consent needed</span>
+    <span class="state" style="border-color:#B9F9D3;color:#146C43"><i style="background:#B9F9D3;box-shadow:0 0 0 3px #B9F9D355"></i>✓ Done</span>
+    <span class="state" style="border-color:#CABEFF;color:#5A47C2"><i style="background:#CABEFF;box-shadow:0 0 0 3px #CABEFF55"></i>✦ Proposed</span>
+    <span class="state" style="border-color:#FFAF94;color:#B03A1E"><i style="background:#FFAF94;box-shadow:0 0 0 3px #FFAF9455"></i>✕ Blocked</span>
+  </div>
+  <p style="font-size:14px;color:var(--muted)">The glyphs here are placeholders. Build them as bespoke SVG or Lucide icons, never emoji.</p>
+  <div class="scroll"><table>
+    <tr><th>State</th><th>Glow / fill</th><th>Text ink</th><th>Ink on Pearl</th><th>Shape cue</th></tr>
+    <tr><td>Active</td><td>Aqua #83F4EA</td><td><span class="swatch" style="background:#0B6B64"></span>#0B6B64</td><td class="pass">6.16 : 1</td><td>Pulsing fluid ring</td></tr>
+    <tr><td>Consent needed</td><td>Amber #F5B83D</td><td><span class="swatch" style="background:#8A5300"></span>#8A5300</td><td class="pass">6.13 : 1</td><td>ConsentHalo (dashed ring with a lock notch)</td></tr>
+    <tr><td>Done</td><td>Mint #B9F9D3</td><td><span class="swatch" style="background:#146C43"></span>#146C43</td><td class="pass">6.24 : 1</td><td>Steady glow plus a check</td></tr>
+    <tr><td>Proposed</td><td>Lavender #CABEFF</td><td><span class="swatch" style="background:#5A47C2"></span>#5A47C2</td><td class="pass">6.52 : 1</td><td>Translucent bud, dotted outline</td></tr>
+    <tr><td>Failed / blocked</td><td>Coral #FFAF94</td><td><span class="swatch" style="background:#B03A1E"></span>#B03A1E</td><td class="pass">5.86 : 1</td><td>Suspended droplet, still (no pulse)</td></tr>
+  </table></div>
+
+  <h3>Contrast check (WCAG, computed)</h3>
+  <p>Contrast ratios against Pearl #F7FCFF. AA requires 4.5 : 1 for body text and 3 : 1 for large text and UI outlines.</p>
+  <div class="scroll"><table>
+    <tr><th>Foreground</th><th>On Pearl</th><th>Verdict</th></tr>
+    <tr><td>Deep Ink #153A52</td><td>11.55</td><td class="pass">Body text ✓</td></tr>
+    <tr><td>Deep Azure #1163A5</td><td>6.06</td><td class="pass">Body text and links ✓</td></tr>
+    <tr><td>Ocean Blue #1988CF</td><td>3.72</td><td>Large text / icons only</td></tr>
+    <tr><td>Sky, Aqua, Mint, Lime, Lavender, Coral</td><td>1.16 – 1.72</td><td class="fail">Never as text on light glass</td></tr>
+  </table></div>
+  <p>Going the other way, Deep Ink text on any bright token passes (6.7 – 10 : 1), so labels inside aqua, mint, lime, lavender or coral fills use Deep Ink. In Deep Ocean mode (base #061E33), Pearl text reaches 16.4 : 1, and Aqua, Mint, Lavender, Coral and Amber all clear 9.5 : 1, so in night mode the bright tokens can serve as text.</p>
+
+  <h3>Materials</h3>
+  <div class="scroll"><table>
+    <tr><th>Material</th><th>Recipe</th></tr>
+    <tr><td>Sky-ocean ground</td><td>Vertical gradient Sky Blue → Ocean Blue → Deep Azure, with a mint haze at the horizon, soft caustic light patterns moving slowly, and a few bubbles rising on a back layer that never sits behind text</td></tr>
+    <tr><td>AeroGlass</td><td>Pearl at 70–82% opacity, blur 16–24px (that's the whole blur budget, no stacking of blurred layers), a 1px white inner border at 60%, a 1px Deep Ink outer border at 8%, a top-edge highlight gradient, and a soft blue-tinted shadow. Text panels get the higher opacity.</td></tr>
+    <tr><td>Pearlescence</td><td>A faint conic sheen (Lavender → Aqua → Mint at 8–12%) that shifts slightly with pointer position</td></tr>
+    <tr><td>Chrome</td><td>Thin brushed-white strokes on dock edges, dial bezels and orb rims. Detail only.</td></tr>
+    <tr><td>Deep Ocean (night)</td><td>Base #061E33 to Deep Ink. Glass becomes Deep Ink at 60% with aqua rim light, and nodes glow like bioluminescence.</td></tr>
+  </table></div>
+
+  <h3>Typography</h3>
+  <div class="scroll"><table>
+    <tr><th>Role</th><th>Face</th><th>Size / weight</th></tr>
+    <tr><td>Display (hero wordmark)</td><td>Sora</td><td>72–112px, 600, tracking +0.04em, all caps</td></tr>
+    <tr><td>Page title</td><td>Sora</td><td>40px, 600</td></tr>
+    <tr><td>Section / panel title</td><td>Sora</td><td>22–24px, 600</td></tr>
+    <tr><td>Body</td><td>Inter</td><td>16px / 1.55, 400–500</td></tr>
+    <tr><td>Labels, captions</td><td>Inter</td><td>14px, 500 (the projector minimum for anything essential)</td></tr>
+    <tr><td>Telemetry, scores, timestamps</td><td>JetBrains Mono (or IBM Plex Mono)</td><td>13–14px, tabular numbers</td></tr>
+  </table></div>
+  <p>Load the fonts self-hosted with <code>next/font</code> and <code>display: swap</code>. Headings get generous space above them. Translucent text never goes under 14px or below 4.5 : 1.</p>
+
+  <h3>Logo</h3>
+  <p>A translucent fluid compass-orb: a glass sphere with a soft compass rose etched in its specular highlight and a small glowing organic network inside. The wordmark is WAYFINDER in Sora caps with a restrained light sweep on load, played once rather than looped.</p>
+
+  <h3>Node forms</h3>
+  <figure class="specimen">
+    <svg viewBox="0 0 700 120" role="img" aria-label="Seven node glyphs: person orb, agent core with halo, resource capsule, skill star, policy hexagon, opportunity seed, workflow stream">
+      <defs>
+        <radialGradient id="pearl" cx="35%" cy="30%"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#E6F4FF"/><stop offset="1" stop-color="#CABEFF"/></radialGradient>
+        <radialGradient id="core" cx="50%" cy="50%"><stop offset="0" stop-color="#fff"/><stop offset=".4" stop-color="#83F4EA"/><stop offset="1" stop-color="#1988CF"/></radialGradient>
+        <linearGradient id="cap" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#B9F9D3"/><stop offset="1" stop-color="#5fd39a"/></linearGradient>
+        <radialGradient id="seed" cx="40%" cy="35%"><stop offset="0" stop-color="#fff6d8"/><stop offset=".55" stop-color="#CABEFF"/><stop offset="1" stop-color="#E8C66A"/></radialGradient>
+      </defs>
+      <g font-family="-apple-system, sans-serif" font-size="12" fill="#153A52" text-anchor="middle">
+        <circle cx="50" cy="48" r="26" fill="url(#pearl)" stroke="#1163A5" stroke-opacity=".3"/><text x="50" y="53" font-weight="700">AB</text><text x="50" y="104">Person</text>
+        <circle cx="150" cy="48" r="28" fill="none" stroke="#83F4EA" stroke-width="2"/><circle cx="150" cy="48" r="15" fill="url(#core)"/><text x="150" y="104">AI agent</text>
+        <rect x="222" y="34" width="56" height="28" rx="14" fill="url(#cap)" fill-opacity=".85" stroke="#146C43" stroke-opacity=".4"/><text x="250" y="104">Resource</text>
+        <path d="M350 32 l4 12 12 4 -12 4 -4 12 -4 -12 -12 -4 12 -4z" fill="#C8F46B" stroke="#153A52" stroke-opacity=".35"/><text x="350" y="104">Skill</text>
+        <path d="M450 22 l24 13 v26 l-24 13 -24 -13 v-26z" fill="#eef3f7" stroke="#9fb2c2" stroke-width="2"/><path d="M450 22 v52 M426 35 l48 26" stroke="#ffffff" stroke-opacity=".9"/><text x="450" y="104">Policy</text>
+        <ellipse cx="550" cy="48" rx="20" ry="25" fill="url(#seed)" stroke="#5A47C2" stroke-opacity=".4" stroke-dasharray="3 3"/><text x="550" y="104">Opportunity</text>
+        <path d="M615 60 C 635 20, 655 76, 685 36" fill="none" stroke="#83F4EA" stroke-width="8" stroke-linecap="round" opacity=".7"/><path d="M615 60 C 635 20, 655 76, 685 36" fill="none" stroke="#1988CF" stroke-width="2" stroke-linecap="round"/><circle cx="650" cy="48" r="3" fill="#fff"/><text x="650" y="104">Workflow</text>
+      </g>
+    </svg>
+    <figcaption>Rough glyph shapes. Each type has to be recognizable from its silhouette alone, without color.</figcaption>
+  </figure>
+  <div class="scroll"><table>
+    <tr><th>Node</th><th>Form</th><th>Notes</th></tr>
+    <tr><td>Person</td><td>Pearlescent glass orb with an avatar or initials</td><td>Private attributes never appear on the public node</td></tr>
+    <tr><td>AI agent</td><td>Glowing cyan core inside a thin halo</td><td>The halo rotates slowly while the agent is working</td></tr>
+    <tr><td>Department</td><td>A soft regional glow behind its members</td><td>A region, not a box, so it never blocks threads</td></tr>
+    <tr><td>Resource</td><td>Translucent green capsule</td><td>Fill level shows availability</td></tr>
+    <tr><td>Skill</td><td>Tiny four-point star</td><td>Hidden at low zoom (LOD)</td></tr>
+    <tr><td>Policy</td><td>Silver crystalline hexagon</td><td>Shows a gate icon when it's blocking</td></tr>
+    <tr><td>Opportunity</td><td>Lavender-gold shimmering seed-orb</td><td>Opens into a flower once consent is complete</td></tr>
+    <tr><td>Workflow</td><td>A fluid stream joining its nodes</td><td>Particles move in the direction of the work</td></tr>
+  </table></div>
+  <p><strong>Threads:</strong> line width goes from 1px to 5px with connection strength, and the glow follows the same scale. Each thread's state color comes from the semantic table. A thread with no inspectable source isn't drawn.</p>
+
+  <h3>Component library</h3>
+  <div class="scroll"><table>
+    <tr><th>Component</th><th>Purpose</th><th>Anatomy and states</th><th>Motion</th></tr>
+    <tr><td>AeroGlass</td><td>Base surface for every panel</td><td>Tint, blur, inner highlight, double border, shadow. Variants: <em>subtle</em>, <em>panel</em>, <em>solid</em> (for text-heavy panels)</td><td>The highlight shifts slightly with the pointer</td></tr>
+    <tr><td>LiquidOrb</td><td>People, agents, the assistant, the logo</td><td>Layered specular highlights, inner particles, a rim. States: idle, hover, selected, pulsing</td><td>Breathes (scale 1 → 1.03, about 4s, each orb on its own phase)</td></tr>
+    <tr><td>LivingThread</td><td>Every connection</td><td>A curved path plus directional particles. Props: strength, state, direction, provenance</td><td>Particles flow; a thread draws in when it appears and fades out when it goes</td></tr>
+    <tr><td>PearlButton</td><td>Actions</td><td>Gloss pill with a top highlight. Variants: primary (Ocean), secondary (Pearl), danger (Coral ink)</td><td>Brightens on hover, presses in to 0.97 on press, springs back</td></tr>
+    <tr><td>AquaDock</td><td>Main navigation</td><td>Curved floating pill, icon, label tooltip, active glow</td><td>Magnifies neighbors on hover and focus (max 1.4×)</td></tr>
+    <tr><td>CloudPanel</td><td>Floating windows</td><td>AeroGlass with a rounded, cloud-like silhouette (24–32px radius)</td><td>Rises and fades in on a spring</td></tr>
+    <tr><td>EcoMeter</td><td>Progress, budgets, fitness</td><td>Glass tube, liquid fill, tick marks, a numeric value always shown</td><td>The fill sloshes to its new level; the surface wobbles a little</td></tr>
+    <tr><td>WaveTimeline</td><td>Time series and workflow history</td><td>Flowing ribbon, event beads, labelled time axis, uncertainty band</td><td>The ribbon extends as events arrive</td></tr>
+    <tr><td>GlassInspector</td><td>Details for a node or workflow</td><td>Side CloudPanel: header orb, tabs (Connections · Activity · Permissions · Actions), provenance footer</td><td>Slides in from the right. On mobile it's a bottom sheet.</td></tr>
+    <tr><td>ConsentHalo</td><td>Anything waiting for approval</td><td>Amber ring around the subject with a lock notch, plus who needs to approve and the Approve/Decline actions</td><td>Slow rotating shimmer. It closes into a mint ring when approved and goes coral if declined.</td></tr>
+  </table></div>
+
+  <h2 id="motion">7. Motion and live behaviour</h2>
+  <p>Springs by default: stiffness about 170, damping about 22, no visible overshoot on text. Idle motion is slow (3–8s cycles), and live events are fast and focused (300–800ms).</p>
+  <table>
+    <tr><th>Event</th><th>What moves</th></tr>
+    <tr><td>Idle</td><td>Nodes breathe on their own phases, particles drift along threads, background bubbles rise slowly</td></tr>
+    <tr><td>Pointer near a node</td><td>Nearby nodes lean slightly toward the pointer and the local cluster brightens (throttled)</td></tr>
+    <tr><td>Coordinated activity</td><td>Threads on the active path light up aqua in sequence</td></tr>
+    <tr><td>Opportunity found</td><td>A bud appears, strands reach toward it, then it blooms into a flower</td></tr>
+    <tr><td>Consent requested / given</td><td>The ConsentHalo shimmers, then closes into a mint ring</td></tr>
+    <tr><td>Notification</td><td>A toast shaped like a water droplet falls in from the top right, settles, and fades</td></tr>
+    <tr><td>Completion</td><td>A soft mint bloom and a single ripple. No confetti.</td></tr>
+    <tr><td>Route change</td><td>The camera glides between rooms that sit next to each other in one world</td></tr>
+    <tr><td>Scroll (welcome)</td><td>Gentle parallax between the sky, sphere and glass-pane layers</td></tr>
+    <tr><td>Loading</td><td>Pearlescent shimmer skeleton in the shape of the real content</td></tr>
+    <tr><td>Sound (opt-in)</td><td>Synthesized ambient tones and soft chimes on bloom and completion. Muted by default.</td></tr>
+    <tr><td>Reduced motion</td><td>Breathing, particles, parallax and the camera glide stop. State changes become crossfades of 150ms or less. Everything stays usable.</td></tr>
+  </table>
+
+  <h2 id="demo">8. Signature demo: Experience the Story</h2>
+  <p>One click replays the five-person laptop-repair story. Every stage shows a readable caption (Inter, 20px or larger, on a solid AeroGlass strip). The controls are Replay, Pause, Speed (0.5× / 1× / 2×) and a stage scrubber. Judges can open any module along the way.</p>
+  <div class="scroll"><table>
+    <tr><th>#</th><th>Stage</th><th>What's on screen</th></tr>
+    <tr><td>1</td><td>Five independent messages arrive</td><td>Five droplet toasts and five iMessage bubbles in the phone preview, labelled <em>Simulated</em></td></tr>
+    <tr><td>2</td><td>Representatives understand needs and resources</td><td>Each person's orb grows orbiting tokens (need, skill, resource)</td></tr>
+    <tr><td>3</td><td>Five nodes begin to glow</td><td>A, B, C, D and E brighten in the Universe, scattered far apart</td></tr>
+    <tr><td>4</td><td>Agents identify a possible event</td><td>Aqua threads reach between the five agents, and a "Complementary Match" step lights up</td></tr>
+    <tr><td>5</td><td>An opportunity flower blooms</td><td>A lavender seed blooms at the centroid, with a "Why this match?" card</td></tr>
+    <tr><td>6</td><td>Each participant is asked for consent</td><td>Five amber ConsentHalos and five approval requests in the phone</td></tr>
+    <tr><td>7</td><td>All five approve</td><td>The halos close to mint one by one, and only then are introductions shown</td></tr>
+    <tr><td>8</td><td>Workflow graph appears</td><td>Islands for venue, electronics instructor, laptops, logistics and organizers on the workflow canvas</td></tr>
+    <tr><td>9</td><td>Budget and approvals appear</td><td>EcoMeter budget jars (sample), approval gates as ConsentHalos</td></tr>
+    <tr><td>10</td><td>Time Machine compares plans</td><td>Current Reality vs Alternative Future panels, with metrics changing</td></tr>
+    <tr><td>11</td><td>Darwin evolves strategies</td><td>Several generations play out, the genealogy tree grows, the fitness chart climbs</td></tr>
+    <tr><td>12</td><td>Improved plan recommended</td><td>Recommendation card with simulated, measurable benefits and a <em>Require Admin Approval</em> button</td></tr>
+  </table></div>
+
+  <h2 id="a11y">9. Responsive, accessible, fast</h2>
+  <h3>Responsive</h3>
+  <ul>
+    <li>Design for 1440px and 1920px stage screens first. Tablets keep the canvas with larger touch targets.</li>
+    <li>Phones get an accessible 2D view of the network (clusters as a list plus a mini map) and full-screen inspectors as bottom sheets, not a shrunken desktop canvas. The AquaDock becomes a bottom pill that scrolls sideways.</li>
+  </ul>
+  <h3>Accessibility</h3>
+  <ul>
+    <li>Every state has an icon and a label as well as a color, and node types differ by silhouette.</li>
+    <li>Focus is a 2px Deep Azure ring with an aqua outer glow, which stays visible on glass. Canvas nodes can be reached with Tab and arrow keys through an HTML layer on top of the canvas.</li>
+    <li>Every canvas has a screen-reader description and a live region that announces stage and state changes.</li>
+    <li>Dialogs use accessible primitives (focus trap, Esc to close, returning focus to where it was).</li>
+  </ul>
+  <h3>Performance</h3>
+  <ul>
+    <li>Target 60 FPS on capable desktops. Use adaptive DPR and level of detail (LOD) for big graphs: skills and labels drop out first.</li>
+    <li>Pick the right layer for each job: WebGL (R3F) for the hero sphere and selected 3D scenes, Canvas for large networks, SVG for workflow threads, and semantic HTML for every overlay and all text.</li>
+    <li>Never give each animating node its own React state. Animate in the render loop or with refs, batch updates, and throttle pointer handling.</li>
+    <li>Fonts load through <code>next/font</code>, and art assets are compressed.</li>
+  </ul>
+
+  <h2 id="honesty">10. Honesty and data rules</h2>
+  <ul>
+    <li><strong>Fixture badge:</strong> any view showing seeded or simulated data says so in the top bar, and the figures themselves are labelled.</li>
+    <li><strong>Provenance:</strong> every connection, match and score can be inspected. A personal connection is never drawn without its source.</li>
+    <li><strong>Message truth:</strong> messages go Simulated → Prepared → Sent, and Sent only after the backend confirms.</li>
+    <li><strong>No auto-execution:</strong> consequential actions (money, introductions, acting on someone's behalf) always wait for authorization.</li>
+    <li><strong>Integrations:</strong> Gemini, Photon, Nessie and the rest show Connected only after a live check. Otherwise they show Fixture or Not configured.</li>
+    <li><strong>Estimates:</strong> Time Machine and Darwin outputs always show their assumptions and confidence, and are labelled <em>Simulated</em>.</li>
+  </ul>
+
+  <h2 id="questions">11. Open questions</h2>
+  <p>These are places where the prompt and the README don't line up, for the team to decide.</p>
+  <ol>
+    <li><strong>Names:</strong> the prompt uses <code>/discover</code>, <code>/orchestrate</code> and <code>/evolution</code>. The README and v1 use Mycelium, Flows and Darwin. Should the engine names stay as labels in the UI, with the prompt's paths as the URLs?</li>
+    <li><strong>Scope:</strong> the README marks Time Machine / Lab as a stretch goal and Darwin as "simple". The prompt makes Darwin one of the top three and asks for a full Time Machine. Which wins for the 24-hour build?</li>
+    <li><strong>Amber hex:</strong> the prompt asks for amber on consent but doesn't define a token. Is #F5B83D okay?</li>
+    <li><strong>Night mode:</strong> is Deep Ocean mode needed for the demo, or is it a post-hackathon feature?</li>
+    <li><strong>Other sponsors:</strong> do Solana receipts, ElevenLabs voice and Snowflake/Cortex get any UI here, and if so, where?</li>
+    <li><strong>Projector check:</strong> the 14px minimum and the contrast tables should be tested on the real stage screen before the visuals are frozen.</li>
+  </ol>
+</main>
+</body>
+</html>

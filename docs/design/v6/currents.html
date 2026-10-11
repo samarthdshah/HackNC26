@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wayfinder Currents</title>
+<link rel="stylesheet" href="shared/aero.css">
+<style>
+/* Sea under the sky: the shared page gradient carries the sky, this adds the water line */
+.sea{position:fixed;left:0;right:0;bottom:0;height:42vh;z-index:0;pointer-events:none;
+  background:linear-gradient(180deg,rgb(255 255 255/0) 0%,color-mix(in srgb,var(--accent) 22%,transparent) 30%,color-mix(in srgb,var(--accent-lo) 42%,transparent) 100%)}
+.sea::before{content:"";position:absolute;left:0;right:0;top:28%;height:2px;background:linear-gradient(90deg,transparent,rgb(255 255 255/.7),transparent)}
+.sea svg{position:absolute;left:0;top:calc(28% - 14px);width:200%;height:28px;opacity:.5;animation:drift 18s linear infinite}
+@keyframes drift{to{transform:translateX(-50%)}}
+
+.wrap{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) 380px;grid-template-rows:auto minmax(0,1fr);gap:20px;
+  padding:28px 96px 112px 28px;height:100vh;   /* right gutter keeps the top-right menu clear */min-height:640px;max-width:1440px;margin:0 auto}
+
+/* Header */
+.head .body{display:grid;gap:10px}
+.head .top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.head .qt{font-size:22px;font-weight:600;line-height:1.2}
+.head .meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14px;color:var(--ink-2)}
+.head .meta b{color:var(--ink);font-weight:600}
+.switcher{flex-wrap:wrap;border-radius:18px;max-width:100%}
+.switcher button{display:inline-flex;align-items:center;gap:6px;flex:none}
+.switcher .dot{width:9px;height:9px}
+
+/* Reference mini-map */
+.ref .body{display:grid;grid-template-columns:1fr;gap:8px;padding:10px 14px 14px}
+.ref svg{width:100%;height:150px;display:block}
+.ref .foot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--ink-2)}
+.ref .pill{padding:6px 12px;font-size:13px}
+
+/* Main flow: flat on purpose, no glow or gloss */
+.flow{grid-column:1;grid-row:2;display:flex;flex-direction:column;min-height:0}
+.flow .bar .pill{margin-left:auto;padding:5px 12px;font-size:13px}
+.flow .stage{flex:1;position:relative;padding:8px 16px 0}
+.flow .stage{min-height:0}
+#flow{position:absolute;inset:8px 16px 0;width:calc(100% - 32px);height:calc(100% - 8px);display:block;overflow:visible}
+.n-name{font:600 15px var(--font);fill:var(--ink)}
+.n-sub{font:400 12px var(--font);fill:var(--ink-2)}
+.n-verdict{font:600 11px var(--font);letter-spacing:.08em;text-transform:uppercase}
+.n-init{font:700 18px var(--font);fill:#fff;pointer-events:none}
+.n-num{font:600 13px var(--font);fill:var(--ink)}
+.pulse{transform-box:fill-box;transform-origin:center;animation:ring 1.8s ease-out infinite}
+@keyframes ring{from{transform:scale(1);opacity:.7}to{transform:scale(1.9);opacity:0}}
+.ticker{display:flex;align-items:center;gap:10px;margin:0 16px 16px;padding:10px 14px;border-radius:12px;background:rgb(255 255 255/.5);border:1px solid rgb(255 255 255/.8);font-size:15px;min-height:46px}
+.ticker .ico{width:22px;height:22px;flex:none;fill:var(--accent)}
+.ticker .msg{flex:1;transition:none}
+.ticker .msg.in{animation:tin .45s var(--ease)}
+@keyframes tin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.legend{display:flex;gap:14px;flex-wrap:wrap;padding:0 18px 14px;font-size:12px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:50%}
+
+/* Transactions + chat */
+.ref{grid-column:2;grid-row:1}
+.tx{grid-column:2;grid-row:2;display:flex;flex-direction:column;min-height:0}
+.tx .list{min-height:0}
+.tx .list{flex:1;overflow:auto;padding:14px 14px 6px;display:grid;gap:10px;align-content:start;-webkit-user-select:text;user-select:text}
+.msgi{display:grid;grid-template-columns:32px 1fr;gap:10px;align-items:start}
+.msgi .orb{width:32px;height:32px;font-size:13px}
+.msgi .hd{display:flex;align-items:center;gap:6px;font-size:13px;flex-wrap:wrap}
+.msgi .hd b{font-weight:600}
+.msgi .hd time{color:var(--ink-2);font-size:12px}
+.msgi .tx-t{margin-top:3px;font-size:14px;line-height:1.4;padding:8px 11px;border-radius:4px 12px 12px 12px;background:rgb(255 255 255/.62);border:1px solid rgb(255 255 255/.85)}
+.msgi.me .tx-t{background:color-mix(in srgb,var(--accent-hi) 22%,rgb(255 255 255/.7));}
+.msgi.sys .tx-t{background:rgb(255 255 255/.35);font-size:13px;color:var(--ink-2)}
+.msgi.new{animation:tin .45s var(--ease)}
+.typing{display:inline-flex;gap:4px;padding:10px 12px}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--ink-2);animation:typ 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes typ{0%,100%{opacity:.25}50%{opacity:1}}
+.compose{display:flex;gap:8px;padding:12px 14px 14px;border-top:1px solid rgb(255 255 255/.7)}
+.compose input{flex:1;min-width:0;font:inherit;font-size:14px;color:var(--ink);padding:9px 14px;border-radius:99px;border:1px solid rgb(255 255 255/.85);outline:none;
+  background:rgb(255 255 255/.6);box-shadow:inset 0 1px 3px rgb(0 40 100/.22)}
+.compose input:focus{box-shadow:inset 0 1px 3px rgb(0 40 100/.22),0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent)}
+.chats{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid rgb(255 255 255/.7);font-size:13px;color:var(--ink-2)}
+
+@media (max-width:1000px){
+  .wrap{grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .wrap{height:auto}
+  .ref,.tx,.flow{grid-column:1;grid-row:auto}
+  .flow{min-height:420px}
+  .tx .list{max-height:420px}
+}
+@media (max-width:700px){
+  .wrap{padding:12px 12px 110px;gap:12px}
+  .head .qt{font-size:18px}
+  .flow{min-height:400px}
+  .flow .stage{overflow-x:auto;overflow-y:hidden}
+  #flow{width:760px}
+  .head .top{gap:4px}
+}
+</style>
+</head>
+<body data-page="currents">
+<div class="sea" aria-hidden="true"><svg viewBox="0 0 1200 28" preserveAspectRatio="none"><path d="M0 14 Q75 2 150 14 T300 14 T450 14 T600 14 T750 14 T900 14 T1050 14 T1200 14" fill="none" stroke="#fff" stroke-width="2"/></svg></div>
+
+<main class="wrap">
+  <section class="head milk still title-card" aria-labelledby="pt" data-tour="1|Currents|One request, end to end: who it went to, who passed it on, and who finally owned it.">
+    <div class="bar"><span class="logo-orb"></span>One query, end to end<span class="live"><i></i>live</span></div>
+    <div class="body">
+      <div class="top"><h1 class="page-title" id="pt">Currents</h1></div>
+      <div class="qt" id="qTitle"></div>
+      <div class="more"><div>
+        <span class="page-sub">Where a single request travelled, and who it touched.</span>
+        <div class="meta" id="qMeta"></div>
+      </div></div>
+      <div class="seg switcher" id="switcher" role="group" aria-label="Choose a query" data-tour="2|Your queries|Switch between the requests you have open. Each one has its own path and chat."></div>
+    </div>
+  </section>
+
+  <section class="ref milk" aria-label="Position in the org" data-tour="3|Where it sits|The same request on the full org map in Roots.">
+    <div class="bar">Where it sits in Roots</div>
+    <div class="body">
+      <svg id="mini" viewBox="-120 -80 240 160" role="img" aria-label="Mini map of the org with this query highlighted"></svg>
+      <div class="foot"><span id="miniNote"></span><a class="pill ghost" href="roots.html">Open in Roots</a></div>
+    </div>
+  </section>
+
+  <section class="flow milk still" aria-label="Path of the query" data-tour="4|The path|Each numbered stop is a hop. The dashed arc at the end is the shortcut Wayfinder learned for next time.">
+    <div class="bar">Path<span class="chip info" id="hopChip" style="text-shadow:none"></span><button class="pill ghost" id="replay">↻ Replay</button></div>
+    <div class="stage"><svg id="flow" viewBox="0 0 1000 380" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Left to right flow of hops"></svg></div>
+    <div class="legend" aria-hidden="true"><span><i style="background:var(--accent)"></i>You</span><span><i style="background:#F0715A"></i>Redirected</span><span><i style="background:#F2A114"></i>Delegated</span><span><i style="background:#2E9E3A"></i>Approved / answered</span><span><i style="background:#2A8CE8"></i>Waiting</span></div>
+    <div class="ticker" aria-live="polite"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg><span class="msg" id="tick"></span><span class="chip">just now</span></div>
+  </section>
+
+  <aside class="tx milk still" aria-label="Transactions" data-tour="5|Transactions|Every message, approval and payment on this request. Type below to message Wayfinder about it.">
+    <div class="bar">Transactions<span class="live"><i></i><span id="activeCount"></span></span></div>
+    <div class="chats" id="chatsRow"></div>
+    <div class="list" id="txList" aria-live="polite"></div>
+    <form class="compose" id="compose" autocomplete="off">
+      <input id="msgIn" type="text" placeholder="Message Wayfinder about this query…" aria-label="Message">
+      <button class="pill" type="submit">Send</button>
+    </form>
+  </aside>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="shared/aero.js"></script>
+<script src="shared/data.js"></script>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const RM = Aero.RM, T = ms => RM ? 1 : ms;
+  const wait = ms => new Promise(r => setTimeout(r, T(ms)));
+  // Flat verdict colors; "you" follows the theme accent
+  const VC = {start:'var(--accent)', redirect:'#F0715A', delegate:'#F2A114', approve:'#2E9E3A', answer:'#2E9E3A', pending:'#2A8CE8'};
+  const VERB = {redirect:'redirected', delegate:'delegated', approve:'approved', answer:'answered', pending:'waiting'};
+  const LEARN = '#2E9E3A';
+  const ORB = {wf:'', leo:'accent'};
+  const orbClass = id => id === 'wf' ? '' : id === 'leo' ? 'accent' : (['blue', 'amber', 'pink', 'grey'][id.charCodeAt(0) % 4]);
+  const KIND = {route:['info', 'routed'], learn:['', 'learned'], approve:['', 'approved'], pay:['warn', 'payment'], pending:['warn', 'pending'], msg:null, you:null};
+
+  let q = WF.query(new URLSearchParams(location.search).get('q'));
+  let run = 0;
+  const logs = {};   // per-query chat copy, so sends persist while switching
+
+  /* ============ Header + switcher ============ */
+  function renderHeader() {
+    $('qTitle').textContent = q.title;
+    const done = q.status === 'done';
+    $('qMeta').innerHTML = `<span class="chip ${done ? '' : 'warn'}">${done ? 'Resolved' : 'In progress'}</span>
+      <span><b>${q.elapsed}</b> so far · usually ${q.usual}</span><span>· ${q.type}</span><span>· started ${q.started}</span>`;
+    $('switcher').innerHTML = WF.queries.map(x => `<button data-q="${x.id}" aria-pressed="${x.id === q.id}" title="${x.title}">
+      <i class="dot" style="background:${x.status === 'done' ? '#2E9E3A' : '#F2A114'}"></i>${x.type}</button>`).join('');
+    const n = q.hops.length;
+    $('hopChip').textContent = `${n} ${n === 1 ? 'hop' : 'hops'}`;
+    document.title = `Wayfinder Currents · ${q.title}`;
+  }
+  $('switcher').addEventListener('click', e => {
+    const b = e.target.closest('button[data-q]'); if (!b || b.dataset.q === q.id) return;
+    q = WF.query(b.dataset.q); history.replaceState(null, '', `?q=${q.id}`); renderAll();
+  });
+
+  /* ============ Mini-map: the Roots graph, shrunk and faint ============ */
+  function renderMini() {
+    const svg = d3.select('#mini'); svg.selectAll('*').remove();
+    const on = new Set(['leo', ...q.hops.map(h => h.who)]);
+    const onDept = new Set([...on].map(id => WF.person(id)?.dept));
+    const pos = {}, nD = WF.org.length;
+    const g = svg.append('g');
+    WF.org.forEach((d, i) => {
+      const a = i / nD * Math.PI * 2 - Math.PI / 2, dx = Math.cos(a) * 62 * 1.45, dy = Math.sin(a) * 62 * .92;
+      const lit = onDept.has(d.id);
+      g.append('line').attr('x1', 0).attr('y1', 0).attr('x2', dx).attr('y2', dy).attr('stroke', 'var(--ink)').attr('stroke-opacity', lit ? .25 : .08).attr('stroke-width', 1);
+      d.subs.forEach((s, j) => {
+        const sa = a + (j - (d.subs.length - 1) / 2) * .42, sx = dx + Math.cos(sa) * 15, sy = dy + Math.sin(sa) * 12;
+        g.append('line').attr('x1', dx).attr('y1', dy).attr('x2', sx).attr('y2', sy).attr('stroke', 'var(--ink)').attr('stroke-opacity', lit ? .2 : .07);
+        s.people.forEach((full, k) => {
+          const id = full.split(' ')[0].toLowerCase(), pa = sa + (k - (s.people.length - 1) / 2) * .7, px = sx + Math.cos(pa) * 7, py = sy + Math.sin(pa) * 6;
+          pos[id] = [px, py];
+          g.append('circle').attr('cx', px).attr('cy', py).attr('r', on.has(id) ? 3.2 : 1.4)
+            .attr('fill', on.has(id) ? (id === 'leo' ? 'var(--accent)' : VC[q.hops.find(h => h.who === id)?.verdict] || 'var(--accent)') : 'var(--ink)')
+            .attr('fill-opacity', on.has(id) ? 1 : .2).attr('stroke', on.has(id) ? '#fff' : 'none').attr('stroke-width', 1);
+        });
+        g.append('circle').attr('cx', sx).attr('cy', sy).attr('r', 2.4).attr('fill', 'var(--lv1)').attr('fill-opacity', lit ? .8 : .25);
+      });
+      g.append('circle').attr('cx', dx).attr('cy', dy).attr('r', 5).attr('fill', 'var(--hub)').attr('fill-opacity', lit ? .9 : .28).attr('stroke', '#fff').attr('stroke-opacity', lit ? 1 : .4);
+      if (lit) g.append('text').attr('x', dx).attr('y', dy + (dy > 0 ? 15 : -9)).attr('text-anchor', 'middle').attr('font-size', 7.5).attr('font-weight', 600).attr('fill', 'var(--ink)').text(d.name);
+    });
+    // the query's path threaded through the map
+    const chain = ['leo', ...q.hops.map(h => h.who)].map(id => pos[id]).filter(Boolean);
+    g.append('path').attr('d', d3.line().curve(d3.curveCatmullRom.alpha(.5))(chain)).attr('fill', 'none').attr('stroke', 'var(--accent)').attr('stroke-width', 1.4).attr('stroke-dasharray', '3 2').lower();
+    g.append('circle').attr('r', 6).attr('fill', 'var(--good)').attr('stroke', '#fff').attr('stroke-width', 1.2);
+    g.append('text').attr('y', 2.6).attr('text-anchor', 'middle').attr('font-size', 7).attr('font-weight', 700).attr('fill', '#fff').text('W');
+    $('miniNote').textContent = `${onDept.size} of ${WF.org.length} departments touched`;
+  }
+
+  /* ============ Main flow ============ */
+  const W = 1000, Y = 210;
+  function chainNodes() {
+    return [{p:WF.me, verdict:'start'}, ...q.hops.map(h => ({p:WF.person(h.who), verdict:h.verdict, msg:h.msg, at:h.at}))];
+  }
+  function edgePath(a, b, i) {
+    const dx = b.x - a.x, bend = i % 2 ? 30 : -30;
+    return `M${a.x},${a.y} C${a.x + dx * .4},${a.y + bend} ${b.x - dx * .4},${b.y + bend} ${b.x},${b.y}`;
+  }
+  function tick(text) { const m = $('tick'); m.textContent = text; m.classList.remove('in'); void m.offsetWidth; m.classList.add('in'); }
+
+  async function playFlow() {
+    const my = ++run, alive = () => my === run;
+    const svg = d3.select('#flow'); svg.selectAll('*').remove();
+    const nodes = chainNodes(), n = nodes.length, pad = n <= 2 ? 260 : 90;
+    nodes.forEach((d, i) => { d.x = n === 1 ? W / 2 : pad + (W - pad * 2) * i / (n - 1); d.y = Y; });
+    const gLearn = svg.append('g'), gEdges = svg.append('g'), gNodes = svg.append('g'), gFx = svg.append('g');
+
+    // all nodes laid out up front, hidden until reached
+    const ng = gNodes.selectAll('g.node').data(nodes).join('g').attr('class', 'node').attr('transform', d => `translate(${d.x},${d.y})`);
+    const inner = ng.append('g').attr('class', 'inner').attr('transform', (d, i) => i === 0 ? 'scale(1)' : 'scale(0)');
+    inner.filter(d => d.verdict === 'pending').append('circle').attr('class', 'pulse').attr('r', 27).attr('fill', 'none').attr('stroke', VC.pending).attr('stroke-width', 3);
+    inner.append('circle').attr('r', 27).attr('fill', d => VC[d.verdict]).attr('stroke', 'rgb(255 255 255 / .9)').attr('stroke-width', 4);
+    inner.append('text').attr('class', 'n-init').attr('text-anchor', 'middle').attr('y', 6).text(d => d.p.first[0]);
+    const lab = ng.append('g').attr('class', 'lab').attr('opacity', (d, i) => i === 0 ? 1 : 0);
+    lab.append('text').attr('class', 'n-name').attr('text-anchor', 'middle').attr('y', 54).text(d => d.verdict === 'start' ? `${d.p.first} (you)` : d.p.first);
+    lab.append('text').attr('class', 'n-sub').attr('text-anchor', 'middle').attr('y', 71).text(d => `${d.p.deptName} · ${d.p.subName}`);
+    lab.append('text').attr('class', 'n-verdict').attr('text-anchor', 'middle').attr('y', 89).attr('fill', d => VC[d.verdict]).text(d => d.verdict === 'start' ? 'asked' : VERB[d.verdict]);
+
+    tick(`${WF.me.first} asks: "${WF.transactions[q.id]?.[0]?.text ?? q.title}"`);
+    await wait(900); if (!alive()) return;
+
+    const edges = [];
+    for (let i = 1; i < n; i++) {
+      const a = nodes[i - 1], b = nodes[i];
+      const path = gEdges.append('path').attr('d', edgePath(a, b, i)).attr('fill', 'none').attr('stroke', VC[b.verdict]).attr('stroke-opacity', .75).attr('stroke-width', 3.5).attr('stroke-linecap', 'round');
+      const el = path.node(), len = el.getTotalLength();
+      path.attr('stroke-dasharray', len).attr('stroke-dashoffset', len);
+      const comet = gFx.append('circle').attr('r', 8).attr('fill', VC[b.verdict]).attr('stroke', '#fff').attr('stroke-width', 2.5);
+      await new Promise(res => {
+        const t0 = performance.now(), dur = T(800);
+        const step = now => { if (!alive()) return res(); const t = Math.min(1, (now - t0) / dur), e = d3.easeCubicInOut(t), p = el.getPointAtLength(len * e);
+          comet.attr('cx', p.x).attr('cy', p.y); path.attr('stroke-dashoffset', len * (1 - e)); t < 1 ? requestAnimationFrame(step) : res(); };
+        requestAnimationFrame(step);
+      });
+      comet.remove(); if (!alive()) return;
+      edges.push(path);
+      const gi = ng.filter((d, k) => k === i);
+      gi.select('.inner').transition().duration(T(520)).ease(d3.easeBackOut.overshoot(2)).attr('transform', 'scale(1)');
+      gi.select('.lab').transition().duration(T(400)).attr('opacity', 1);
+      // numbered disc, as in the v2 hook scene
+      const disc = gFx.append('g').attr('transform', `translate(${b.x + 24},${b.y - 26}) scale(0)`);
+      disc.append('circle').attr('r', 13).attr('fill', '#fff').attr('stroke', 'rgb(0 0 0 / .15)').attr('stroke-width', 1.5);
+      disc.append('text').attr('class', 'n-num').attr('text-anchor', 'middle').attr('y', 4.5).text(i);
+      disc.transition().duration(T(420)).ease(d3.easeBackOut).attr('transform', `translate(${b.x + 24},${b.y - 26}) scale(1)`);
+      tick(b.verdict === 'pending' ? `Hop ${i}: waiting on ${b.p.first}. "${b.msg}"` : `Hop ${i}: ${b.p.first} ${VERB[b.verdict]}. "${b.msg}"`);
+      await wait(1150); if (!alive()) return;
+    }
+
+    if (n > 2) {
+      await wait(500); if (!alive()) return;
+      const last = nodes[n - 1], first = nodes[0];
+      edges.forEach(e => e.transition().duration(T(600)).attr('stroke-opacity', .25 * .75));
+      ng.filter((d, k) => k > 0 && k < n - 1).transition().duration(T(600)).attr('opacity', .45);
+      gFx.selectAll('g').filter((d, k, all) => k < all.length - 1).transition().duration(T(600)).attr('opacity', .4);
+      const lp = gLearn.append('path').attr('d', `M${first.x},${first.y - 30} C${first.x + 120},${Y - 190} ${last.x - 120},${Y - 190} ${last.x},${last.y - 30}`)
+        .attr('fill', 'none').attr('stroke', LEARN).attr('stroke-width', 4).attr('stroke-linecap', 'round');
+      const el = lp.node(), len = el.getTotalLength();
+      lp.attr('stroke-dasharray', `${len} ${len}`).attr('stroke-dashoffset', len)
+        .transition().duration(T(900)).ease(d3.easeCubicInOut).attr('stroke-dashoffset', 0)
+        .on('end', () => lp.attr('stroke-dasharray', '10 9'));
+      await wait(900); if (!alive()) return;
+      const mid = el.getPointAtLength(len / 2);
+      const chip = gFx.append('g').attr('transform', `translate(${mid.x},${mid.y - 2})`).attr('opacity', 0);
+      const txt = 'Should have been 1 hop', cw = txt.length * 7.4 + 28;
+      chip.append('rect').attr('x', -cw / 2).attr('y', -15).attr('width', cw).attr('height', 30).attr('rx', 15).attr('fill', '#E3F6EE').attr('stroke', LEARN).attr('stroke-width', 1.5);
+      chip.append('text').attr('text-anchor', 'middle').attr('y', 5).attr('font-size', 13).attr('font-weight', 600).attr('fill', '#0B6B4A').text(txt);
+      chip.transition().duration(T(400)).attr('opacity', 1);
+      tick(q.learned ? `Learned: ${q.learned.note}. Next time, one hop.` : `Learned: next time ${WF.me.first} goes straight to ${last.p.first}.`);
+    } else if (n === 2) {
+      tick(`Resolved in one hop by ${nodes[1].p.first}.`);
+    }
+  }
+  $('replay').addEventListener('click', () => playFlow());
+
+  /* ============ Transactions + chat ============ */
+  function log() { return logs[q.id] ??= (WF.transactions[q.id] || []).map(x => ({...x})); }
+  function msgHTML(m, fresh) {
+    const id = m.from, name = id === 'leo' ? 'You' : WF.nameOf(id), init = id === 'wf' ? 'W' : name[0];
+    const k = KIND[m.kind], sys = id === 'wf' && m.kind !== 'msg';
+    return `<div class="msgi${id === 'leo' ? ' me' : ''}${sys ? ' sys' : ''}${fresh ? ' new' : ''}">
+      <span class="orb ${orbClass(id)}">${init}</span>
+      <div><div class="hd"><b>${name}</b><time>${m.t}</time>${k ? `<span class="chip ${k[0]}">${k[1]}</span>` : ''}</div><div class="tx-t">${m.text}</div></div></div>`;
+  }
+  function renderTx() {
+    const list = $('txList'); list.innerHTML = log().map(m => msgHTML(m)).join('');
+    list.scrollTop = list.scrollHeight;
+    const active = WF.queries.filter(x => x.status === 'active');
+    $('activeCount').textContent = `${active.length} active chats`;
+    const owner = WF.person(q.hops.at(-1)?.who);
+    $('chatsRow').innerHTML = `<span class="orb sm ${q.status === 'done' ? '' : 'amber'}"></span><span>${q.status === 'done' ? 'Closed' : 'Open'} thread with <b style="color:var(--ink)">${owner ? owner.first : 'Wayfinder'}</b> · ${log().length} messages</span>`;
+  }
+  const now = () => new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}).replace(/\s?[AP]M/i, '');
+  $('compose').addEventListener('submit', async e => {
+    e.preventDefault();
+    const inp = $('msgIn'), text = inp.value.trim(); if (!text) return; inp.value = '';
+    const qid = q.id, list = $('txList'), m = {t:now(), from:'leo', kind:'you', text};
+    log().push(m); list.insertAdjacentHTML('beforeend', msgHTML(m, true)); list.scrollTop = list.scrollHeight;
+    const typing = document.createElement('div'); typing.className = 'msgi sys new';
+    typing.innerHTML = `<span class="orb">W</span><div><div class="tx-t typing"><i></i><i></i><i></i></div></div>`;
+    list.appendChild(typing); list.scrollTop = list.scrollHeight;
+    await wait(1100);
+    typing.remove();
+    const owner = WF.person(WF.query(qid).hops.at(-1)?.who)?.first ?? 'the owner';
+    const reply = WF.query(qid).status === 'done'
+      ? `This one is closed. Want me to reopen it with ${owner}?`
+      : `Noted. I added that to the thread with ${owner} and will text you when they reply.`;
+    const r = {t:now(), from:'wf', kind:'msg', text:reply};
+    logs[qid].push(r);
+    if (q.id === qid) { list.insertAdjacentHTML('beforeend', msgHTML(r, true)); list.scrollTop = list.scrollHeight; renderTx(); }
+    Aero.toast('msg', 'New message', 'Wayfinder replied', reply);
+    setTimeout(Aero.hideToast, 4200);
+  });
+
+  function renderAll() { renderHeader(); renderMini(); renderTx(); playFlow(); }
+  renderAll();
+})();
+</script>
+</body>
+</html>
