@@ -24,6 +24,7 @@ npm run dev -w @wayfinder/web       # http://localhost:3000
 - Your phone is whoever the scenario centres on. Text `/iam leo` (or `/iam nina`, …) to switch. Switching moves that persona to your phone, and the previous one falls back to the terminal.
 - Everyone else answers from the agent's terminal: `/as raj`, then type Raj's reply. Texts to people not on your phone are printed in the terminal as `→ Name: …`.
 - With one phone, "group" threads (RSVP, intros) arrive as separate DMs. That's expected (see [ideas.md](../ideas.md)).
+- Or let a script play everyone else: `npm run autoreply -w @wayfinder/agent -- lunch` answers each RSVP, approval and task with that scenario's lines after a short delay (`--delay 2500`). It never answers for a persona bound to your phone.
 - The website can also speak as anyone. Open Currents with `?me=p_raj` and use the compose box. That's handy when the terminal is busy.
 
 ## Scenarios

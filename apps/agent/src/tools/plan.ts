@@ -47,7 +47,7 @@ fewest steps, each run by one specialist, as a dependency graph (steps without d
 - Fixes and favours from other teams: one action step.
 - Meetings or events needing a room: a room step (after any rsvp, so it knows the headcount), then an action
   step for Workplace to book it (task_type room_booking), depending on the room step. Food needs The Commons.
-- Moving budget between departments: approval then payment with to_department.
+- Moving budget between departments: approval then payment, with to_department on both.
 - Set vendor_id on every approval, call and payment step that involves a vendor.
 - Never add steps the agent does itself (lookups, telling the requester).
 - task_type must be one of the allowed values; vendor_id and to_department must be real ids.`;
@@ -82,7 +82,7 @@ export async function proposePlan(input: In, feedback: string[] = [], previous?:
     ? `\n\nYour previous plan:\n${JSON.stringify(previous)}\n\nThe policy critic found:\n- ${feedback.join("\n- ")}\nRevise the plan.`
     : "";
   const { steps: proposed } = await askJson(grounding(input) + revise, PlanSchema, PLANNER);
-  const steps = mergeApprovals(proposed);
+  const steps = transferTargets(mergeApprovals(proposed));
   const allowed = taskTypes();
   const ids = new Set(steps.map((s) => s.id));
   return steps.map((s) => ({
@@ -90,7 +90,24 @@ export async function proposePlan(input: In, feedback: string[] = [], previous?:
     task_type: allowed.includes(s.task_type) ? s.task_type : (input.task_type ?? s.task_type),
     depends_on: s.depends_on.filter((d) => ids.has(d) && d !== s.id),
     vendor_id: vendors.some((v) => v.id === s.vendor_id) ? s.vendor_id : undefined,
+    to_department: departments.some((d) => d.id === s.to_department) ? s.to_department : undefined,
   }));
+}
+
+/**
+ * The approval for a budget transfer needs the receiving department too (POL-SPEND-2 asks
+ * both budget owners), but the planner often only puts to_department on the payment.
+ * Copy it onto the approval steps that payment depends on.
+ */
+function transferTargets<T extends z.infer<typeof StepSchema>>(steps: T[]): T[] {
+  const target = new Map<string, string>(); // approval id -> receiving department
+  for (const st of steps) {
+    if (st.kind !== "payment" || !st.to_department) continue;
+    for (const d of st.depends_on) target.set(d, st.to_department);
+  }
+  return steps.map((st) =>
+    st.kind === "approval" && !st.to_department && target.has(st.id) ? { ...st, to_department: target.get(st.id) } : st,
+  );
 }
 
 /**

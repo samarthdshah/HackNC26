@@ -1,14 +1,13 @@
 "use client";
-// Insights: port of docs/design/v6/insights.html. Numbers, skill bars and Recharts are React
-// (they re-render on every WF refresh); bubbles, the gain radial and the chord live in scene.ts.
+// Insights: port of docs/design/v6/insights.html, trimmed to KPIs, the gain radial and the chord.
+// The numbers are React (they re-render on every WF refresh); bubbles, the radial and the chord live in scene.ts.
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { WF } from "@wayfinder/shared";
 import { useAeroPage } from "@/lib/aero/usePage";
 import { useWF } from "@/lib/wf/store";
-import { RM, css as cssVar, onTheme } from "@/lib/aero/runtime";
+import { RM, onTheme } from "@/lib/aero/runtime";
 import { css } from "./style";
 import { drawChord, drawGain, fmt, hrs, mount, onView, type GainRow } from "./scene";
 
@@ -17,25 +16,25 @@ type Kpi = { k: string; to: number; from?: number; f: (v: number) => string; pre
 
 const mins = (v: number) => {
   const h = Math.floor(v / 60);
-  return h >= 48 ? `${(v / 1440).toFixed(1)} d` : `${h} h ${Math.round(v % 60)} m`;
+  return h >= 48 ? `${(v / 1440).toFixed(1)} d` : h ? `${h} h ${Math.round(v % 60)} m` : `${Math.max(1, Math.round(v))} m`;
 };
 
+/** Hours lost and saved are summed from the 12-week series so each number matches its sparkline
+ *  and the "Last 12 weeks" chip. Hops and median compare seeded history with live AVATAR requests. */
 function kpis(wf: WF): Kpi[] {
-  const S = wf.stats, ser = wf.series, last = ser.at(-1);
+  const S = wf.stats, ser = wf.series;
+  const total = (k: "hoursLost" | "hoursSaved") => ser.reduce((n, d) => n + d[k], 0);
   const after = S.medianResolveMs;
   return [
-    { k: "Hours lost", to: S.hoursLost, f: hrs, suf: "h", spark: ser.map((d) => d.hoursLost), chip: "“not us” replies" },
-    { k: "Hours saved", to: S.hoursSaved, f: hrs, suf: "h", spark: ser.map((d) => d.hoursSaved), chip: "paging + live", cls: "info" },
-    { k: "Requests routed", to: S.requestsRouted, f: fmt, spark: ser.map((d) => d.requests), chip: `${fmt(last?.requests ?? 0)} this wk` },
-    after != null
-      ? { k: "Median resolve", to: after / 60000, f: mins, chip: `was ${S.medianBefore}` }
-      : { k: "Median resolve", to: S.medianBeforeMs / 60000, f: mins, chip: "before AVATAR" },
-    { k: "Intros made", to: S.introsMade, f: fmt, chip: "Mycelium", cls: "info" },
-    { k: "Text approvals", to: S.approvalsByText, f: fmt, chip: "no portals" },
+    { k: "Hours lost", to: total("hoursLost"), f: hrs, suf: "h", spark: ser.map((d) => d.hoursLost), chip: "“not us” replies" },
+    { k: "Hours saved", to: total("hoursSaved"), f: hrs, suf: "h", spark: ser.map((d) => d.hoursSaved), chip: "live vs usual time", cls: "info" },
     S.avgHopsAfter != null
       ? { k: "Avg hops", from: S.avgHopsBefore, to: S.avgHopsAfter, f: (v) => v.toFixed(1), pre: `${S.avgHopsBefore} → `, spark: ser.map((d) => d.hops),
           chip: `−${Math.round((1 - S.avgHopsAfter / (S.avgHopsBefore || 1)) * 100)}%` }
       : { k: "Avg hops", to: S.avgHopsBefore, f: (v) => v.toFixed(1), spark: ser.map((d) => d.hops), chip: "after: live" },
+    after != null
+      ? { k: "Median resolve", to: after / 60000, f: mins, chip: `was ${S.medianBefore}` }
+      : { k: "Median resolve", to: S.medianBeforeMs / 60000, f: mins, chip: "before AVATAR" },
   ];
 }
 
@@ -71,27 +70,6 @@ function Tile({ t, i, go }: { t: Kpi; i: number; go: boolean }) {
   );
 }
 
-/* ============ Recharts ============ */
-type Colors = { hi: string; mid: string; lo: string; soft: string; ink: string; ink2: string; grey: string; person: string };
-const colors = (): Colors => ({ hi: cssVar("--accent-hi"), mid: cssVar("--accent"), lo: cssVar("--accent-lo"), soft: cssVar("--accent-soft"), ink: cssVar("--ink"), ink2: cssVar("--ink-2"), grey: "#9DB0C3", person: cssVar("--person") });
-type TipProps = { active?: boolean; label?: string; payload?: { dataKey: string; color?: string; name: string; value: number | null }[] };
-function Tip({ active, payload, label }: TipProps) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="milk still tip">
-      <div className="t">{label}</div>
-      {payload.map((p) => (
-        <div className="r" key={p.dataKey}>
-          <span><i style={{ background: !String(p.color).startsWith("url") ? p.color : p.dataKey === "before" ? "#9DB0C3" : cssVar("--accent") }} />{p.name}</span>
-          <b>{p.value ?? "—"}</b>
-        </div>
-      ))}
-    </div>
-  );
-}
-const axis = (c: Colors) => ({ tick: { fill: c.ink2, fontSize: 12 }, axisLine: { stroke: "rgba(11,42,74,.18)" }, tickLine: false });
-const sw = (bg: string) => <i className="dot" style={{ background: bg }} />;
-
 export default function Insights() {
   useAeroPage("insights");
   const { wf, helpers } = useWF();
@@ -99,8 +77,6 @@ export default function Insights() {
   const ready = wf != null;
   const [themeTick, setThemeTick] = useState(0);
   const [kpiGo, setKpiGo] = useState(false);
-  const [skillsGo, setSkillsGo] = useState(false);
-  const [chartsShown, setChartsShown] = useState(false);
   const [chordShown, setChordShown] = useState(false);
 
   useEffect(() => onTheme(() => setThemeTick((t) => t + 1)), []);
@@ -110,18 +86,18 @@ export default function Insights() {
   useEffect(() => {
     if (!ready) return;
     const q = (s: string) => rootRef.current!.querySelector(s)!;
-    const offs = [onView(q("#kpis"), () => setKpiGo(true), 0.2), onView(q("#skills"), () => setSkillsGo(true)),
-      onView(q("#area"), () => setChartsShown(true), 0.15), onView(q("#chord"), () => setChordShown(true), 0.15)];
+    const offs = [onView(q("#kpis"), () => setKpiGo(true), 0.2), onView(q("#chord"), () => setChordShown(true), 0.15)];
     return () => offs.forEach((f) => f());
   }, [ready]);
 
-  /* Gain radial: top five departments by hours lost, inner ring = smallest */
+  /* Gain radial: top five departments with any hours lost, inner ring = smallest */
   const gainRef = useRef<{ play: () => void; kill: () => void } | null>(null);
   const gainPlayed = useRef(false);
   useEffect(() => {
     const svg = rootRef.current?.querySelector<SVGSVGElement>("#gain");
     if (!wf || !svg) return;
-    const top5 = [...wf.byDept].sort((a, b) => b.hoursLost - a.hoursLost || b.bounces - a.bounces).slice(0, 5).reverse();
+    const top5 = [...wf.byDept].filter((d) => d.hoursLost > 0)
+      .sort((a, b) => b.hoursLost - a.hoursLost || b.bounces - a.bounces).slice(0, 5).reverse();
     const rows: GainRow[] = top5.map((d) => ({ name: helpers.dept(d.id)?.short ?? d.name, tag: `${d.bouncePct}% bounced`, detail: `${hrs(d.hoursLost)} h lost · ${d.bounces} bounces`, value: d.hoursLost }));
     gainRef.current?.kill();
     const h = (gainRef.current = drawGain(svg, rows, { animate: !gainPlayed.current }));
@@ -140,11 +116,7 @@ export default function Insights() {
     return off;
   }, [wf, helpers, chordShown, themeTick]);
 
-  const c = useMemo(() => (chartsShown ? colors() : null), [chartsShown, themeTick]);
   const tiles = useMemo(() => (wf ? kpis(wf) : []), [wf]);
-  const skills = useMemo(() => (wf ? [...wf.byDept].sort((a, b) => b.hoursLost - a.hoursLost) : []), [wf]);
-  const maxLost = Math.max(1, ...skills.map((d) => d.hoursLost));
-  const barData = useMemo(() => (wf ? wf.byDept.map((d) => ({ name: helpers.dept(d.id)?.short ?? d.name, before: d.hopsBefore, after: d.hopsAfter })) : []), [wf, helpers]);
 
   return (
     <div ref={rootRef}>
@@ -163,7 +135,7 @@ export default function Insights() {
         </header>
 
         <div className="grid">
-          <section className="milk still card span2 title-card" aria-labelledby="kpiH" data-tour="2|At a glance|The numbers that matter. Each sparkline shows the 12-week trend.">
+          <section className="milk still card title-card kpi-card" aria-labelledby="kpiH" data-tour="2|At a glance|The numbers that matter. Each sparkline shows the 12-week trend; the after numbers come from live AVATAR requests.">
             <div className="bar" id="kpiH">At a glance<span className="live"><i />live</span></div>
             <div className="body"><div className="kpis" id="kpis">{tiles.map((t, i) => <Tile key={t.k} t={t} i={i} go={kpiGo} />)}</div></div>
           </section>
@@ -214,71 +186,7 @@ export default function Insights() {
             </div>
           </section>
 
-          <section className="milk still card" aria-labelledby="skH">
-            <div className="bar" id="skH">Hours lost by department<span className="sub" id="skTotal">{wf ? `${hrs(skills.reduce((n, d) => n + d.hoursLost, 0))} h total` : ""}</span></div>
-            <div className="body">
-              <div className={"skills" + (skillsGo ? " go" : "")} id="skills">
-                {skills.map((d, i) => (
-                  <div className="skill-row" role="img" aria-label={`${d.name}: ${hrs(d.hoursLost)} hours lost`} key={d.id}>
-                    <span>{d.name}</span>
-                    <div className="skill" style={{ "--w": `${((d.hoursLost / maxLost) * 100).toFixed(1)}%`, "--i": i } as CSSProperties}>
-                      <span className="fill" /><div className="lab"><span className="h">{hrs(d.hoursLost)} h</span></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="milk still card" aria-labelledby="arH">
-            <div className="bar" id="arH">Requests vs resolved<span className="sub">per week</span></div>
-            <div className="body">
-              <div className="legend" id="arLegend">{c ? <><span>{sw(c.lo)}Requests</span><span>{sw(c.person)}Resolved</span></> : null}</div>
-              <div className="chart" id="area">
-                {c && wf ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={wf.series} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="gReq" x1={0} y1={0} x2={0} y2={1}><stop offset="0%" stopColor={c.hi} stopOpacity={0.75} /><stop offset="100%" stopColor={c.hi} stopOpacity={0.05} /></linearGradient>
-                        <linearGradient id="gRes" x1={0} y1={0} x2={0} y2={1}><stop offset="0%" stopColor={c.person} stopOpacity={0.55} /><stop offset="100%" stopColor={c.person} stopOpacity={0.03} /></linearGradient>
-                      </defs>
-                      <CartesianGrid stroke="rgba(255,255,255,.7)" vertical={false} />
-                      <XAxis dataKey="week" {...axis(c)} /><YAxis {...axis(c)} allowDecimals={false} />
-                      <Tooltip content={<Tip />} cursor={{ stroke: "rgba(255,255,255,.9)", strokeWidth: 2 }} />
-                      <Area type="monotone" dataKey="requests" name="Requests" stroke={c.lo} strokeWidth={2.4} fill="url(#gReq)" isAnimationActive={!RM} animationDuration={1400} activeDot={{ r: 5, stroke: "#fff", strokeWidth: 2 }} />
-                      <Area type="monotone" dataKey="resolved" name="Resolved" stroke={c.person} strokeWidth={2.4} fill="url(#gRes)" isAnimationActive={!RM} animationDuration={1400} animationBegin={200} activeDot={{ r: 5, stroke: "#fff", strokeWidth: 2 }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : null}
-              </div>
-            </div>
-          </section>
-
-          <section className="milk still card" aria-labelledby="brH" data-tour="4|Fewer hops|How many people a request bounced through before AVATAR. The “after” bars fill in as live requests resolve.">
-            <div className="bar" id="brH">Hops before vs after AVATAR<span className="sub">avg per request</span></div>
-            <div className="body">
-              <div className="legend" id="brLegend">{c ? <><span>{sw("#9DB0C3")}Before</span><span>{sw(`linear-gradient(${c.hi},${c.lo})`)}With AVATAR · live</span></> : null}</div>
-              <div className="chart" id="bars">
-                {c && wf ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={barData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }} barGap={3}>
-                      <defs>
-                        <linearGradient id="gAfter" x1={0} y1={0} x2={0} y2={1}><stop offset="0%" stopColor={c.hi} /><stop offset="100%" stopColor={c.lo} /></linearGradient>
-                        <linearGradient id="gBefore" x1={0} y1={0} x2={0} y2={1}><stop offset="0%" stopColor="#C3D1DE" /><stop offset="100%" stopColor="#8CA0B4" /></linearGradient>
-                      </defs>
-                      <CartesianGrid stroke="rgba(255,255,255,.7)" vertical={false} />
-                      <XAxis dataKey="name" {...axis(c)} interval={0} tick={{ fill: c.ink2, fontSize: 11 }} /><YAxis {...axis(c)} />
-                      <Tooltip content={<Tip />} cursor={{ fill: "rgba(255,255,255,.35)" }} />
-                      <Bar dataKey="before" name="Before" fill="url(#gBefore)" radius={[6, 6, 0, 0]} isAnimationActive={!RM} animationDuration={1100} />
-                      <Bar dataKey="after" name="With AVATAR" fill="url(#gAfter)" radius={[6, 6, 0, 0]} isAnimationActive={!RM} animationDuration={1100} animationBegin={250} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : null}
-              </div>
-            </div>
-          </section>
-
-          <section className="milk still card span2" aria-labelledby="chH" data-tour="5|Where requests flow|Who sends work to whom. Hover a department to isolate its routes.">
+          <section className="milk still card span2" aria-labelledby="chH" data-tour="4|Where requests flow|Who sends work to whom. Hover a department to isolate its routes.">
             <div className="bar" id="chH">Where requests flow<span className="sub">department → department hand-offs</span></div>
             <div className="body">
               <div className="chord-grid">

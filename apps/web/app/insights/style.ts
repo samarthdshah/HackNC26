@@ -1,4 +1,4 @@
-// Verbatim page CSS from docs/design/v6/insights.html (rendered in a <style> that unmounts with the page).
+// Page CSS from docs/design/v6/insights.html, trimmed with the page (rendered in a <style> that unmounts with the page).
 export const css = `
 html,body{overflow-x:hidden}
 body[data-page=insights]{--page:var(--accent);--page-hi:var(--accent-hi)}   /* v7: title bar matches the other panels instead of dock amber */
@@ -42,30 +42,6 @@ header.top .when{display:flex;gap:10px;align-items:center}
 #gain #gainTxt{font:600 15px var(--font);fill:var(--ink)}
 .card-actions{display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:10px}
 
-/* Skill bars */
-.skills{display:grid;gap:9px}
-.skill-row{display:grid;grid-template-columns:118px minmax(0,1fr);align-items:center;gap:10px;font-size:14px;font-weight:600}
-.skill{position:relative;height:30px;border-radius:10px;overflow:hidden;background:rgb(255 255 255/.55);box-shadow:inset 0 1px 3px rgb(0 40 100/.22),0 1px 0 rgb(255 255 255/.8)}
-.skill .fill{position:absolute;inset:0 auto 0 0;width:var(--w);border-radius:10px;transform-origin:left;
-  background:linear-gradient(180deg,rgb(255 255 255/.55),rgb(255 255 255/.12) 49%,transparent 50%),linear-gradient(90deg,var(--accent-lo),var(--accent-hi));
-  box-shadow:inset 0 0 0 1px rgb(255 255 255/.45),2px 0 8px rgb(0 40 100/.2)}
-.skills:not(.go) .fill{transform:translateX(-102%)}
-.skills.go .fill{animation:skills 1.25s cubic-bezier(.17,.67,0,1) both;animation-delay:calc(var(--i) * 70ms)}
-@keyframes skills{0%{transform:translateX(-102%);opacity:0}100%{transform:translateX(0);opacity:1}}
-.skill .lab{position:relative;z-index:1;display:flex;justify-content:flex-end;align-items:center;height:100%;padding:0 10px;font-size:13px;font-weight:600}
-.skill .lab .h{color:var(--ink);text-shadow:0 1px 0 rgb(255 255 255/.7)}
-
-/* Recharts */
-.chart{height:280px}
-.tip{padding:10px 12px;font-size:13px;min-width:150px}
-.tip .t{font-weight:600;margin-bottom:4px}
-.tip .r{display:flex;justify-content:space-between;gap:14px;color:var(--ink-2)}
-.tip .r b{color:var(--ink);font-weight:600}
-.tip .r i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
-.recharts-cartesian-axis-tick-value{font-family:var(--font)}
-.legend{display:flex;gap:16px;font-size:13px;color:var(--ink-2);margin-bottom:6px}
-.legend span{display:inline-flex;align-items:center;gap:6px}
-
 /* Chord */
 .chord-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px;align-items:center}
 #chord{width:100%;max-height:520px;display:block}
@@ -80,7 +56,6 @@ header.top .when{display:flex;gap:10px;align-items:center}
 .detail .rows{margin-top:12px}
 .detail .row .v{margin-left:auto;font-weight:600}
 
-@media (max-width:1000px){ .kpis{grid-template-columns:repeat(3,minmax(0,1fr))} }
 @media (max-width:700px){
   main{padding:18px 12px 120px}
   header.top{flex-direction:column;align-items:flex-start}
@@ -88,11 +63,13 @@ header.top .when{display:flex;gap:10px;align-items:center}
   .grid{grid-template-columns:minmax(0,1fr)}
   .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
   .chord-grid{grid-template-columns:minmax(0,1fr)}
-  .skill-row{grid-template-columns:100px minmax(0,1fr)}
-  .chart{height:240px}
 }
-/* port: seven honest KPI tiles instead of v6's six (hours lost and hours saved are separate) */
-.kpis{grid-template-columns:repeat(7,minmax(0,1fr))}
-@media (max-width:1000px){ .kpis{grid-template-columns:repeat(4,minmax(0,1fr))} }
-@media (max-width:700px){ .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} }
+/* port: four KPI tiles in a 2x2 beside the gain radial; the card stretches to the radial's height */
+.kpi-card{display:flex;flex-direction:column}
+.kpi-card .body{flex:1;display:flex}
+.kpis{flex:1;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr}
+.kpi-card .tile{align-content:space-between;padding:14px 16px 12px}
+.kpi-card .tile .num{font-size:38px}
+.kpi-card .spark{max-width:110px}
+@media (max-width:1000px){ .kpi-card .tile .num{font-size:32px} }
 `;
