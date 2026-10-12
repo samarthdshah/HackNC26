@@ -57,8 +57,8 @@ export function mount(root: HTMLElement, ctx: { wf: WF }): () => void {
   const onResize = () => { sizeBubbles(); if (RM) drawBubbles(0); };
   addEventListener("resize", onResize);
 
-  const S = ctx.wf.stats;
-  const t1 = setTimeout(() => innerWidth > 1100 && toast("route", "Insights refreshed", `${hrs(S.hoursSaved)} hours handed back`,
+  const S = ctx.wf.stats, saved = ctx.wf.series.reduce((n, d) => n + d.hoursSaved, 0); // same 12-week total as the KPI tile
+  const t1 = setTimeout(() => innerWidth > 1100 && toast("route", "Insights refreshed", `${hrs(saved)} hours handed back`,
     `avg hops <span class="hops">${S.avgHopsBefore} → ${S.avgHopsAfter ?? "—"}</span>`), RM ? 0 : 1800);
   const t2 = setTimeout(hideToast, RM ? 4000 : 7500);
 
@@ -87,12 +87,14 @@ export function drawGain(svg: SVGSVGElement, rows: GainRow[], opts: { animate: b
     const jt = mk("text", { class: "jt", x: 484, y: y + 21 }, g); jt.textContent = d.detail;
     const v = mk("text", { class: "val", "text-anchor": "middle", "dominant-baseline": "central" }, valsG); v.textContent = hrs(d.value);
   });
-  const lines = q<SVGPathElement>("#top-lines .line"), circs = q<SVGCircleElement>("#circles .circ"), vals = q<SVGTextElement>("#vals .val");
+  // Fewer than five departments with hours lost: hide the outer rings instead of drawing empty ones.
+  const n = rows.length, ring = <T extends Element>(s: string) => { const all = q<T>(s); all.forEach((e, i) => e.setAttribute("display", i < n ? "inline" : "none")); return all.slice(0, n); };
+  const lines = ring<SVGPathElement>("#top-lines .line"), circs = ring<SVGCircleElement>("#circles .circ"), vals = q<SVGTextElement>("#vals .val");
   // the pen placed values on the circles once they stopped: same idea, measured from the arc
   vals.forEach((v, i) => { const L = lines[i], p = L.getPointAtLength(L.getTotalLength() * percs[i]); v.setAttribute("x", String(p.x)); v.setAttribute("y", String(p.y)); });
 
-  const centre = one("#center-circ"), txt = one("#gainTxt"), horz = q("#horz-lines line"), people = q("#people .person");
-  const baseP = q("#base-lines path"), midP = q("#mid-lines path");
+  const centre = one("#center-circ"), txt = one("#gainTxt"), horz = ring("#horz-lines line"), people = q("#people .person");
+  const baseP = ring("#base-lines path"), midP = ring("#mid-lines path");
   gsap.set(svg, { visibility: "visible" });
   gsap.set(centre, { transformOrigin: "50% 50%" });
   gsap.set(horz, { transformOrigin: "0% 50%" });
@@ -174,8 +176,9 @@ export function drawChord(svgEl: SVGSVGElement, detailEl: HTMLElement, wf: WF, h
     const people = d.subs.flatMap((s) => s.people);
     const chips = [`<span class="chip info">${sum(out)} sent</span>`, `<span class="chip info">${sum(inn)} received</span>`];
     if (bd) {
-      chips.push(`<span class="chip">${bd.hopsBefore} → ${bd.hopsAfter ?? "live"} hops</span>`);
-      chips.push(`<span class="chip">${hrs(bd.hoursLost)} h lost</span>`);
+      // hops are for requests this department raised; hours lost are for requests it bounced
+      chips.push(`<span class="chip" title="Average hops for requests this department raised">${bd.hopsBefore} → ${bd.hopsAfter ?? "—"} hops on its asks</span>`);
+      chips.push(`<span class="chip" title="Hours requests sat here before it said “not us”">${hrs(bd.hoursLost)} h lost here</span>`);
     }
     detailEl.innerHTML = `<div class="k">${esc(d.subs.map((s) => s.name).join(" · "))}</div><div class="big" style="display:flex;align-items:center;gap:10px"><span class="dot" style="width:18px;height:18px;background:${cols[i]}"></span>${esc(d.name)}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">${chips.join("")}</div>

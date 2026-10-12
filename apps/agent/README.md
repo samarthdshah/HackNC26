@@ -17,6 +17,7 @@ Agent server: Photon Spectrum, multi-agent LangGraph orchestration on Gemini, ap
 | `npm run dev` | Starts every surface in `SURFACES`, restarts on file changes |
 | `npm run terminal` | Terminal chat only (tuichat downloads on first run). No phone needed |
 | `npm run sim` | Scripted demo flows through the real graphs and Gemini, no Spectrum. `npm run sim -- "welcome lunch"` runs one. |
+| `npm run autoreply -- lunch` | Answers every ask (RSVP, approval, task) as the person asked, from the live feed, so one phone can run a whole scenario. Skips people bound to a phone. Scenarios: `auto`, `lunch`, `transfer`, `leo`, `outage`, `room`, `leave`, `dock`; `--delay ms`, `--skip p_x,p_y` |
 | `npm run voice:test -- "text"` | Sends an ElevenLabs voice note to `DEMO_PHONE` over iMessage |
 | `npm run tiger:test` | One live request through C's events trigger: prints the derived request, hops and edge history, then cleans up. Needs the owner login: `TIGER_DATABASE_URL` as `tsdbadmin` with its password, or `TIGER_OWNER_PASSWORD` (`-- --keep` leaves the rows for Insights) |
 | `npm run darwin:test` | Checkout incident with Darwin's approved rule: expects "Routing to Platform Engineering directly (Darwin: …)" and the ask to Aisha |
